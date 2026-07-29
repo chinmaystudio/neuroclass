@@ -1,0 +1,6 @@
+{
+  "name": "NeuroClass AI - Ultra Local",
+  "description": "High-accuracy, 100% local AI proctoring and classroom intelligence system with biometric attendance.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
