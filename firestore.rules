@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Explicit Session Guardian Rules
+    match /user_roles/{email} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if request.resource.data.email == email
+                           && request.resource.data.role in ['teacher', 'student', 'admin'];
+      allow delete: if false;
+    }
+
+    // Knowledge Store, Evaluations, Audit Logs, and Teachers Rules
+    match /knowledge_store/{id} {
+      allow read, write: if true;
+    }
+    match /evaluations/{id} {
+      allow read, write: if true;
+    }
+    match /audit_logs/{id} {
+      allow read, write: if true;
+    }
+    match /teachers/{id} {
+      allow read, write: if true;
+    }
+  }
+}

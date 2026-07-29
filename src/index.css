@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:ital,wght@1,900&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-editorial-bg: #ffffff;
+  --color-glass: rgba(0, 0, 0, 0.03);
+  --color-glass-border: rgba(0, 0, 0, 0.05);
+
+  --color-dark-editorial-bg: #000000;
+  --color-dark-glass: rgba(255, 255, 255, 0.05);
+  --color-dark-glass-border: rgba(255, 255, 255, 0.1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply antialiased selection:bg-blue-500/30 dark:selection:bg-white/30 selection:text-slate-900 dark:selection:text-white overflow-x-hidden;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+}
+
+@layer utilities {
+  .editorial-glass {
+    @apply bg-white/40 dark:bg-white/5 backdrop-blur-[20px] border border-black/5 dark:border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.05)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transform-gpu;
+    backface-visibility: hidden;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#3b82f6] via-[#a855f7] to-[#ec4899];
+  }
+
+  .glow-btn {
+    @apply bg-slate-900 dark:bg-white text-white dark:text-black rounded-[100px] font-semibold transition-all duration-300 shadow-xl dark:shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-2xl dark:hover:shadow-[0_0_30px_rgba(255,255,255,0.4)] active:scale-95;
+  }
+
+  .scan-box {
+    @apply border-2 border-[#00ff00] relative;
+  }
+
+  .scan-box::after {
+    content: 'STUDENT ID: 8829';
+    @apply absolute -top-[25px] left-0 bg-[#00ff00] text-black text-[10px] font-bold px-1.5 py-0.5;
+  }
+
+  .cheating-alert-box {
+    @apply border-2 border-[#ff4444] animate-pulse;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 dark:bg-white/10 rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-300 dark:bg-white/20;
+  }
+}

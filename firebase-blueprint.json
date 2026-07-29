@@ -1,0 +1,203 @@
+{
+  "entities": {
+    "Classroom": {
+      "title": "Classroom",
+      "description": "Represents a virtual classroom session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "user_id": { "type": "string" },
+        "students": { "type": "integer" },
+        "attendance": { "type": "string" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "code", "user_id"]
+    },
+    "Test": {
+      "title": "Test",
+      "description": "A test or assignment within a classroom",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classroom_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "test_data": { "type": "object" },
+        "status": { "type": "string" },
+        "start_time": { "type": "string", "format": "date-time" },
+        "end_time": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "classroom_id", "user_id", "title"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A student enrolled in a classroom",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "classroom_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "roll_number": { "type": "string" },
+        "phone": { "type": "string" },
+        "avatar": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "classroom_id", "user_id"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Record of a student's presence in a class",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "student_id": { "type": "string" },
+        "classroom_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "student_id", "classroom_id", "user_id"]
+    },
+    "Attempt": {
+      "title": "Attempt",
+      "description": "A student's attempt at a test",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "test_id": { "type": "string" },
+        "student_id": { "type": "string" },
+        "classroom_id": { "type": "string" },
+        "answers": { "type": "object" },
+        "violations": { "type": "array" },
+        "score": { "type": "number" },
+        "status": { "type": "string" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "finished_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "test_id", "student_id", "classroom_id"]
+    },
+    "UserRole": {
+      "title": "UserRole",
+      "description": "Binds an email address to a single immutable role (Session Guardian)",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    },
+    "KnowledgeAsset": {
+      "title": "KnowledgeAsset",
+      "description": "A key, rubric or instruction document in the RAG Knowledge Store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "subject": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "type", "subject", "content"]
+    },
+    "EvaluationRecord": {
+      "title": "EvaluationRecord",
+      "description": "A completed evaluation of a student's submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "studentName": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "subject": { "type": "string" },
+        "assessmentName": { "type": "string" },
+        "marksObtained": { "type": "number" },
+        "totalMarks": { "type": "number" },
+        "percentage": { "type": "number" },
+        "grade": { "type": "string" },
+        "feedback": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "studentName", "rollNumber", "subject", "assessmentName", "marksObtained", "totalMarks", "percentage", "grade", "feedback", "date"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Security and activity log of system events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "actor": { "type": "string" },
+        "action": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "actor", "action", "details"]
+    },
+    "TeacherRecord": {
+      "title": "TeacherRecord",
+      "description": "Registration record of an approved teacher in the system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "department": { "type": "string" },
+        "status": { "type": "string" },
+        "joinedAt": { "type": "string" },
+        "classesCount": { "type": "integer" }
+      },
+      "required": ["id", "name", "email", "department", "status"]
+    }
+  },
+  "firestore": {
+    "/classrooms/{classId}": {
+      "schema": "Classroom",
+      "description": "Main collection for classrooms"
+    },
+    "/tests/{testId}": {
+      "schema": "Test",
+      "description": "Main collection for tests"
+    },
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Main collection for students"
+    },
+    "/attendance/{attId}": {
+      "schema": "Attendance",
+      "description": "Main collection for attendance records"
+    },
+    "/attempts/{attemptId}": {
+      "schema": "Attempt",
+      "description": "Main collection for test attempts"
+    },
+    "/user_roles/{email}": {
+      "schema": "UserRole",
+      "description": "Role bounds collection for session guardian"
+    },
+    "/knowledge_store/{id}": {
+      "schema": "KnowledgeAsset",
+      "description": "Collection for keys and rubrics"
+    },
+    "/evaluations/{id}": {
+      "schema": "EvaluationRecord",
+      "description": "Collection for graded papers and essays"
+    },
+    "/audit_logs/{id}": {
+      "schema": "AuditLog",
+      "description": "Collection for secure audit logs"
+    },
+    "/teachers/{id}": {
+      "schema": "TeacherRecord",
+      "description": "Collection for academic teachers"
+    }
+  }
+}
