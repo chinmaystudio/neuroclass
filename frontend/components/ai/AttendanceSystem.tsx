@@ -6,7 +6,7 @@ import { EmailService } from '../../services/ml/EmailService';
 import { supabase } from '../../database/supabase';
 import { logEvent } from '../../database/analytics';
 import { getApiUrl } from '../../config/apiConfig';
-import { finalizeAttendanceSession, sendAttendanceFrame, startAttendanceSession } from '../../services/api/attendance';
+import { finalizeAttendanceSession, reviewAttendanceObservation, sendAttendanceFrame, startAttendanceSession } from '../../services/api/attendance';
 
 interface AttendanceSystemProps {
   classId: string;
@@ -28,6 +28,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
   const [identified, setIdentified] = useState<any[]>([]);
+  const [finalReport, setFinalReport] = useState<any | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [selectedStudentForReg, setSelectedStudentForReg] = useState<string>('');
@@ -80,11 +81,14 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       if (!response.ok) throw new Error(payload.error || 'Could not open an attendance session.');
       await startAttendanceSession(classId, payload.session.id);
       const nextSession = { ...payload.session, pin: payload.pin, challengeToken: payload.challengeToken };
+      identifiedIdsRef.current.clear();
+      setIdentified([]);
+      setFinalReport(null);
       setActiveSession(nextSession);
       setSessionNotice(`Session PIN: ${payload.pin}. ${payload.warning || 'Session is ready.'}`);
       try {
         await startCamera();
-        setSessionNotice(`Session PIN: ${payload.pin}. Camera is ready; click Scan Group to analyze the classroom.`);
+        setSessionNotice(`Session PIN: ${payload.pin}. Camera is ready; start live face preview or capture a photo to analyze.`);
       } catch (cameraStartError: any) {
         setCameraError(cameraStartError.message || 'Session opened, but camera access is still required.');
       }
@@ -115,12 +119,24 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       if (!response.ok) throw new Error(payload.error || 'Could not close an attendance session.');
       setActiveSession(null);
       setRegistrationSamples([]);
-      setSessionNotice(null);
+      setFinalReport(payload.report || null);
+      setSessionNotice(payload.report ? `Session closed. ${payload.report.presentCount} present out of ${payload.report.rosterCount}. Final report is ready.` : 'Session closed.');
     } catch (error: any) {
       setCameraError(error.message || 'Could not close an attendance session.');
     } finally {
       setSessionBusy(false);
     }
+  };
+
+  const downloadFinalReport = () => {
+    if (!finalReport) return;
+    const blob = new Blob([JSON.stringify(finalReport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `attendance-report-${finalReport.sessionId || 'session'}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   const recordTeacherAttendance = async (student: any, confidence: number, modeName: string) => {
@@ -249,7 +265,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
         confidence: confidenceToPercent(match),
         bbox: [Number(match.bbox[0]), Number(match.bbox[1]), Number(match.bbox[2]), Number(match.bbox[3])] as [number, number, number, number],
       }))
-      .filter((box) => box.status === 'PRESENT' && Boolean(box.studentId));
+      .filter((box) => box.bbox[2] > box.bbox[0] && box.bbox[3] > box.bbox[1]);
     setLiveBoxes(boxes);
   };
 
@@ -274,8 +290,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
       const results = Array.isArray(result.results) ? result.results : [];
       updateLiveBoxes(results);
-      addIdentifiedResults(results);
-      setSessionNotice(results.length ? `${results.length} face result${results.length === 1 ? '' : 's'} analyzed. Green boxes are confirmed present.` : 'Scanning live… no faces returned in this frame.');
+      setSessionNotice(results.length ? `${results.length} face result${results.length === 1 ? '' : 's'} detected. Click Capture Photo & Analyze to record presence.` : 'Scanning live… no faces returned in this frame.');
     } catch (error: any) {
       setCameraError(error.message || 'Live group scan failed.');
       stopLiveGroupScan('Live group scan stopped because the frame request failed.');
@@ -370,34 +385,36 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     }
   };
 
-  const captureAndProcessGroup = async () => {
+  const captureAndProcessGroupPhoto = async () => {
     setIsAnalyzing(true);
+    setCameraError(null);
     try {
       const sessionForScan = activeSession || await openAttendanceSession();
       if (!sessionForScan) return;
       if (!isCameraActive && !streamRef.current) await startCamera();
       if (!videoRef.current) throw new Error('Camera preview is not ready.');
       const blob = await captureFrameBlob(videoRef.current);
-      if (!blob) throw new Error('Could not capture frame');
-      
+      if (!blob) throw new Error('Could not capture frame.');
+
       const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
-      
-      if (result.results && result.results.length > 0) {
-        for (const match of result.results) {
-          if (match.status === 'PRESENT' && match.student_id) {
-            if (!identified.find(i => i.studentId === match.student_id)) {
-              setIdentified(prev => [{ studentId: match.student_id, name: match.name, confidence: match.confidence === 'HIGH' ? 95 : 75 }, ...prev]);
-              const student = students.find(s => s.id === match.student_id);
-              if (student) {
-                logEvent('Attendance', 'Student Identified', student.name);
-                await EmailService.sendAttendanceEmail(student.email, student.name, className);
-              }
-            }
-          }
+      const results = Array.isArray(result.results) ? result.results : [];
+      updateLiveBoxes(results);
+      const confirmed: any[] = [];
+      for (const match of results) {
+        if (match.status !== 'PRESENT' || !match.student_id) continue;
+        if (match.observation_id) {
+          await reviewAttendanceObservation(sessionForScan.id, match.observation_id, 'PRESENT', match.student_id);
+        } else {
+          const student = students.find((item) => item.id === match.student_id);
+          if (!student) continue;
+          await recordTeacherAttendance(student, confidenceToPercent(match), 'manual-capture');
         }
+        confirmed.push(match);
       }
+      addIdentifiedResults(confirmed);
+      setSessionNotice(`Photo analyzed: ${confirmed.length} student${confirmed.length === 1 ? '' : 's'} marked present. Click again to capture another photo.`);
     } catch (error: any) {
-      setCameraError(error.message || 'Failed to record group attendance via AI service.');
+      setCameraError(error.message || 'Failed to analyze and record the captured photo.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -529,16 +546,41 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
                 {registrationSamples.length < 5 ? `Capture Sample (${registrationSamples.length}/5)` : 'Upload Face Samples'}
               </button>
             </div>
+          ) : mode === 'group' ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  disabled={!activeSession || !isCameraActive || isAnalyzing}
+                  title="Capture one photo, send it to the secure ML service, and mark confirmed present students in the Attendance Log."
+                  onClick={captureAndProcessGroupPhoto}
+                  className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isAnalyzing ? 'Analyzing Photo…' : 'Capture Photo & Analyze'}
+                </button>
+                <button type="button" onClick={toggleCamera} className="px-6 py-4 bg-rose-500/10 text-rose-500 rounded-[20px]">
+                  <Camera size={20} />
+                </button>
+              </div>
+              <button
+                type="button"
+                disabled={sessionBusy || !activeSession || !isCameraActive}
+                onClick={isLiveScanning ? () => stopLiveGroupScan('Live face preview paused. Capture a photo when ready.') : startLiveGroupScan}
+                className={`w-full py-3 rounded-[18px] font-bold uppercase tracking-widest text-[9px] disabled:cursor-not-allowed disabled:opacity-50 ${isLiveScanning ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}
+              >
+                {isLiveScanning ? 'Pause Live Face Preview' : 'Start Live Face Preview'}
+              </button>
+            </div>
           ) : (
             <div className="flex gap-4">
-              <button 
+              <button
                 type="button"
                 disabled={isAnalyzing}
-                title={mode === 'group' ? (isLiveScanning ? 'Stop the continuous live group scan.' : 'Open a session if needed and continuously scan classroom frames.') : (activeSession && isCameraActive ? 'Capture a frame and send it to the secure Vercel attendance gateway.' : 'Open a session and activate the camera before scanning.')}
-                onClick={mode === 'group' ? (isLiveScanning ? () => stopLiveGroupScan() : startLiveGroupScan) : processSingle}
-                className={`flex-1 py-4 ${isLiveScanning ? 'bg-rose-600' : 'bg-blue-600'} text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-wait disabled:opacity-60`}
+                title={activeSession && isCameraActive ? 'Capture a frame and send it to the secure Vercel attendance gateway.' : 'Open a session and activate the camera before scanning.'}
+                onClick={processSingle}
+                className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-wait disabled:opacity-60"
               >
-                {mode === 'single' ? (activeSession ? 'Analyze Individual' : 'Start Session & Analyze') : (isLiveScanning ? 'Stop Live Group Scan' : 'Start Live Group Scan')}
+                {activeSession ? 'Analyze Individual' : 'Start Session & Analyze'}
               </button>
               <button type="button" onClick={toggleCamera} className="px-6 py-4 bg-rose-500/10 text-rose-500 rounded-[20px]">
                 <Camera size={20} />
@@ -549,6 +591,17 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       </div>
 
       <div className="bg-white dark:bg-slate-800/40 rounded-[24px] border border-slate-200 dark:border-slate-800 p-6 flex flex-col">
+        {finalReport && (
+          <div className="mb-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Final attendance report</p>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+              <div><p className="text-lg font-bold text-emerald-600">{finalReport.presentCount}</p><p className="text-[8px] uppercase tracking-wide opacity-60">Present</p></div>
+              <div><p className="text-lg font-bold">{finalReport.absentCount}</p><p className="text-[8px] uppercase tracking-wide opacity-60">Absent</p></div>
+              <div><p className="text-lg font-bold">{finalReport.attendanceRate}%</p><p className="text-[8px] uppercase tracking-wide opacity-60">Rate</p></div>
+            </div>
+            <button type="button" onClick={downloadFinalReport} className="mt-3 w-full rounded-xl bg-emerald-600 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-white">Download Final Report</button>
+          </div>
+        )}
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">Attendance Log</h3>
           <span className="text-[10px] font-bold text-blue-500">{identified.length} Identified</span>

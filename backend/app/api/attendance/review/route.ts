@@ -41,12 +41,14 @@ export async function POST(request: Request): Promise<Response> {
     if (observationError || !observation) throw new GatewayError('Attendance observation not found', 404);
 
     const studentId = body.student_id ? requireUuid(body.student_id, 'student_id') : observation.student_id;
+    let enrolledStudent: { id: string; name: string } | null = null;
     if (studentId) {
-      const { data: student, error: studentError } = await auth.db.from('students').select('id').eq('id', studentId).eq('classroom_id', session.classroom_id).maybeSingle();
+      const { data: student, error: studentError } = await auth.db.from('students').select('id,name').eq('id', studentId).eq('classroom_id', session.classroom_id).maybeSingle();
       if (studentError || !student) throw new GatewayError('student_id is not enrolled in this classroom', 400);
+      enrolledStudent = student;
     }
 
-    const { error: updateError } = await auth.db.from('attendance_observations').update({ student_id: studentId || null, status: decision, verification_method: 'MANUAL' }).eq('id', observationId).eq('session_id', sessionId);
+    const { error: updateError } = await auth.db.from('attendance_observations').update({ student_id: studentId || null, status: decision, verification: 'MANUAL' }).eq('id', observationId).eq('session_id', sessionId);
     if (updateError) throw new GatewayError('Unable to persist review decision', 500);
 
     if (studentId && decision !== 'ABSENT') {
@@ -54,8 +56,10 @@ export async function POST(request: Request): Promise<Response> {
         session_id: sessionId,
         classroom_id: session.classroom_id,
         student_id: studentId,
+        student_name: enrolledStudent?.name || 'Student',
         status: decision === 'LATE' ? 'Late' : 'Present',
         confidence: observation.confidence,
+        verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
         verification_method: 'MANUAL',
       }, { onConflict: 'session_id,student_id' });
       if (error) throw new GatewayError('Unable to persist reviewed attendance', 500);

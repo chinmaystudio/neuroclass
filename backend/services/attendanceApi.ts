@@ -97,8 +97,28 @@ export async function closeAttendanceSession(request: Request): Promise<Response
     const now = new Date().toISOString();
     const { data: session, error } = await supabase.from('attendance_sessions').update({ status: 'closed', closed_at: now, ends_at: now }).eq('id', sessionId).eq('teacher_id', user.id).select('id,classroom_id,status,closed_at').single();
     if (error) return json({ error: 'Unable to close the attendance session.' }, 500);
-    await audit({ classroom_id: current.classroom_id, session_id: sessionId, actor_user_id: user.id, actor_role: 'teacher', event_type: 'session_closed', payload: {} });
-    return json({ session });
+
+    const [{ count: rosterCount, error: rosterError }, { data: attendanceRows, error: attendanceError }, { count: observationCount, error: observationError }] = await Promise.all([
+      supabase.from('students').select('id', { count: 'exact', head: true }).eq('classroom_id', current.classroom_id),
+      supabase.from('attendance').select('id,student_id,student_name,status,verified_method,verified_at,confidence').eq('session_id', sessionId).order('verified_at', { ascending: true }),
+      supabase.from('attendance_observations').select('id', { count: 'exact', head: true }).eq('session_id', sessionId),
+    ]);
+    if (rosterError || attendanceError || observationError) console.error('[attendance.report] summary query failed', { rosterError, attendanceError, observationError });
+    const entries = attendanceRows || [];
+    const presentCount = entries.filter((entry) => entry.status === 'Present' || entry.status === 'Late').length;
+    const report = {
+      sessionId,
+      classroomId: current.classroom_id,
+      closedAt: now,
+      rosterCount: rosterCount || 0,
+      presentCount,
+      absentCount: Math.max(0, (rosterCount || 0) - presentCount),
+      attendanceRate: rosterCount ? Math.round((presentCount / rosterCount) * 100) : 0,
+      observationCount: observationCount || 0,
+      entries,
+    };
+    await audit({ classroom_id: current.classroom_id, session_id: sessionId, actor_user_id: user.id, actor_role: 'teacher', event_type: 'session_closed', payload: { report: { rosterCount: report.rosterCount, presentCount: report.presentCount, observationCount: report.observationCount } } });
+    return json({ session, report });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to close the attendance session.' }, error.status || 500);
   }
