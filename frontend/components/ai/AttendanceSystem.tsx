@@ -22,6 +22,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   const [students, setStudents] = useState<any[]>([]);
   const [identified, setIdentified] = useState<any[]>([]);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [selectedStudentForReg, setSelectedStudentForReg] = useState<string>('');
   const [activeSession, setActiveSession] = useState<any>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
@@ -46,6 +47,8 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
 
   const openAttendanceSession = async () => {
     setSessionBusy(true);
+    setCameraError(null);
+    setSessionNotice(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again before opening attendance.');
@@ -58,7 +61,13 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       if (!response.ok) throw new Error(payload.error || 'Could not open an attendance session.');
       await startAttendanceSession(classId, payload.session.id);
       setActiveSession({ ...payload.session, pin: payload.pin, challengeToken: payload.challengeToken });
-      setCameraError(`Session PIN: ${payload.pin}. ${payload.warning}`);
+      setSessionNotice(`Session PIN: ${payload.pin}. ${payload.warning || 'Session is ready.'}`);
+      try {
+        await startCamera();
+        setSessionNotice(`Session PIN: ${payload.pin}. Camera is ready; click Scan Group to analyze the classroom.`);
+      } catch (cameraStartError: any) {
+        setCameraError(cameraStartError.message || 'Session opened, but camera access is still required.');
+      }
     } catch (error: any) {
       setCameraError(error.message || 'Could not open an attendance session.');
     } finally {
@@ -82,6 +91,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       if (!response.ok) throw new Error(payload.error || 'Could not close an attendance session.');
       setActiveSession(null);
       setRegistrationSamples([]);
+      setSessionNotice(null);
     } catch (error: any) {
       setCameraError(error.message || 'Could not close an attendance session.');
     } finally {
@@ -109,21 +119,48 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     return payload.attendance;
   };
 
+  const startCamera = async () => {
+    if (isCameraActive && streamRef.current) return;
+    setCameraError(null);
+    const stream = await CameraService.startCamera();
+    const video = videoRef.current;
+    if (!video) {
+      CameraService.stopCamera(stream);
+      throw new Error('Camera preview is not ready. Please try again.');
+    }
+    streamRef.current = stream;
+    video.srcObject = stream;
+    await new Promise<void>((resolve) => {
+      if (video.readyState >= 1) {
+        resolve();
+        return;
+      }
+      const onMetadata = () => {
+        video.removeEventListener('loadedmetadata', onMetadata);
+        resolve();
+      };
+      video.addEventListener('loadedmetadata', onMetadata, { once: true });
+      window.setTimeout(resolve, 1500);
+    });
+    await video.play().catch(() => undefined);
+    setIsCameraActive(true);
+  };
+
   const toggleCamera = async () => {
-    if (isCameraActive) {
+    if (isCameraActive || streamRef.current) {
       CameraService.stopCamera(streamRef.current);
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
       setIsCameraActive(false);
+      setSessionNotice(activeSession ? 'Session is open. Activate the camera before scanning.' : null);
       return;
     }
 
     try {
-      setCameraError(null);
-      const stream = await CameraService.startCamera();
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setIsCameraActive(true);
+      await startCamera();
+      setSessionNotice(activeSession ? 'Camera is ready. Click Scan Group to analyze the classroom.' : 'Camera is ready. Open an attendance session before scanning.');
     } catch (err: any) {
-      setCameraError(err.message || "Could not access camera.");
+      setCameraError(err.message || 'Could not access camera.');
     }
   };
 
@@ -201,8 +238,8 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   };
 
   const captureAndProcessGroup = async () => {
-    if (!videoRef.current || !activeSession) {
-      setCameraError('Open an attendance session before scanning students.');
+    if (!videoRef.current || !isCameraActive || !activeSession) {
+      setCameraError(!activeSession ? 'Open an attendance session before scanning students.' : 'Activate the camera before scanning students.');
       return;
     }
     setIsAnalyzing(true);
@@ -293,6 +330,12 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
             </div>
           )}
 
+          {sessionNotice && !isAnalyzing && (
+            <div className="absolute left-4 right-4 bottom-4 z-25 rounded-xl bg-blue-950/85 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-blue-100">
+              {sessionNotice}
+            </div>
+          )}
+
           {isAnalyzing && (
             <div className="absolute inset-0 z-30 pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-4 text-white">
@@ -303,7 +346,11 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
           )}
         </div>
 
-        <div className="relative z-30 pointer-events-auto flex flex-col gap-4">
+                  <div className="relative z-30 pointer-events-auto flex flex-col gap-4">
+            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-slate-800/60 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">
+              {activeSession ? (isCameraActive ? 'Ready: session and camera are active.' : 'Next step: activate the camera.') : 'Next step: open an attendance session.'}
+            </div>
+
           {mode === 'register' ? (
             <div className="flex flex-col gap-3">
               <select 
@@ -329,9 +376,10 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
             <div className="flex gap-4">
               <button 
                 type="button"
-                disabled={!isCameraActive || !activeSession || isAnalyzing}
+                disabled={isAnalyzing}
+                title={activeSession && isCameraActive ? 'Capture a frame and send it to the secure Vercel attendance gateway.' : 'Open a session and activate the camera before scanning.'}
                 onClick={mode === 'single' ? processSingle : captureAndProcessGroup}
-                className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px]"
+                className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-wait disabled:opacity-60"
               >
                 {mode === 'single' ? 'Analyze Individual' : 'Scan Group (10-12 Photos recommended)'}
               </button>
