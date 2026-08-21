@@ -242,7 +242,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 bg-slate-50 dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800">
+    <div className="relative z-20 pointer-events-auto grid grid-cols-1 md:grid-cols-2 gap-8 p-6 bg-slate-50 dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800">
       <div className="space-y-6">
         <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 flex items-center justify-between gap-4">
           <div>
@@ -255,20 +255,23 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
             <button onClick={openAttendanceSession} disabled={sessionBusy} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest disabled:opacity-40">{sessionBusy ? 'Opening…' : 'Open session'}</button>
           )}
         </div>
-        <div className="flex gap-4 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit">
+        <div className="relative z-30 pointer-events-auto flex gap-4 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit">
           <button 
+            type="button"
             onClick={() => setMode('single')}
             className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'single' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
           >
             One-by-One
           </button>
           <button 
+            type="button"
             onClick={() => setMode('group')}
             className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'group' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
           >
             Group Mode
           </button>
           <button 
+            type="button"
             onClick={() => setMode('register')}
             className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'register' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
           >
@@ -280,7 +283,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
           
           {!isCameraActive && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md text-white gap-4 p-6 text-center">
+            <div className="absolute inset-0 z-20 pointer-events-auto flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md text-white gap-4 p-6 text-center">
               {cameraError ? (
                 <>
                   <AlertCircle size={48} className="text-rose-500 mb-2" />
@@ -297,7 +300,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
           )}
 
           {isAnalyzing && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="absolute inset-0 z-30 pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-4 text-white">
                 <Loader2 className="animate-spin" size={32} />
                 <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Local Neural Engine Active...</p>
@@ -306,7 +309,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
           )}
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="relative z-30 pointer-events-auto flex flex-col gap-4">
           {mode === 'register' ? (
             <div className="flex flex-col gap-3">
               <select 
@@ -320,6 +323,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
                 ))}
               </select>
               <button 
+                type="button"
                 disabled={!isCameraActive || !selectedStudentForReg || isAnalyzing}
                 onClick={registerFace}
                 className="w-full py-4 bg-emerald-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px]"
@@ -330,13 +334,14 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
           ) : (
             <div className="flex gap-4">
               <button 
+                type="button"
                 disabled={!isCameraActive || !activeSession || isAnalyzing}
                 onClick={mode === 'single' ? processSingle : captureAndProcessGroup}
                 className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px]"
               >
                 {mode === 'single' ? 'Analyze Individual' : 'Scan Group (10-12 Photos recommended)'}
               </button>
-              <button onClick={toggleCamera} className="px-6 py-4 bg-rose-500/10 text-rose-500 rounded-[20px]">
+              <button type="button" onClick={toggleCamera} className="px-6 py-4 bg-rose-500/10 text-rose-500 rounded-[20px]">
                 <Camera size={20} />
               </button>
             </div>
