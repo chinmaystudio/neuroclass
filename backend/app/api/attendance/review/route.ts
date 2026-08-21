@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { handleOptions, withCors } from '../../../../lib/cors';
 import {
   GatewayError,
   getAuthorizedSession,
@@ -8,6 +9,10 @@ import {
 } from '../../../../lib/aiGateway';
 
 export const runtime = 'nodejs';
+
+export async function OPTIONS(request: Request): Promise<Response> {
+  return handleOptions(request);
+}
 
 const DECISION_MAP: Record<string, 'PRESENT' | 'ABSENT' | 'LATE'> = {
   PRESENT: 'PRESENT',
@@ -56,8 +61,8 @@ export async function POST(request: Request): Promise<Response> {
       if (error) throw new GatewayError('Unable to persist reviewed attendance', 500);
     }
 
-    return NextResponse.json({ session_id: sessionId, observation_id: observationId, decision, student_id: studentId || null, status: 'REVIEW_RECORDED' });
+    return withCors(NextResponse.json({ session_id: sessionId, observation_id: observationId, decision, student_id: studentId || null, status: 'REVIEW_RECORDED' }), request.headers.get('origin'));
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, request);
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { handleOptions, withCors } from '../../../../lib/cors';
 import {
   assertStudentOwnsClassroom,
   GatewayError,
@@ -9,6 +10,10 @@ import {
 } from '../../../../lib/aiGateway';
 
 export const runtime = 'nodejs';
+
+export async function OPTIONS(request: Request): Promise<Response> {
+  return handleOptions(request);
+}
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -22,7 +27,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const response = await forwardMultipartToRender('/ai/v1/enrollment', form, ['student_id', 'classroom_id', 'registration_session_id', 'files']);
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) return NextResponse.json({ error: 'AI Service rejected the enrollment', detail: data }, { status: response.status });
+    if (!response.ok) return withCors(NextResponse.json({ error: 'AI Service rejected the enrollment', detail: data }, { status: response.status }), request.headers.get('origin'));
 
     if (data.success) {
       const acceptedSamples = Number(data.accepted_samples || 0);
@@ -42,7 +47,7 @@ export async function POST(request: Request): Promise<Response> {
       if (studentStatusError) throw new GatewayError('Unable to update student registration status', 500);
     }
 
-    return NextResponse.json({
+    return withCors(NextResponse.json({
       success: Boolean(data.success),
       status: data.success ? 'accepted' : 'rejected',
       student_id: studentId,
@@ -50,8 +55,8 @@ export async function POST(request: Request): Promise<Response> {
       accepted_samples: Number(data.accepted_samples || 0),
       rejected_samples: Number(data.rejected_samples || 0),
       rejection_reasons: data.rejection_reasons || [],
-    }, { status: response.status });
+    }, { status: response.status }), request.headers.get('origin'));
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, request);
   }
 }

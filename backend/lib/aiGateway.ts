@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { supabase } from '../database/supabase';
+import { withCors } from './cors';
 
 export type GatewayAuth = {
   user: User;
@@ -21,10 +22,10 @@ function adminDb(): SupabaseClient {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-export function jsonError(error: unknown): Response {
+export function jsonError(error: unknown, request?: Request): Response {
   const status = error instanceof GatewayError ? error.status : 500;
   const message = error instanceof Error ? error.message : 'Internal Server Error';
-  return Response.json({ error: message }, { status });
+  return withCors(Response.json({ error: message }, { status }), request?.headers.get('origin'));
 }
 
 export async function requireGatewayAuth(request: Request): Promise<GatewayAuth> {

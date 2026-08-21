@@ -1,4 +1,5 @@
 import { getApiAuthHeaders } from '../../lib/api-auth';
+import { getApiUrl } from '../../config/apiConfig';
 
 export async function uploadFaceSamples(
   studentId: string, 
@@ -14,15 +15,17 @@ export async function uploadFaceSamples(
     formData.append('files', blob, `sample_${i}.jpg`);
   });
 
-  const response = await fetch(`${import.meta.env.VITE_API_URL}/api/students/face-registration`, {
+  const response = await fetch(getApiUrl('/api/students/face-registration'), {
     method: 'POST',
     headers: await getApiAuthHeaders(),
     body: formData,
   });
 
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error('Failed to register face samples');
+    const detail = typeof payload.detail === 'string' ? payload.detail : payload.detail?.error;
+    throw new Error(payload.error || detail || 'Failed to register face samples.');
   }
 
-  return response.json();
+  return payload;
 }

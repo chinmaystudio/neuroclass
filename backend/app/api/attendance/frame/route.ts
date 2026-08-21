@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { handleOptions, withCors } from '../../../../lib/cors';
 import {
   assertTeacherOwnsClassroom,
   GatewayError,
@@ -12,6 +13,10 @@ import {
 } from '../../../../lib/aiGateway';
 
 export const runtime = 'nodejs';
+
+export async function OPTIONS(request: Request): Promise<Response> {
+  return handleOptions(request);
+}
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -28,10 +33,10 @@ export async function POST(request: Request): Promise<Response> {
 
     const renderResponse = await forwardMultipartToRender('/ai/v1/attendance/frame', form, ['classroom_id', 'session_id', 'file']);
     const data = await renderResponse.json().catch(() => ({}));
-    if (!renderResponse.ok) return NextResponse.json({ error: 'AI Service failed to process frame', detail: data }, { status: renderResponse.status });
+    if (!renderResponse.ok) return withCors(NextResponse.json({ error: 'AI Service failed to process frame', detail: data }, { status: renderResponse.status }), request.headers.get('origin'));
     data.results = await persistObservations(auth, sessionId, Array.isArray(data.results) ? data.results : []);
-    return NextResponse.json(data);
+    return withCors(NextResponse.json(data), request.headers.get('origin'));
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, request);
   }
 }
