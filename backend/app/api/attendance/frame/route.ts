@@ -31,7 +31,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!sessionIsOpen(session)) throw new GatewayError('Attendance session is not active', 409);
     await assertTeacherOwnsClassroom(auth, classroomId);
 
-    const renderResponse = await forwardMultipartToRender('/ai/v1/attendance/frame', form, ['classroom_id', 'session_id', 'file']);
+    const renderResponse = await forwardMultipartToRender('/ai/v1/attendance/frame', form, ['classroom_id', 'session_id', 'capture_mode', 'file']);
     const data = await renderResponse.json().catch(() => ({}));
     if (!renderResponse.ok) return withCors(NextResponse.json({ error: 'AI Service failed to process frame', detail: data }, { status: renderResponse.status }), request.headers.get('origin'));
     data.results = await persistObservations(auth, sessionId, Array.isArray(data.results) ? data.results : []);

@@ -40,11 +40,13 @@ export async function reviewAttendanceObservation(sessionId: string, observation
 export async function sendAttendanceFrame(
   classroomId: string,
   sessionId: string,
-  imageBlob: Blob
+  imageBlob: Blob,
+  captureMode: 'live' | 'manual' = 'live'
 ) {
   const formData = new FormData();
   formData.append('classroom_id', classroomId);
   formData.append('session_id', sessionId);
+  formData.append('capture_mode', captureMode);
   formData.append('file', imageBlob, 'frame.jpg');
 
   const response = await fetch(getApiUrl('/api/attendance/frame'), {

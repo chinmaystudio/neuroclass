@@ -227,7 +227,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
   };
 
   const confidenceToPercent = (match: any) => {
@@ -328,7 +328,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const blob = await captureFrameBlob(videoRef.current);
       if (!blob) throw new Error('Could not capture frame');
       
-      const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
+      const result = await sendAttendanceFrame(classId, sessionForScan.id, blob, 'manual');
       
       if (result.results && result.results.length > 0) {
         for (const match of result.results) {
@@ -396,7 +396,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const blob = await captureFrameBlob(videoRef.current);
       if (!blob) throw new Error('Could not capture frame.');
 
-      const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
+      const result = await sendAttendanceFrame(classId, sessionForScan.id, blob, 'manual');
       const results = Array.isArray(result.results) ? result.results : [];
       updateLiveBoxes(results);
       const confirmed: any[] = [];
