@@ -6,6 +6,7 @@ import { AttendanceSystem } from '../ai/AttendanceSystem';
 import { ProctoringSystem } from '../ai/ProctoringSystem';
 import { ClassroomMaterialsPanel } from './ClassroomMaterialsPanel';
 import { ClassroomLearningAnalytics } from './ClassroomLearningAnalytics';
+import { getApiUrl } from '../../config/apiConfig';
 
 interface ClassroomDetailProps {
   classroomId: string;
@@ -16,6 +17,9 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
   const [classroom, setClassroom] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'students' | 'tests' | 'materials' | 'attendance' | 'proctoring' | 'x402' | 'settings'>('students');
+  const [testPortalSrc, setTestPortalSrc] = useState<string | null>(null);
+  const [testPortalLoading, setTestPortalLoading] = useState(false);
+  const [testPortalError, setTestPortalError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -26,6 +30,35 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
     };
     fetchDetails();
   }, [classroomId]);
+
+  useEffect(() => {
+    if (activeTab !== 'tests') return;
+    let cancelled = false;
+    setTestPortalLoading(true);
+    setTestPortalError(null);
+    setTestPortalSrc(null);
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken) throw new Error('Your NeuroClass session is missing. Please sign in again.');
+      const response = await fetch(getApiUrl('/api/test-portal/handoff'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classroomId }),
+      });
+      if (!response.ok) throw new Error('Unable to authorize the classroom test portal.');
+      const result = await response.json() as { handoffToken: string };
+      if (!cancelled) {
+        const portalUrl = import.meta.env.VITE_TEST_PORTAL_URL || 'https://test-creation-qwlp.onrender.com';
+        setTestPortalSrc(`${portalUrl}/api/auth/handoff?token=${encodeURIComponent(result.handoffToken)}&redirect=${encodeURIComponent(`/classroom/${classroomId}`)}`);
+      }
+    })().catch(error => {
+      if (!cancelled) setTestPortalError(error instanceof Error ? error.message : 'Test portal authorization failed.');
+    }).finally(() => {
+      if (!cancelled) setTestPortalLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [activeTab, classroomId]);
 
   if (!classroom) return <div className="p-8">Loading...</div>;
 
@@ -112,9 +145,19 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
             )}
             
             {activeTab === 'tests' && (
-              <div className="bg-white dark:bg-white/5 rounded-3xl p-8 border border-black/5 dark:border-white/10 shadow-xl">
-                <h3 className="text-xl font-bold mb-4">Test Designer</h3>
-                <p className="text-sm text-slate-500">The Test Designer module will be integrated here.</p>
+              <div className="bg-white dark:bg-white/5 rounded-3xl border border-black/5 dark:border-white/10 shadow-xl overflow-hidden min-h-[720px] flex flex-col">
+                <div className="flex items-center justify-between gap-4 p-5 border-b border-black/5 dark:border-white/10">
+                  <div>
+                    <h3 className="text-xl font-bold">Test Designer</h3>
+                    <p className="text-sm text-slate-500">Create, publish, and monitor tests for {classroom.name}. Only enrolled students can access them.</p>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600">Classroom secured</span>
+                </div>
+                <div className="flex-1 min-h-[640px] bg-slate-100 dark:bg-black/20">
+                  {testPortalLoading && <div className="flex h-full min-h-[640px] items-center justify-center text-sm font-semibold text-slate-500">Authorizing classroom test portal…</div>}
+                  {testPortalError && <div className="flex h-full min-h-[640px] items-center justify-center p-8 text-center text-sm font-semibold text-red-500">{testPortalError}</div>}
+                  {testPortalSrc && <iframe title={`${classroom.name} test designer`} src={testPortalSrc} className="h-full min-h-[640px] w-full border-0" allow="camera; fullscreen; autoplay" allowFullScreen />}
+                </div>
               </div>
             )}
 
