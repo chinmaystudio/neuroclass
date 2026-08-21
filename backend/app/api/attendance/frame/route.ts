@@ -5,6 +5,7 @@ import {
   GatewayError,
   getAuthorizedSession,
   jsonError,
+  materializeManualPresentAttendance,
   persistObservations,
   requireGatewayAuth,
   requireUuid,
@@ -35,6 +36,9 @@ export async function POST(request: Request): Promise<Response> {
     const data = await renderResponse.json().catch(() => ({}));
     if (!renderResponse.ok) return withCors(NextResponse.json({ error: 'AI Service failed to process frame', detail: data }, { status: renderResponse.status }), request.headers.get('origin'));
     data.results = await persistObservations(auth, sessionId, Array.isArray(data.results) ? data.results : []);
+    if (String(form.get('capture_mode') || 'live') === 'manual') {
+      data.results = await materializeManualPresentAttendance(auth, session, data.results);
+    }
     return withCors(NextResponse.json(data), request.headers.get('origin'));
   } catch (error) {
     return jsonError(error, request);

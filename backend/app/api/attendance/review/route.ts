@@ -60,7 +60,6 @@ export async function POST(request: Request): Promise<Response> {
         status: decision === 'LATE' ? 'Late' : 'Present',
         confidence: observation.confidence,
         verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
-        verification_method: 'MANUAL',
       }, { onConflict: 'session_id,student_id' });
       if (error) throw new GatewayError('Unable to persist reviewed attendance', 500);
     }

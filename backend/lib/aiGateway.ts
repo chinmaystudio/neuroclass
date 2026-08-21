@@ -124,3 +124,47 @@ export async function persistObservations(auth: GatewayAuth, sessionId: string, 
   }
   return results.map((result, index) => ({ ...result, observation_id: inserted?.[index]?.id || null }));
 }
+
+export async function materializeManualPresentAttendance(auth: GatewayAuth, session: { id: string; classroom_id: string }, results: any[]) {
+  const present = results.filter((result) => result.status === 'PRESENT' && result.student_id);
+  if (!present.length) return results;
+  const studentIds = [...new Set(present.map((result) => result.student_id as string))];
+  const { data: students, error: studentsError } = await auth.db
+    .from('students')
+    .select('id,name')
+    .eq('classroom_id', session.classroom_id)
+    .in('id', studentIds);
+  if (studentsError) throw new GatewayError('Unable to load enrolled students for attendance', 500);
+  const studentById = new Map((students || []).map((student) => [student.id, student]));
+  const validPresent = present.filter((result) => studentById.has(result.student_id));
+  if (!validPresent.length) return results;
+
+  const observationIds = validPresent.map((result) => result.observation_id).filter(Boolean);
+  if (observationIds.length) {
+    const { error: observationError } = await auth.db
+      .from('attendance_observations')
+      .update({ status: 'PRESENT', verification: 'MANUAL' })
+      .eq('session_id', session.id)
+      .in('id', observationIds);
+    if (observationError) throw new GatewayError('Unable to persist reviewed attendance observations', 500);
+  }
+
+  const attendanceRows = validPresent.map((result) => ({
+    session_id: session.id,
+    classroom_id: session.classroom_id,
+    student_id: result.student_id,
+    student_name: studentById.get(result.student_id)?.name || 'Student',
+    status: 'Present',
+    confidence: typeof result.similarity === 'number' ? result.similarity : null,
+    verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
+  }));
+  const { error: attendanceError } = await auth.db
+    .from('attendance')
+    .upsert(attendanceRows, { onConflict: 'session_id,student_id' });
+  if (attendanceError) {
+    console.error('[attendance.manual] materialization failed', { message: attendanceError.message, code: attendanceError.code, details: attendanceError.details, hint: attendanceError.hint });
+    throw new GatewayError('Unable to persist reviewed attendance', 500);
+  }
+  const persistedIds = new Set(validPresent.map((result) => result.student_id));
+  return results.map((result) => persistedIds.has(result.student_id) ? { ...result, attendance_persisted: true } : result);
+}

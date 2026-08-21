@@ -6,7 +6,7 @@ import { EmailService } from '../../services/ml/EmailService';
 import { supabase } from '../../database/supabase';
 import { logEvent } from '../../database/analytics';
 import { getApiUrl } from '../../config/apiConfig';
-import { finalizeAttendanceSession, reviewAttendanceObservation, sendAttendanceFrame, startAttendanceSession } from '../../services/api/attendance';
+import { finalizeAttendanceSession, sendAttendanceFrame, startAttendanceSession } from '../../services/api/attendance';
 
 interface AttendanceSystemProps {
   classId: string;
@@ -137,26 +137,6 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     anchor.download = `attendance-report-${finalReport.sessionId || 'session'}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-  };
-
-  const recordTeacherAttendance = async (student: any, confidence: number, modeName: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token || !activeSession) throw new Error('Your authenticated teacher session or attendance session is missing.');
-    const response = await fetch(getApiUrl('/api/attendance/teacher-mark'), {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        classroomId: classId,
-        sessionId: activeSession.id,
-        studentId: student.id,
-        studentName: student.name,
-        confidence,
-        mode: modeName,
-      }),
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || 'Failed to record attendance.');
-    return payload.attendance;
   };
 
   const startCamera = async () => {
@@ -298,7 +278,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     } finally {
       liveScanInFlightRef.current = false;
     }
-    if (liveScanActiveRef.current) liveScanTimerRef.current = window.setTimeout(() => void runLiveGroupFrame(sessionForScan), 1200);
+    if (liveScanActiveRef.current) liveScanTimerRef.current = window.setTimeout(() => void runLiveGroupFrame(sessionForScan), 450);
   };
 
   const startLiveGroupScan = async () => {
@@ -399,20 +379,9 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const result = await sendAttendanceFrame(classId, sessionForScan.id, blob, 'manual');
       const results = Array.isArray(result.results) ? result.results : [];
       updateLiveBoxes(results);
-      const confirmed: any[] = [];
-      for (const match of results) {
-        if (match.status !== 'PRESENT' || !match.student_id) continue;
-        if (match.observation_id) {
-          await reviewAttendanceObservation(sessionForScan.id, match.observation_id, 'PRESENT', match.student_id);
-        } else {
-          const student = students.find((item) => item.id === match.student_id);
-          if (!student) continue;
-          await recordTeacherAttendance(student, confidenceToPercent(match), 'manual-capture');
-        }
-        confirmed.push(match);
-      }
+      const confirmed = results.filter((match) => match.status === 'PRESENT' && match.student_id && match.attendance_persisted !== false);
       addIdentifiedResults(confirmed);
-      setSessionNotice(`Photo analyzed: ${confirmed.length} student${confirmed.length === 1 ? '' : 's'} marked present. Click again to capture another photo.`);
+      setSessionNotice(`Photo analyzed: ${confirmed.length} student${confirmed.length === 1 ? '' : 's'} recognized and persisted. Click again to capture another photo.`);
     } catch (error: any) {
       setCameraError(error.message || 'Failed to analyze and record the captured photo.');
     } finally {
