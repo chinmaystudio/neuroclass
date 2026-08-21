@@ -40,7 +40,7 @@ import DesignerTab from '../tabs/DesignerTab';
 import PreviewTab from '../tabs/PreviewTab';
 import ProctoringTab from '../tabs/ProctoringTab';
 import SettingsTab from '../tabs/SettingsTab';
-import TestDesignerPortal from '../exams/TestDesignerPortal';
+
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -409,77 +409,40 @@ export const ClassroomView: React.FC<ClassroomViewProps> = ({ user, onClose, onO
       {/* Full Screen Test Designer Portal */}
       <AnimatePresence>
         {showTestDesigner && (
-          <TestDesignerPortal
-            initialTest={currentTestToEdit}
-            onShowToast={showToast}
-            onClose={() => {
-              setShowTestDesigner(false);
-              setCurrentTestToEdit(undefined);
-            }}
-            onSave={async (testData) => {
-              if (!selectedClassId) {
-                showToast('No classroom selected. Cannot save.', 'warn');
-                return;
-              }
-              try {
-                const testId = testData.id || uuidv4();
-                
-                if (!testData.settings?.title) {
-                  showToast('Test title is required.', 'warn');
-                  return;
-                }
-
-                const { error } = await (supabase.from('tests') as any).upsert({
-                  id: testId,
-                  classroom_id: selectedClassId,
-                  user_id: currentUserId,
-                  title: testData.settings.title,
-                  test_data: { ...testData, id: testId, classroom_id: selectedClassId },
-                  status: 'draft',
-                  created_at: new Date().toISOString()
-                }, { onConflict: 'id' });
-                
-                if (error) throw error;
-                showToast('Draft progress saved to cloud.', 'info');
-              } catch (err: any) {
-                console.error('[DATABASE ERROR] Failed to save draft:', err);
-                showToast(`Database Error: ${err.message || 'Check console for details'}`, 'error');
-              }
-            }}
-            onPublish={async (testData) => {
-              if (!selectedClassId) {
-                showToast('No classroom selected. Cannot publish.', 'warn');
-                return;
-              }
-              try {
-                const testId = testData.id || uuidv4();
-
-                if (!testData.settings?.title) {
-                  showToast('Test title is required before publishing.', 'warn');
-                  return;
-                }
-
-                const { error } = await (supabase.from('tests') as any).upsert({
-                  id: testId,
-                  classroom_id: selectedClassId,
-                  user_id: currentUserId,
-                  title: testData.settings.title,
-                  test_data: { ...testData, id: testId, classroom_id: selectedClassId },
-                  status: 'published',
-                  created_at: new Date().toISOString()
-                }, { onConflict: 'id' });
-                
-                if (error) throw error;
-                showToast('Test published and assigned successfully!', 'success');
-                setShowTestDesigner(false);
-                setCurrentTestToEdit(undefined);
-                triggerRefresh();
-              } catch (err: any) {
-                console.error('[DATABASE ERROR] Failed to publish test:', err);
-                showToast(`Publish Failure: ${err.message || 'Check console for details'}`, 'error');
-              }
-            }}
-          />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl dark:bg-slate-900"
+            >
+              <div className="flex items-center justify-between border-b border-black/5 p-6 dark:border-white/10">
+                <h3 className="text-xl font-black">Advanced Test Designer</h3>
+                <button onClick={() => setShowTestDesigner(false)} className="rounded-full p-2 hover:bg-slate-100 dark:hover:bg-white/10">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 text-center space-y-6">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
+                  <FileText size={40} />
+                </div>
+                <div>
+                  <h4 className="text-lg font-bold">External Test Portal</h4>
+                  <p className="mt-2 text-sm text-slate-500">
+                    The advanced test designer is hosted on a dedicated infrastructure for enhanced security and performance.
+                  </p>
+                </div>
+                <a 
+                  href={import.meta.env.VITE_TEST_PORTAL_URL || 'https://neuroclass-test-portal.vercel.app'} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-sm font-bold text-white transition-all hover:bg-blue-700"
+                >
+                  Launch Test Portal <ExternalLink size={18} />
+                </a>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

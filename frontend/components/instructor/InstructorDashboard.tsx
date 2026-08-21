@@ -3,7 +3,7 @@ import { Sidebar } from './Sidebar';
 import { ClassroomList } from './ClassroomList';
 import { ClassroomDetail } from './ClassroomDetail';
 import { StripeDashboard } from './stripe/StripeDashboard';
-import { TestDesigner } from './TestDesigner';
+
 import { InstructorSettings } from './InstructorSettings';
 import { AttendanceSystem } from '../ai/AttendanceSystem';
 import { ProctoringSystem } from '../ai/ProctoringSystem';
@@ -32,7 +32,30 @@ export const InstructorDashboard: React.FC = () => {
       case 'stripe':
         return <StripeDashboard />;
       case 'tests':
-        return <TestDesigner />;
+        return (
+          <div className="h-full flex items-center justify-center p-6">
+            <div className="max-w-md w-full text-center space-y-6 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-8 rounded-3xl border border-black/5 dark:border-white/10 shadow-2xl">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <div>
+                <h4 className="text-xl font-black text-slate-900 dark:text-white">Advanced Test Portal</h4>
+                <p className="mt-2 text-sm text-slate-500">
+                  The test designer is now hosted on its own dedicated high-performance infrastructure.
+                </p>
+              </div>
+              <a 
+                href={import.meta.env.VITE_TEST_PORTAL_URL || 'https://neuroclass-test-portal.vercel.app'} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-sm font-bold text-white transition-all hover:bg-blue-700 shadow-lg shadow-blue-500/30"
+              >
+                Launch Test Portal
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            </div>
+          </div>
+        );
       case 'attendance':
         return selectedClassId ? (
           <div className="h-full overflow-y-auto p-6 scrollbar-hide">
