@@ -6,14 +6,21 @@ import { EmailService } from '../../services/ml/EmailService';
 import { supabase } from '../../database/supabase';
 import { logEvent } from '../../database/analytics';
 import { getApiUrl } from '../../config/apiConfig';
-import { finalizeAttendanceSession, startAttendanceSession } from '../../services/api/attendance';
+import { finalizeAttendanceSession, sendAttendanceFrame, startAttendanceSession } from '../../services/api/attendance';
 
 interface AttendanceSystemProps {
   classId: string;
   className: string;
 }
 
-
+type LiveAttendanceBox = {
+  trackId: string;
+  studentId: string | null;
+  name: string;
+  status: string;
+  confidence: number;
+  bbox: [number, number, number, number];
+};
 
 export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, className }) => {
   const [mode, setMode] = useState<'single' | 'group' | 'register'>('single');
@@ -27,12 +34,24 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   const [activeSession, setActiveSession] = useState<any>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [registrationSamples, setRegistrationSamples] = useState<Blob[]>([]);
+  const [liveBoxes, setLiveBoxes] = useState<LiveAttendanceBox[]>([]);
+  const [isLiveScanning, setIsLiveScanning] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const liveScanTimerRef = useRef<number | null>(null);
+  const liveScanInFlightRef = useRef(false);
+  const liveScanActiveRef = useRef(false);
+  const identifiedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     fetchStudents();
+    return () => {
+      liveScanActiveRef.current = false;
+      if (liveScanTimerRef.current !== null) window.clearTimeout(liveScanTimerRef.current);
+      CameraService.stopCamera(streamRef.current);
+      streamRef.current = null;
+    };
   }, [classId]);
 
   const fetchStudents = async () => {
@@ -80,6 +99,8 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
 
   const closeAttendanceSession = async () => {
     if (!activeSession) return;
+    stopLiveGroupScan('Attendance session closed.');
+    setLiveBoxes([]);
     setSessionBusy(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -193,6 +214,95 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
   };
 
+  const confidenceToPercent = (match: any) => {
+    if (typeof match.similarity === 'number') return Math.max(0, Math.min(100, match.similarity * 100));
+    if (typeof match.confidence === 'number') return Math.max(0, Math.min(100, match.confidence));
+    return match.confidence === 'HIGH' ? 95 : match.confidence === 'MEDIUM' ? 75 : 50;
+  };
+
+  const addIdentifiedResults = (results: any[]) => {
+    const newlyIdentified: any[] = [];
+    for (const match of results) {
+      if (match.status !== 'PRESENT' || !match.student_id || identifiedIdsRef.current.has(match.student_id)) continue;
+      identifiedIdsRef.current.add(match.student_id);
+      const student = students.find((item) => item.id === match.student_id);
+      const entry = {
+        studentId: match.student_id,
+        name: match.name || student?.name || 'Present student',
+        confidence: confidenceToPercent(match),
+      };
+      newlyIdentified.push(entry);
+      logEvent('Attendance', 'Student Identified', entry.name);
+      if (student?.email) void EmailService.sendAttendanceEmail(student.email, student.name, className).catch((error) => console.warn('Attendance email failed:', error));
+    }
+    if (newlyIdentified.length) setIdentified((previous) => [...newlyIdentified.reverse(), ...previous]);
+  };
+
+  const updateLiveBoxes = (results: any[]) => {
+    const boxes = results
+      .filter((match) => Array.isArray(match.bbox) && match.bbox.length === 4)
+      .map((match) => ({
+        trackId: String(match.track_id ?? `${match.student_id ?? 'unknown'}-${match.bbox.join('-')}`),
+        studentId: match.student_id || null,
+        name: match.name || (match.status === 'PRESENT' ? 'Present student' : 'Review'),
+        status: String(match.status || 'UNKNOWN'),
+        confidence: confidenceToPercent(match),
+        bbox: [Number(match.bbox[0]), Number(match.bbox[1]), Number(match.bbox[2]), Number(match.bbox[3])] as [number, number, number, number],
+      }))
+      .filter((box) => box.status === 'PRESENT' && Boolean(box.studentId));
+    setLiveBoxes(boxes);
+  };
+
+  const stopLiveGroupScan = (notice = 'Live group scan stopped.') => {
+    liveScanActiveRef.current = false;
+    setIsLiveScanning(false);
+    if (liveScanTimerRef.current !== null) {
+      window.clearTimeout(liveScanTimerRef.current);
+      liveScanTimerRef.current = null;
+    }
+    if (notice) setSessionNotice(notice);
+  };
+
+  const runLiveGroupFrame = async (sessionForScan: any) => {
+    if (!liveScanActiveRef.current || liveScanInFlightRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+    liveScanInFlightRef.current = true;
+    try {
+      const blob = await captureFrameBlob(video);
+      if (!blob) throw new Error('Could not capture a camera frame.');
+      const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
+      const results = Array.isArray(result.results) ? result.results : [];
+      updateLiveBoxes(results);
+      addIdentifiedResults(results);
+      setSessionNotice(results.length ? `${results.length} face result${results.length === 1 ? '' : 's'} analyzed. Green boxes are confirmed present.` : 'Scanning live… no faces returned in this frame.');
+    } catch (error: any) {
+      setCameraError(error.message || 'Live group scan failed.');
+      stopLiveGroupScan('Live group scan stopped because the frame request failed.');
+      return;
+    } finally {
+      liveScanInFlightRef.current = false;
+    }
+    if (liveScanActiveRef.current) liveScanTimerRef.current = window.setTimeout(() => void runLiveGroupFrame(sessionForScan), 1200);
+  };
+
+  const startLiveGroupScan = async () => {
+    if (isLiveScanning) return;
+    setCameraError(null);
+    setLiveBoxes([]);
+    const sessionForScan = activeSession || await openAttendanceSession();
+    if (!sessionForScan) return;
+    try {
+      if (!streamRef.current) await startCamera();
+      liveScanActiveRef.current = true;
+      setIsLiveScanning(true);
+      setSessionNotice('Live group scan is running. Move the camera slowly across the classroom.');
+      void runLiveGroupFrame(sessionForScan);
+    } catch (error: any) {
+      setCameraError(error.message || 'Could not start live group scanning.');
+    }
+  };
+
   const processSingle = async () => {
     setIsAnalyzing(true);
     try {
@@ -203,7 +313,6 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const blob = await captureFrameBlob(videoRef.current);
       if (!blob) throw new Error('Could not capture frame');
       
-      const { sendAttendanceFrame } = await import('../../services/api/attendance');
       const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
       
       if (result.results && result.results.length > 0) {
@@ -271,7 +380,6 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const blob = await captureFrameBlob(videoRef.current);
       if (!blob) throw new Error('Could not capture frame');
       
-      const { sendAttendanceFrame } = await import('../../services/api/attendance');
       const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
       
       if (result.results && result.results.length > 0) {
@@ -359,6 +467,27 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
             </div>
           )}
 
+          {liveBoxes.length > 0 && (
+            <div className="absolute inset-0 z-20 pointer-events-none">
+              {liveBoxes.map((box) => {
+                const [x1, y1, x2, y2] = box.bbox;
+                const width = Math.max(0, x2 - x1);
+                const height = Math.max(0, y2 - y1);
+                return (
+                  <div
+                    key={box.trackId}
+                    className="absolute border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(16,185,129,0.45)]"
+                    style={{ left: `${x1 / Math.max(1, videoRef.current?.videoWidth || 1) * 100}%`, top: `${y1 / Math.max(1, videoRef.current?.videoHeight || 1) * 100}%`, width: `${width / Math.max(1, videoRef.current?.videoWidth || 1) * 100}%`, height: `${height / Math.max(1, videoRef.current?.videoHeight || 1) * 100}%` }}
+                  >
+                    <span className="absolute -top-6 left-0 whitespace-nowrap rounded bg-emerald-500 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-white">
+                      {box.name} · {box.confidence.toFixed(0)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {isAnalyzing && (
             <div className="absolute inset-0 z-30 pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-4 text-white">
@@ -373,7 +502,9 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
             <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-slate-800/60 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">
               {mode === 'register'
                 ? (isCameraActive ? 'Registration ready: capture five samples. No attendance session is required.' : 'Next step: activate the camera.')
-                : (activeSession ? (isCameraActive ? 'Ready: session and camera are active.' : 'Next step: activate the camera.') : 'Ready to start: click Scan Group to open a session and scan.')}
+                : mode === 'group' && isLiveScanning
+                  ? 'LIVE SCAN ACTIVE: green boxes are confirmed present students.'
+                  : (activeSession ? (isCameraActive ? 'Ready: click Start Live Group Scan to continuously analyze the classroom.' : 'Next step: activate the camera.') : 'Ready to start: click Start Live Group Scan to open a session and scan.')}
             </div>
             {cameraError && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-rose-600">{cameraError}</div>}
 
@@ -403,11 +534,11 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
               <button 
                 type="button"
                 disabled={isAnalyzing}
-                title={activeSession && isCameraActive ? 'Capture a frame and send it to the secure Vercel attendance gateway.' : 'Open a session and activate the camera before scanning.'}
-                onClick={mode === 'single' ? processSingle : captureAndProcessGroup}
-                className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-wait disabled:opacity-60"
+                title={mode === 'group' ? (isLiveScanning ? 'Stop the continuous live group scan.' : 'Open a session if needed and continuously scan classroom frames.') : (activeSession && isCameraActive ? 'Capture a frame and send it to the secure Vercel attendance gateway.' : 'Open a session and activate the camera before scanning.')}
+                onClick={mode === 'group' ? (isLiveScanning ? () => stopLiveGroupScan() : startLiveGroupScan) : processSingle}
+                className={`flex-1 py-4 ${isLiveScanning ? 'bg-rose-600' : 'bg-blue-600'} text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-wait disabled:opacity-60`}
               >
-                {mode === 'single' ? (activeSession ? 'Analyze Individual' : 'Start Session & Analyze') : (activeSession ? 'Scan Group (10-12 Photos recommended)' : 'Start Session & Scan Group')}
+                {mode === 'single' ? (activeSession ? 'Analyze Individual' : 'Start Session & Analyze') : (isLiveScanning ? 'Stop Live Group Scan' : 'Start Live Group Scan')}
               </button>
               <button type="button" onClick={toggleCamera} className="px-6 py-4 bg-rose-500/10 text-rose-500 rounded-[20px]">
                 <Camera size={20} />
