@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { handleOptions, withCors } from '../../../../lib/cors';
 import {
-  assertStudentOwnsClassroom,
+  assertTeacherOrStudentCanRegister,
   GatewayError,
   jsonError,
   requireGatewayAuth,
@@ -21,7 +21,7 @@ export async function POST(request: Request): Promise<Response> {
     const form = await request.formData();
     const studentId = requireUuid(form.get('student_id'), 'student_id');
     const classroomId = requireUuid(form.get('classroom_id'), 'classroom_id');
-    await assertStudentOwnsClassroom(auth, studentId, classroomId);
+    await assertTeacherOrStudentCanRegister(auth, studentId, classroomId);
     const files = form.getAll('files').filter((value): value is File => value instanceof File);
     if (files.length < 1 || files.length > 10) throw new GatewayError('Provide between 1 and 10 face samples', 400);
 

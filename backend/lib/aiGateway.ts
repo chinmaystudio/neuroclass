@@ -55,6 +55,25 @@ export async function assertStudentOwnsClassroom(auth: GatewayAuth, studentId: s
   if (error || !data) throw new GatewayError('You do not own this student enrollment', 403);
 }
 
+export async function assertTeacherOrStudentCanRegister(auth: GatewayAuth, studentId: string, classroomId: string): Promise<void> {
+  const { data: enrollment, error: enrollmentError } = await auth.db
+    .from('students')
+    .select('id,user_id')
+    .eq('id', studentId)
+    .eq('classroom_id', classroomId)
+    .maybeSingle();
+  if (enrollmentError || !enrollment) throw new GatewayError('Student enrollment was not found in this classroom', 404);
+  if (String(enrollment.user_id || '') === auth.user.id) return;
+
+  const { data: classroom, error: classroomError } = await auth.db
+    .from('classrooms')
+    .select('id')
+    .eq('id', classroomId)
+    .eq('user_id', auth.user.id)
+    .maybeSingle();
+  if (classroomError || !classroom) throw new GatewayError('You are not authorized to register this student', 403);
+}
+
 export async function getAuthorizedSession(auth: GatewayAuth, sessionId: string) {
   const { data, error } = await auth.db.from('attendance_sessions').select('id,classroom_id,teacher_id,status,starts_at,ends_at,started_at,finished_at').eq('id', sessionId).maybeSingle();
   if (error || !data) throw new GatewayError('Attendance session not found', 404);
