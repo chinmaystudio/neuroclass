@@ -818,10 +818,16 @@ const ClasslistView: React.FC<{ user: any, onClassSelect: (id: string) => void }
         if (!isSupabaseConfigured()) {
            throw new Error('Supabase project configuration is required to view classrooms.');
         }
-        let query = supabase.from('classrooms' as any).select('*').eq('user_id', currentUserId);
+        let query = supabase.from('classrooms' as any).select('*, students:students(count)').eq('user_id', currentUserId);
         const { data, error: dbErr } = await query;
         if (dbErr) throw dbErr;
-        setClassrooms(data || []);
+        
+        const enrichedData = (data || []).map((cls: any) => ({
+          ...cls,
+          students: cls.students?.[0]?.count || 0
+        }));
+        
+        setClassrooms(enrichedData);
       } catch (err: any) {
         console.error('Failed to fetch classrooms:', err);
         let msg = err.message || 'Connection failed';
@@ -1471,15 +1477,26 @@ const StudentsListView: React.FC<{ classId: string, onShowToast: any }> = ({ cla
             </div>
             <button 
               onClick={async () => {
+                if (!window.confirm(`Are you sure you want to remove ${student.name} from this classroom?`)) return;
                 try {
                   const { error } = await (supabase.from('students') as any).delete().eq('id', student.id);
                   if (error) throw error;
+                  
                   setStudents(prev => prev.filter(s => s.id !== student.id));
+                  
+                  // Decrement classroom count
+                  const { data: classData } = await (supabase.from('classrooms') as any).select('students').eq('id', classId).single();
+                  if (classData) {
+                    await (supabase.from('classrooms') as any).update({ students: Math.max(0, (classData.students || 0) - 1) }).eq('id', classId);
+                  }
+                  
                   onShowToast('Student removed', 'info');
                 } catch (error) {
+                  console.error('Error removing student:', error);
                   onShowToast('Failed to remove student', 'warn');
                 }
               }}
+              title="Remove Student"
               className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl transition-all"
             >
                <Trash2 size={16} />

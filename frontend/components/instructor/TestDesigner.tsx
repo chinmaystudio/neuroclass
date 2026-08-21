@@ -38,12 +38,16 @@ export const TestDesigner = () => {
 
       const { data } = await supabase
         .from('classrooms')
-        .select('*')
+        .select('*, students:students(count)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (data) {
-        setClassrooms(data);
+        const enrichedData = data.map(cls => ({
+          ...cls,
+          students: cls.students?.[0]?.count || 0
+        }));
+        setClassrooms(enrichedData);
         if (data.length > 0) setSelectedClass(data[0].id);
       }
     } catch (error) {

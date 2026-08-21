@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Users, LayoutTemplate, X } from 'lucide-react';
+import { Plus, Users, LayoutTemplate, X, Trash2 } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
@@ -22,12 +22,18 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
     try {
       const { data, error } = await supabase
         .from('classrooms')
-        .select('*')
+        .select('*, students:students(count)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setClassrooms(data || []);
+      
+      const enrichedData = (data || []).map(cls => ({
+        ...cls,
+        students: cls.students?.[0]?.count || 0
+      }));
+      
+      setClassrooms(enrichedData);
     } catch (err) {
       console.error('Error fetching classrooms:', err);
     } finally {
@@ -38,6 +44,27 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
   useEffect(() => {
     fetchClassrooms();
   }, [user]);
+
+  const handleDeleteClass = async (e: React.MouseEvent, classId: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this classroom? All associated tests, students, and attendance records will be permanently removed.')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('classrooms')
+        .delete()
+        .eq('id', classId);
+        
+      if (error) throw error;
+      
+      fetchClassrooms();
+    } catch (err: any) {
+      console.error('Error deleting classroom:', err);
+      alert('Failed to delete classroom: ' + err.message);
+    }
+  };
 
   const handleCreateClass = async () => {
     if (!newClassName.trim() || !user) return;
@@ -113,8 +140,17 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
                   {cls.name.substring(0, 1).toUpperCase()}
                 </div>
-                <div className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/20">
-                  {cls.status || 'Active'}
+                <div className="flex items-center gap-2">
+                  <div className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/20">
+                    {cls.status || 'Active'}
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteClass(e, cls.id)}
+                    className="w-8 h-8 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
+                    title="Delete Classroom"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
               <h3 className="text-xl font-bold mb-2 group-hover:text-blue-500 transition-colors">{cls.name}</h3>

@@ -122,13 +122,18 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ user, onClose }) =
       const userEmail = user.email || user.user_metadata?.email || '';
       const { data, error } = await (supabase
         .from('students') as any)
-        .select('id,classroom_id,user_id,name,roll_number,phone,email,face_registration_status,joined_at,classrooms(*)')
+        .select('id,classroom_id,user_id,name,roll_number,phone,email,face_registration_status,joined_at,classrooms(*, students:students(count))')
         .eq('email', userEmail);
       
       if (error) throw error;
       // Filter unique enrollments by classroom_id
-      const uniqueEnrollments = data ? Array.from(new Map(data.map((item: any) => [item.classroom_id, item])).values()) : [];
-      setEnrolledClasses(uniqueEnrollments);
+      const uniqueEnrollments = data ? Array.from(new Map(data.map((item: any) => {
+        if (item.classrooms) {
+          item.classrooms.students = item.classrooms.students?.[0]?.count || 0;
+        }
+        return [item.classroom_id, item];
+      }))).values() : [];
+      setEnrolledClasses(Array.from(uniqueEnrollments));
     } catch (e) {
       console.error('Error fetching enrollments:', e);
     } finally {
