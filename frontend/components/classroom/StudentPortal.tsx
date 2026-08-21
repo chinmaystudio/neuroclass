@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { CameraService } from '../../services/ml/CameraService';
-import { LocalMLService } from '../../services/ml/LocalMLService';
 import ExamPortal from '../exams/ExamPortal';
 import { AssignmentEvaluator } from '../evaluation/AssignmentEvaluator';
 import { getApiUrl } from '../../config/apiConfig';
@@ -123,7 +122,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ user, onClose }) =
       const userEmail = user.email || user.user_metadata?.email || '';
       const { data, error } = await (supabase
         .from('students') as any)
-        .select('*, classrooms(*)')
+        .select('id,classroom_id,user_id,name,roll_number,phone,email,face_registration_status,joined_at,classrooms(*)')
         .eq('email', userEmail);
       
       if (error) throw error;
@@ -186,24 +185,30 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ user, onClose }) =
       }
 
       console.log('[DEBUG] Classroom found:', classroom.name, 'ID:', classroom.id);
-      const { error: enrollErr } = await (supabase
+      const { data: student, error: enrollErr } = await (supabase
         .from('students') as any)
         .insert({
           classroom_id: classroom.id,
+          user_id: currentUserId,
           name: studentDetails.name,
           roll_number: studentDetails.rollNumber,
           phone: studentDetails.phoneNumber,
           email: studentDetails.email,
-          face_samples: studentDetails.faceSamples,
           joined_at: new Date().toISOString()
-        });
+        })
+        .select('id')
+        .single();
       
-      if (enrollErr) {
-        if (enrollErr.message?.includes('unique')) {
+      if (enrollErr || !student) {
+        if (enrollErr?.message?.includes('unique')) {
            throw new Error('You are already enrolled in this classroom.');
         }
-        throw enrollErr;
+        throw enrollErr || new Error('Unable to create student enrollment.');
       }
+
+      const { uploadFaceSamples } = await import('../../services/api/faceRegistration');
+      const blobs = await Promise.all(studentDetails.faceSamples.map(async (dataUrl) => (await fetch(dataUrl)).blob()));
+      await uploadFaceSamples(student.id, classroom.id, blobs);
 
       // 3. Update classroom student count
       await (supabase

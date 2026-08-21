@@ -6,6 +6,7 @@ import { EmailService } from '../../services/ml/EmailService';
 import { supabase } from '../../database/supabase';
 import { logEvent } from '../../database/analytics';
 import { getApiUrl } from '../../config/apiConfig';
+import { finalizeAttendanceSession, startAttendanceSession } from '../../services/api/attendance';
 
 interface AttendanceSystemProps {
   classId: string;
@@ -24,6 +25,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   const [selectedStudentForReg, setSelectedStudentForReg] = useState<string>('');
   const [activeSession, setActiveSession] = useState<any>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
+  const [registrationSamples, setRegistrationSamples] = useState<Blob[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -34,7 +36,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
 
   const fetchStudents = async () => {
     try {
-      const { data, error } = await (supabase.from('students') as any).select('*').eq('classroom_id', classId);
+      const { data, error } = await (supabase.from('students') as any).select('id,name,email,face_registration_status').eq('classroom_id', classId).order('name');
       if (error) throw error;
       setStudents(data || []);
     } catch (e) {
@@ -54,6 +56,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Could not open an attendance session.');
+      await startAttendanceSession(classId, payload.session.id);
       setActiveSession({ ...payload.session, pin: payload.pin, challengeToken: payload.challengeToken });
       setCameraError(`Session PIN: ${payload.pin}. ${payload.warning}`);
     } catch (error: any) {
@@ -69,6 +72,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again before closing attendance.');
+      await finalizeAttendanceSession(activeSession.id);
       const response = await fetch(getApiUrl('/api/attendance/session'), {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
@@ -77,6 +81,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Could not close an attendance session.');
       setActiveSession(null);
+      setRegistrationSamples([]);
     } catch (error: any) {
       setCameraError(error.message || 'Could not close an attendance session.');
     } finally {
@@ -175,10 +180,17 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const blob = await captureFrameBlob(videoRef.current);
       if (!blob) throw new Error('Could not capture frame');
       
+      const nextSamples = [...registrationSamples, blob].slice(-10);
+      if (nextSamples.length < 5) {
+        setRegistrationSamples(nextSamples);
+        setCameraError(`Sample ${nextSamples.length}/5 captured. Change your angle slightly and capture another sample.`);
+        return;
+      }
       const { uploadFaceSamples } = await import('../../services/api/faceRegistration');
-      await uploadFaceSamples(selectedStudentForReg, classId, [blob]);
+      await uploadFaceSamples(selectedStudentForReg, classId, nextSamples);
       
-      alert("Face registered successfully!");
+      alert(`Face registered successfully with ${nextSamples.length} samples!`);
+      setRegistrationSamples([]);
       fetchStudents();
     } catch (e: any) {
       console.error('Face registration failed:', e);
@@ -301,7 +313,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
               >
                 <option value="">Select Student to Register</option>
                 {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} {s.face_descriptor ? '(Registered)' : ''}</option>
+                  <option key={s.id} value={s.id}>{s.name} {s.face_registration_status === 'REGISTERED' ? '(Registered)' : ''}</option>
                 ))}
               </select>
               <button 
@@ -310,7 +322,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
                 onClick={registerFace}
                 className="w-full py-4 bg-emerald-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px]"
               >
-                Capture & Save Biometrics
+                {registrationSamples.length < 5 ? `Capture Sample (${registrationSamples.length}/5)` : 'Upload Face Samples'}
               </button>
             </div>
           ) : (

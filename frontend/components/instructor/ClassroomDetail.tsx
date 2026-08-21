@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Users, ShieldCheck, BrainCircuit, FileText, BarChart3, Settings, Zap } from 'lucide-react';
+import { ArrowLeft, Users, ShieldCheck, BrainCircuit, FileText, BarChart3, Settings, Zap, UserCheck } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { AttendanceSystem } from '../ai/AttendanceSystem';
+import { ProctoringSystem } from '../ai/ProctoringSystem';
 import { ClassroomMaterialsPanel } from './ClassroomMaterialsPanel';
 import { ClassroomLearningAnalytics } from './ClassroomLearningAnalytics';
 
@@ -14,12 +15,12 @@ interface ClassroomDetailProps {
 export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, onBack }) => {
   const [classroom, setClassroom] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'students' | 'tests' | 'materials' | 'x402' | 'proctoring' | 'settings'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'tests' | 'materials' | 'attendance' | 'proctoring' | 'x402' | 'settings'>('students');
 
   useEffect(() => {
     const fetchDetails = async () => {
       const { data } = await supabase.from('classrooms').select('*').eq('id', classroomId).single();
-      const { data: roster } = await (supabase.from('students') as any).select('id,name,email,roll_number,face_descriptor').eq('classroom_id', classroomId).order('name');
+      const { data: roster } = await (supabase.from('students') as any).select('id,name,email,roll_number,face_registration_status').eq('classroom_id', classroomId).order('name');
       if (data) setClassroom(data);
       setStudents(roster || []);
     };
@@ -32,6 +33,7 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
     { id: 'students', label: 'Students', icon: <Users size={16} /> },
     { id: 'tests', label: 'Test Designer', icon: <BrainCircuit size={16} /> },
     { id: 'materials', label: 'Materials', icon: <FileText size={16} /> },
+    { id: 'attendance', label: 'Attendance', icon: <UserCheck size={16} /> },
     { id: 'proctoring', label: 'Proctoring', icon: <ShieldCheck size={16} /> },
     { id: 'x402', label: 'x402 Protocol', icon: <Zap size={16} /> },
     { id: 'settings', label: 'Settings', icon: <Settings size={16} /> },
@@ -102,7 +104,7 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
                   {students.length === 0 ? <p className="text-sm text-slate-500">No students have joined with the classroom code yet.</p> : students.map((student) => (
                     <div key={student.id} className="flex items-center justify-between rounded-2xl border border-black/5 dark:border-white/10 p-4">
                       <div><p className="font-bold">{student.name}</p><p className="text-xs text-slate-500">{student.email || 'No email'} {student.roll_number ? `· Roll ${student.roll_number}` : ''}</p></div>
-                      <span className={`text-[10px] font-bold uppercase tracking-widest ${student.face_descriptor ? 'text-emerald-500' : 'text-amber-500'}`}>{student.face_descriptor ? 'Biometric ready' : 'Needs registration'}</span>
+                      <span className={`text-[10px] font-bold uppercase tracking-widest ${student.face_registration_status === 'REGISTERED' ? 'text-emerald-500' : 'text-amber-500'}`}>{student.face_registration_status === 'REGISTERED' ? 'Biometric ready' : 'Needs registration'}</span>
                     </div>
                   ))}
                 </div>
@@ -120,12 +122,22 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
               <div className="space-y-6"><ClassroomMaterialsPanel classroomId={classroom.id} /><ClassroomLearningAnalytics classroomId={classroom.id} /></div>
             )}
 
-            {activeTab === 'proctoring' && (
+            {activeTab === 'attendance' && (
               <div className="space-y-4">
                 <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
-                  <h3 className="text-xl font-bold mb-2">Teacher Attendance Session</h3>
-                  <p className="text-sm text-slate-500 mb-6">Open a time-limited session, scan the classroom roster locally, and write only teacher-authorized attendance records.</p>
+                  <h3 className="text-xl font-bold mb-2">Classroom Attendance</h3>
+                  <p className="text-sm text-slate-500 mb-6">Open a teacher-authorized session, register student samples, and scan this classroom through the Render AI gateway.</p>
                   <AttendanceSystem classId={classroom.id} className={classroom.name} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'proctoring' && (
+              <div className="space-y-4">
+                <div className="rounded-3xl border border-purple-500/20 bg-purple-500/5 p-6">
+                  <h3 className="text-xl font-bold mb-2">Exam Proctoring</h3>
+                  <p className="text-sm text-slate-500 mb-6">Monitor exam integrity separately from classroom attendance.</p>
+                  <ProctoringSystem />
                 </div>
               </div>
             )}

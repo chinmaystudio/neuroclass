@@ -16,11 +16,6 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
   const [step, setStep] = useState(1);
   const [joinCode, setJoinCode] = useState('');
   
-  // Existing registered face data (reuses face descriptor across all classes)
-  const [existingFaceData, setExistingFaceData] = useState<{
-    descriptor: any;
-    samples: string[];
-  } | null>(null);
 
   // Registration Data
   const [studentDetails, setStudentDetails] = useState({
@@ -59,34 +54,8 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
   }, [stream]);
 
   const fetchExistingFaceData = async () => {
-    try {
-      const { data: existingProfiles } = await supabase
-        .from('students')
-        .select('face_descriptor, face_samples, roll_number, phone, name')
-        .eq('user_id', user!.id)
-        .not('face_descriptor', 'is', null);
-
-      if (existingProfiles && existingProfiles.length > 0) {
-        const profileWithFace = existingProfiles.find(p => p.face_descriptor != null);
-        if (profileWithFace) {
-          const parsedSamples = Array.isArray(profileWithFace.face_samples) ? profileWithFace.face_samples : [];
-          setExistingFaceData({
-            descriptor: profileWithFace.face_descriptor,
-            samples: parsedSamples,
-          });
-
-          setStudentDetails(prev => ({
-            ...prev,
-            name: prev.name || profileWithFace.name || '',
-            rollNumber: prev.rollNumber || profileWithFace.roll_number || '',
-            phoneNumber: prev.phoneNumber || profileWithFace.phone || '',
-            faceSamples: parsedSamples.length > 0 ? parsedSamples : prev.faceSamples,
-          }));
-        }
-      }
-    } catch (e) {
-      console.error('Error fetching existing face data:', e);
-    }
+    // Legacy browser descriptor reuse is intentionally disabled. Each classroom
+    // registration sends fresh image samples to the authenticated Vercel gateway.
   };
 
   const startCapture = async () => {
@@ -122,7 +91,6 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
 
   const handleClearFaceData = () => {
     setStudentDetails(prev => ({ ...prev, faceSamples: [] }));
-    setExistingFaceData(null);
     setError(null);
   };
 
@@ -131,7 +99,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
       setError('You must be logged in.');
       return;
     }
-    if (studentDetails.faceSamples.length < 5 && !existingFaceData) {
+    if (studentDetails.faceSamples.length < 5) {
       setError('Please capture all 5 face samples first.');
       return;
     }
@@ -159,7 +127,6 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
           roll_number: studentDetails.rollNumber,
           phone: studentDetails.phoneNumber,
           email: user.email || '',
-          face_samples: studentDetails.faceSamples,
           joined_at: new Date().toISOString(),
         })
         .select('id')
@@ -259,7 +226,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                   />
                 </div>
 
-                {existingFaceData && (
+                {false && (
                   <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
                     <ShieldCheck size={18} className="shrink-0" />
                     <span>Registered Face-ID Detected — Will automatically apply your Face-ID profile across this class.</span>
@@ -318,7 +285,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                     onClick={() => { setError(null); if (studentDetails.name && studentDetails.rollNumber) setStep(3); else setError('Name and Roll Number are required.'); }}
                     className="flex-1 py-4 rounded-2xl bg-purple-600 text-white font-bold uppercase tracking-widest text-xs"
                   >
-                    {existingFaceData ? 'Confirm Biometrics' : 'Biometrics'}
+                    Biometrics
                   </button>
                 </div>
               </div>
@@ -328,7 +295,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-6">
-                {existingFaceData && !isCapturing ? (
+                {false ? (
                   <div className="p-6 rounded-3xl bg-purple-500/10 border border-purple-500/20 text-center space-y-4">
                     <ShieldCheck size={40} className="mx-auto text-purple-500" />
                     <div>

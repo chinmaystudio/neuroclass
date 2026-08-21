@@ -42,10 +42,10 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
       // 1. Get enrollments and biometric status
       const { data: studentProfiles } = await supabase
         .from('students')
-        .select('*')
+        .select('id,classroom_id,user_id,name,roll_number,email,face_registration_status,joined_at')
         .eq('user_id', user!.id);
 
-      const isBio = (studentProfiles || []).some(s => s.face_descriptor != null);
+      const isBio = (studentProfiles || []).some(s => s.face_registration_status === 'REGISTERED');
       const enrolledCount = studentProfiles ? studentProfiles.length : 0;
       const classIds = (studentProfiles || []).map(s => s.classroom_id);
       // 2. Fetch tests for enrolled classes

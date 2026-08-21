@@ -27,10 +27,10 @@ export const StudentSettings: React.FC<StudentSettingsProps> = ({ onRegisterFace
     try {
       const { data } = await supabase
         .from('students')
-        .select('face_descriptor')
+        .select('face_registration_status')
         .eq('user_id', user!.id);
 
-      const isBio = (data || []).some(s => s.face_descriptor != null);
+      const isBio = (data || []).some(s => s.face_registration_status === 'REGISTERED');
       setHasBiometric(isBio);
     } catch (e) {
       console.error('Error checking biometric:', e);
@@ -43,14 +43,11 @@ export const StudentSettings: React.FC<StudentSettingsProps> = ({ onRegisterFace
     if (!user || !window.confirm('Are you sure you want to clear your Face-ID biometric data across all enrolled classrooms?')) return;
     setClearing(true);
     try {
-      await supabase
+      const { error } = await supabase
         .from('students')
-        .update({
-          face_descriptor: null,
-          face_samples: [],
-        })
+        .update({ face_registration_status: 'PENDING' })
         .eq('user_id', user.id);
-
+      if (error) throw error;
       setHasBiometric(false);
     } catch (e) {
       console.error('Error clearing face data:', e);

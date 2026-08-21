@@ -38,6 +38,8 @@ export async function POST(request: Request): Promise<Response> {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'student_id,classroom_id' });
       if (error) throw new GatewayError('Unable to persist face profile metadata', 500);
+      const { error: studentStatusError } = await auth.db.from('students').update({ face_registration_status: 'REGISTERED' }).eq('id', studentId).eq('classroom_id', classroomId);
+      if (studentStatusError) throw new GatewayError('Unable to update student registration status', 500);
     }
 
     return NextResponse.json({
