@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "frontend/**/*.ts",
+    "frontend/**/*.tsx",
+    "frontend/**/*.d.ts",
+    "shared/**/*.ts",
+    "vite.config.ts"
+  ],
+  "exclude": [
+    "backend",
+    "api",
+    "node_modules",
+    "dist"
+  ]
+}

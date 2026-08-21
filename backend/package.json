@@ -1,0 +1,32 @@
+{
+  "name": "neuroclass-backend",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@google/genai": "^1.50.1",
+    "@hono/node-server": "^2.1.0",
+    "@supabase/supabase-js": "^2.104.1",
+    "@x402/avm": "^2.22.0",
+    "@x402/core": "^2.22.0",
+    "@x402/hono": "^2.22.0",
+    "algosdk": "^3.6.0",
+    "dotenv": "^17.2.3",
+    "hono": "^4.13.1",
+    "next": "^14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2"
+  }
+}

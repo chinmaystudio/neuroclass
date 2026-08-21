@@ -1,9 +1,0 @@
-{
-  "name": "ExamFlow Pro: Test Creator Portal",
-  "description": "A comprehensive full-stack platform for designing, proctoring, and previewing academic and professional tests with deep customization.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ],
-  "majorCapabilities": []
-}

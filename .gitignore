@@ -1,8 +1,16 @@
 node_modules/
+.next/
 build/
 dist/
 coverage/
 .DS_Store
 *.log
 .env*
+.vercel/
+*.local
+.cache/
+
+# Commit templates, never real credentials.
 !.env.example
+!backend/.env.example
+!frontend/.env.example
