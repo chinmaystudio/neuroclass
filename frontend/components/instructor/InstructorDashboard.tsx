@@ -45,7 +45,7 @@ export const InstructorDashboard: React.FC = () => {
                 </p>
               </div>
               <a 
-                href={import.meta.env.VITE_TEST_PORTAL_URL || 'https://neuroclass-test-portal.vercel.app'} 
+                href={import.meta.env.VITE_TEST_PORTAL_URL || 'https://test-creation-qwlp.onrender.com'} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-sm font-bold text-white transition-all hover:bg-blue-700 shadow-lg shadow-blue-500/30"
