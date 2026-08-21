@@ -113,10 +113,14 @@ export async function persistObservations(auth: GatewayAuth, sessionId: string, 
     student_id: result.student_id || null,
     track_id: result.track_id ?? null,
     status: result.status || 'UNKNOWN',
-    confidence: typeof result.similarity === 'number' ? result.similarity : typeof result.confidence === 'number' ? result.confidence : null,
-    verification_method: result.verification || 'render_arcface',
+    similarity: typeof result.similarity === 'number' ? result.similarity : null,
+    confidence: typeof result.confidence === 'number' ? result.confidence : null,
+    verification: result.verification || 'render_arcface',
   }));
   const { data: inserted, error } = await auth.db.from('attendance_observations').insert(rows).select('id');
-  if (error) throw new GatewayError('Unable to persist attendance observations', 500);
+  if (error) {
+    console.error('[attendance.observations] persistence failed', { message: error.message, code: error.code, details: error.details, hint: error.hint });
+    throw new GatewayError('Unable to persist attendance observations', 500);
+  }
   return results.map((result, index) => ({ ...result, observation_id: inserted?.[index]?.id || null }));
 }
