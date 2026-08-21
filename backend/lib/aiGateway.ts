@@ -136,8 +136,18 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
     .in('id', studentIds);
   if (studentsError) throw new GatewayError('Unable to load enrolled students for attendance', 500);
   const studentById = new Map((students || []).map((student) => [student.id, student]));
-  const validPresent = present.filter((result) => studentById.has(result.student_id));
-  if (!validPresent.length) return results;
+  const validPresentRaw = present.filter((result) => studentById.has(result.student_id));
+  if (!validPresentRaw.length) return results;
+
+  // Deduplicate by student_id to prevent unique constraint violations
+  // if the AI service maps multiple faces to the same student in a single frame.
+  const uniquePresentMap = new Map();
+  for (const result of validPresentRaw) {
+    if (!uniquePresentMap.has(result.student_id)) {
+      uniquePresentMap.set(result.student_id, result);
+    }
+  }
+  const validPresent = Array.from(uniquePresentMap.values());
 
   const observationIds = validPresent.map((result) => result.observation_id).filter(Boolean);
   if (observationIds.length) {
@@ -155,8 +165,8 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
     student_id: result.student_id,
     student_name: studentById.get(result.student_id)?.name || 'Student',
     status: 'Present',
-    confidence: typeof result.similarity === 'number' ? result.similarity : null,
     verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
+    marked_by: auth.user.id,
   }));
 
   // Supabase/PostgreSQL ON CONFLICT cannot use a partial index (WHERE session_id IS NOT NULL).
@@ -169,7 +179,7 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
 
   if (fetchError) {
     console.error('[attendance.manual] fetch existing failed', fetchError);
-    throw new GatewayError('Unable to persist reviewed attendance', 500);
+    throw new GatewayError(`Unable to persist reviewed attendance: ${fetchError.message || JSON.stringify(fetchError)}`, 500);
   }
 
   const existingIds = new Set((existingAttendance || []).map(a => a.student_id));
@@ -180,7 +190,7 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
     const { error: insertError } = await auth.db.from('attendance').insert(toInsert);
     if (insertError) {
       console.error('[attendance.manual] insert failed', insertError);
-      throw new GatewayError('Unable to persist reviewed attendance', 500);
+      throw new GatewayError(`Unable to persist reviewed attendance: ${insertError.message || JSON.stringify(insertError)}`, 500);
     }
   }
 
@@ -193,13 +203,14 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
       .update({
         status: 'Present',
         verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
+        marked_by: auth.user.id,
       })
       .eq('session_id', session.id)
       .in('student_id', Array.from(existingIds));
       
     if (updateError) {
       console.error('[attendance.manual] update failed', updateError);
-      throw new GatewayError('Unable to persist reviewed attendance', 500);
+      throw new GatewayError(`Unable to persist reviewed attendance: ${updateError.message || JSON.stringify(updateError)}`, 500);
     }
   }
   const persistedIds = new Set(validPresent.map((result) => result.student_id));
