@@ -166,7 +166,6 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
     student_name: studentById.get(result.student_id)?.name || 'Student',
     status: 'Present',
     verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
-    marked_by: auth.user.id,
   }));
 
   // Supabase/PostgreSQL ON CONFLICT cannot use a partial index (WHERE session_id IS NOT NULL).
@@ -203,7 +202,6 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
       .update({
         status: 'Present',
         verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
-        marked_by: auth.user.id,
       })
       .eq('session_id', session.id)
       .in('student_id', Array.from(existingIds));

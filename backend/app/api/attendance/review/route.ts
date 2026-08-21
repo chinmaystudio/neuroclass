@@ -65,10 +65,9 @@ export async function POST(request: Request): Promise<Response> {
       if (existing) {
         const { error } = await auth.db.from('attendance').update({
           status: decision === 'LATE' ? 'Late' : 'Present',
-          confidence: observation.confidence,
           verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
         }).eq('id', existing.id);
-        if (error) throw new GatewayError('Unable to persist reviewed attendance', 500);
+        if (error) throw new GatewayError(`Unable to persist reviewed attendance: ${error.message || JSON.stringify(error)}`, 500);
       } else {
         const { error } = await auth.db.from('attendance').insert({
           session_id: sessionId,
@@ -76,10 +75,9 @@ export async function POST(request: Request): Promise<Response> {
           student_id: studentId,
           student_name: enrolledStudent?.name || 'Student',
           status: decision === 'LATE' ? 'Late' : 'Present',
-          confidence: observation.confidence,
           verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
         });
-        if (error) throw new GatewayError('Unable to persist reviewed attendance', 500);
+        if (error) throw new GatewayError(`Unable to persist reviewed attendance: ${error.message || JSON.stringify(error)}`, 500);
       }
     }
 
