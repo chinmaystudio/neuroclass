@@ -87,8 +87,25 @@ export const ClassroomView: React.FC<ClassroomViewProps> = ({ user, onClose, onO
   const [showTestDesigner, setShowTestDesigner] = useState(false);
   const [showAiTestModal, setShowAiTestModal] = useState(false);
   const [currentTestToEdit, setCurrentTestToEdit] = useState<Test | undefined>(undefined);
+  const [testPortalSrc, setTestPortalSrc] = useState<string | null>(null);
+  const [testPortalLoading, setTestPortalLoading] = useState(false);
 
   const triggerRefresh = () => setRefreshKey(prev => prev + 1);
+  useEffect(() => {
+    if (!showTestDesigner || !selectedClassId || !isSupabaseConfigured()) return;
+    let cancelled = false;
+    setTestPortalLoading(true);
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken) throw new Error('NeuroClass session is missing.');
+      const response = await fetch(getApiUrl('/api/test-portal/handoff'), { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ classroomId: selectedClassId }) });
+      if (!response.ok) throw new Error('Unable to authorize the test portal.');
+      const result = await response.json() as { handoffToken: string };
+      if (!cancelled) setTestPortalSrc(`${import.meta.env.VITE_TEST_PORTAL_URL || 'https://test-creation-qwlp.onrender.com'}/api/auth/handoff?token=${encodeURIComponent(result.handoffToken)}&redirect=${encodeURIComponent(`/classroom/${selectedClassId}`)}`);
+    })().catch(error => { if (!cancelled) { setTestPortalSrc(null); showToast(error instanceof Error ? error.message : 'Test portal authorization failed.', 'error'); } }).finally(() => { if (!cancelled) setTestPortalLoading(false); });
+    return () => { cancelled = true; };
+  }, [showTestDesigner, selectedClassId]);
 
   const showToast = (msg: string, type: 'info' | 'success' | 'warn' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -423,16 +440,11 @@ export const ClassroomView: React.FC<ClassroomViewProps> = ({ user, onClose, onO
                 </button>
               </div>
               <div className="min-h-0 flex-1 bg-slate-950">
-                {selectedClassId ? (
-                  <iframe
-                    title="NeuroClass classroom tests"
-                    src={`${import.meta.env.VITE_TEST_PORTAL_URL || 'https://neuroclass-test-portal.vercel.app'}/classroom/${selectedClassId}`}
-                    className="h-full w-full border-0"
-                    allow="camera; fullscreen"
-                  />
+                {testPortalSrc ? (
+                  <iframe title="NeuroClass classroom tests" src={testPortalSrc} className="h-full w-full border-0" allow="camera; fullscreen" />
                 ) : (
                   <div className="grid h-full place-items-center p-8 text-center text-slate-500">
-                    Open a classroom before opening its tests. Tests are intentionally scoped to that classroom.
+                    {!selectedClassId ? 'Open a classroom before opening its tests. Tests are intentionally scoped to that classroom.' : testPortalLoading ? 'Authorizing the test portal with your NeuroClass session…' : 'Unable to authorize the test portal.'}
                   </div>
                 )}
               </div>
