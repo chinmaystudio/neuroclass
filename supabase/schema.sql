@@ -606,3 +606,28 @@ DROP POLICY IF EXISTS "Allow anonymous update x402" ON public.x402_payments;
 
 -- The application is non-custodial. Legacy public.user_wallets is intentionally absent
 -- and removed by supabase/migrations/20260813053600_remove_legacy_user_wallets.sql.
+
+
+-- =========================================================
+-- SHARED CLASSROOM TEST INTEGRATION
+-- The independent test portal uses these existing NeuroClass tables.
+-- No tc_ database or parallel classroom/student identity tables are required.
+-- =========================================================
+ALTER TABLE public.tests ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft';
+ALTER TABLE public.tests ADD COLUMN IF NOT EXISTS created_by TEXT;
+ALTER TABLE public.tests ADD COLUMN IF NOT EXISTS scheduled_start TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.tests ADD COLUMN IF NOT EXISTS scheduled_end TIMESTAMP WITH TIME ZONE;
+CREATE INDEX IF NOT EXISTS tests_classroom_status_idx ON public.tests (classroom_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS students_classroom_user_idx ON public.students (classroom_id, user_id);
+CREATE INDEX IF NOT EXISTS students_classroom_email_idx ON public.students (classroom_id, email);
+
+-- The server is the authority for test publication and attempt state.
+ALTER TABLE public.tests DROP CONSTRAINT IF EXISTS tests_status_check;
+ALTER TABLE public.tests ADD CONSTRAINT tests_status_check CHECK (status IN ('draft', 'published', 'live', 'archived'));
+ALTER TABLE public.attempts DROP CONSTRAINT IF EXISTS attempts_status_check;
+ALTER TABLE public.attempts ADD CONSTRAINT attempts_status_check CHECK (status IN ('in_progress', 'submitted', 'abandoned', 'flagged'));
+
+-- Registered face embeddings remain in face_profiles/face_embeddings and are
+-- never sent to the browser. The AI service receives only the candidate image
+-- through a server-to-server exam verification request.
+COMMIT;

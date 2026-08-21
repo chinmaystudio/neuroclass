@@ -414,7 +414,7 @@ export const ClassroomView: React.FC<ClassroomViewProps> = ({ user, onClose, onO
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl dark:bg-slate-900"
+              className="flex h-[92vh] w-[96vw] max-w-7xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl dark:bg-slate-900"
             >
               <div className="flex items-center justify-between border-b border-black/5 p-6 dark:border-white/10">
                 <h3 className="text-xl font-black">Advanced Test Designer</h3>
@@ -422,24 +422,19 @@ export const ClassroomView: React.FC<ClassroomViewProps> = ({ user, onClose, onO
                   <X size={20} />
                 </button>
               </div>
-              <div className="p-8 text-center space-y-6">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
-                  <FileText size={40} />
-                </div>
-                <div>
-                  <h4 className="text-lg font-bold">External Test Portal</h4>
-                  <p className="mt-2 text-sm text-slate-500">
-                    The advanced test designer is hosted on a dedicated infrastructure for enhanced security and performance.
-                  </p>
-                </div>
-                <a 
-                  href={import.meta.env.VITE_TEST_PORTAL_URL || 'https://neuroclass-test-portal.vercel.app'} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-sm font-bold text-white transition-all hover:bg-blue-700"
-                >
-                  Launch Test Portal <ExternalLink size={18} />
-                </a>
+              <div className="min-h-0 flex-1 bg-slate-950">
+                {selectedClassId ? (
+                  <iframe
+                    title="NeuroClass classroom tests"
+                    src={`${import.meta.env.VITE_TEST_PORTAL_URL || 'https://neuroclass-test-portal.vercel.app'}/classroom/${selectedClassId}`}
+                    className="h-full w-full border-0"
+                    allow="camera; fullscreen"
+                  />
+                ) : (
+                  <div className="grid h-full place-items-center p-8 text-center text-slate-500">
+                    Open a classroom before opening its tests. Tests are intentionally scoped to that classroom.
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
