@@ -4,7 +4,7 @@ import { X, Camera, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw } from 'lu
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { CameraService } from '../../services/ml/CameraService';
-import { LocalMLService } from '../../services/ml/LocalMLService';
+import { getApiUrl } from '../../config/apiConfig';
 
 interface StudentAttendanceModalProps {
   isOpen: boolean;
@@ -12,28 +12,6 @@ interface StudentAttendanceModalProps {
   classroomName: string;
   onClose: () => void;
   onSuccess: () => void;
-}
-
-function parseFaceDescriptor(raw: any): number[] | null {
-  if (!raw) return null;
-  try {
-    let arr = raw;
-    if (typeof raw === 'string') {
-      arr = JSON.parse(raw);
-    }
-    if (typeof arr === 'string') {
-      arr = JSON.parse(arr);
-    }
-    if (arr && typeof arr === 'object' && !Array.isArray(arr) && 'descriptor' in arr) {
-      arr = arr.descriptor;
-    }
-    if (Array.isArray(arr)) {
-      return arr.map(Number);
-    }
-  } catch (e) {
-    console.error('Error parsing face descriptor:', e);
-  }
-  return null;
 }
 
 export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
@@ -50,16 +28,36 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verificationStats, setVerificationStats] = useState<{ distance: number; score: number } | null>(null);
+  const [activeSession, setActiveSession] = useState<{ id: string; ends_at?: string } | null>(null);
+  const [attendancePin, setAttendancePin] = useState('');
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       initCamera();
+      loadActiveSession();
     } else {
       stopCamera();
+      setActiveSession(null);
+      setAttendancePin('');
     }
   }, [isOpen]);
+
+  const loadActiveSession = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Please sign in again.');
+      const response = await fetch(`${getApiUrl('/api/attendance/active')}?classroomId=${encodeURIComponent(classroomId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'No active attendance session.');
+      setActiveSession(payload.session);
+    } catch (e: any) {
+      setError(e.message || 'No active attendance session.');
+    }
+  };
 
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -90,81 +88,37 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   };
 
   const handleVerifyAttendance = async () => {
-    if (!videoRef.current || !user) return;
+    if (!user || !activeSession || attendancePin.trim().length < 6) {
+      setError('Enter the 6-digit PIN shown by your instructor.');
+      return;
+    }
     setIsVerifying(true);
     setError(null);
     setVerificationStats(null);
 
     try {
-      await LocalMLService.loadModels();
-      const currentDescriptor = await LocalMLService.getFaceDescriptor(videoRef.current);
-      if (!currentDescriptor) {
-        throw new Error('No face detected. Please position your face clearly in the camera frame.');
-      }
-
-      // Fetch student profile for this classroom
-      const { data: studentProfile, error: profErr } = await supabase
-        .from('students')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('classroom_id', classroomId)
-        .single();
-
-      if (profErr || !studentProfile) {
-        throw new Error('Enrollment profile not found for this class.');
-      }
-
-      if (!studentProfile.face_descriptor) {
-        throw new Error('No biometric Face ID registered. Please update your profile settings first.');
-      }
-
-      // Parse stored descriptor vector
-      const registeredVector = parseFaceDescriptor(studentProfile.face_descriptor);
-      if (!registeredVector || registeredVector.length !== currentDescriptor.length) {
-        throw new Error('Registered Face ID descriptor format is invalid. Please re-scan your Face ID in settings.');
-      }
-
-      // Compute Euclidean Distance between normalized Float32 vectors
-      let sumSq = 0;
-      for (let i = 0; i < currentDescriptor.length; i++) {
-        const diff = Number(registeredVector[i]) - currentDescriptor[i];
-        sumSq += diff * diff;
-      }
-      const distance = Math.sqrt(sumSq);
-      const matchScore = Math.max(0, Math.min(100, Math.round((1 - distance) * 100)));
-
-      setVerificationStats({ distance, score: matchScore });
-      console.log(`[Face-ID Check] Distance: ${distance.toFixed(3)}, Match Score: ${matchScore}%`);
-
-      // Strict Biometric Match Threshold: distance < 0.48
-      // Face-API standard: <0.45 is strong match, 0.45-0.48 boundary, >=0.48 non-match
-      if (distance >= 0.48) {
-        throw new Error(`Biometric verification failed (Match Score: ${matchScore}%, Distance: ${distance.toFixed(2)}). Face does not match registered profile.`);
-      }
-
-      // Insert Attendance Record into Supabase
-      const { error: attErr } = await supabase
-        .from('attendance')
-        .insert({
-          classroom_id: classroomId,
-          student_id: String(studentProfile.id),
-          student_name: studentProfile.name || user.email?.split('@')[0] || 'Student',
-          status: 'Present',
-          verified_method: `Face-ID Biometric (Score ${matchScore}%)`,
-          verified_at: new Date().toISOString(),
-        });
-
-      if (attErr) throw attErr;
-
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Please sign in again.');
+      const response = await fetch(getApiUrl('/api/attendance/verify'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: JSON.stringify({ sessionId: activeSession.id, pin: attendancePin.trim() }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Attendance verification failed.');
+      setVerificationStats({ distance: 0, score: 100 });
       setIsSuccess(true);
       setTimeout(() => {
         stopCamera();
         onSuccess();
         onClose();
       }, 1500);
-
     } catch (e: any) {
-      setError(e.message || 'Face ID verification failed.');
+      setError(e.message || 'Attendance verification failed.');
     } finally {
       setIsVerifying(false);
     }
@@ -238,6 +192,19 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
             </div>
           )}
 
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Instructor session PIN</label>
+            <input
+              value={attendancePin}
+              onChange={(event) => setAttendancePin(event.target.value.replace(/\\D/g, '').slice(0, 6))}
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="Enter 6-digit PIN"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center font-mono tracking-[0.4em] outline-none focus:border-purple-500 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+            {!activeSession && <p className="text-xs text-slate-500">Waiting for an active instructor attendance session.</p>}
+          </div>
+
           <div className="flex gap-3">
             <button
               onClick={() => {
@@ -252,7 +219,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
 
             <button
               onClick={handleVerifyAttendance}
-              disabled={!isCapturing || isVerifying || isSuccess}
+              disabled={!activeSession || attendancePin.length !== 6 || isVerifying || isSuccess}
               className="flex-1 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
               {isVerifying ? (

@@ -14,8 +14,8 @@ import {
   AlertTriangle, BookOpen, TrendingUp, Database
 } from 'lucide-react';
 import { TestPaperEvaluator } from '../evaluation/TestPaperEvaluator';
-import { LocalMLService } from '../../services/ml/LocalMLService';
 import { CameraService } from '../../services/ml/CameraService';
+import { sendAttendanceFrame, reviewAttendanceObservation } from '../../services/api/attendance';
 import { AssignmentEvaluator } from '../evaluation/AssignmentEvaluator';
 import { AnalyticsDashboard } from '../evaluation/AnalyticsDashboard';
 import { AITestGeneratorModal } from './AITestGeneratorModal';
@@ -56,18 +56,6 @@ type ActiveSection = 'dashboard' | 'classrooms' | 'attendance' | 'tests' | 'moni
 
 const ATTENDANCE_DATA = []; // Removed mock data
 
-const parseFaceDescriptor = (value: unknown): Float32Array | null => {
-  if (!value) return null;
-  try {
-    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return new Float32Array(parsed.map(Number));
-    }
-  } catch {
-    // Invalid legacy biometrics are ignored instead of breaking the scan loop.
-  }
-  return null;
-};
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -1516,6 +1504,7 @@ const FaceIdModule: React.FC<{ user: any, classId: string, onShowToast: any }> =
   const [pendingMatch, setPendingMatch] = useState<any | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [detectionBox, setDetectionBox] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scanTimeoutRef = useRef<number | null>(null);
   const scanActiveRef = useRef(false);
@@ -1581,14 +1570,21 @@ const FaceIdModule: React.FC<{ user: any, classId: string, onShowToast: any }> =
   };
 
   const confirmMatch = async () => {
-    if (pendingMatch) {
-      const saved = await logAttendance(pendingMatch.id, pendingMatch.name);
-      if (!saved) return;
+    if (!pendingMatch) return;
+    try {
+      if (pendingMatch.observationId && activeSessionId) {
+        await reviewAttendanceObservation(activeSessionId, pendingMatch.observationId, 'PRESENT', pendingMatch.id);
+      } else {
+        const saved = await logAttendance(pendingMatch.id, pendingMatch.name);
+        if (!saved) return;
+      }
       seenStudentIdsRef.current.add(pendingMatch.id);
       setIdentified(prev => [pendingMatch, ...prev]);
       onShowToast(`Verified match: ${pendingMatch.name}`, 'success');
       setPendingMatch(null);
       setDetectionBox(null);
+    } catch (error: any) {
+      onShowToast(error.message || 'Unable to confirm this observation.', 'error');
     }
   };
 
@@ -1603,6 +1599,7 @@ const FaceIdModule: React.FC<{ user: any, classId: string, onShowToast: any }> =
       if (scanTimeoutRef.current) window.clearTimeout(scanTimeoutRef.current);
       scanTimeoutRef.current = null;
       scanActiveRef.current = false;
+      setActiveSessionId(null);
       isRecognizingRef.current = false;
       CameraService.stopCamera((videoRef.current?.srcObject as MediaStream | null) || null);
       if (videoRef.current) videoRef.current.srcObject = null;
@@ -1619,8 +1616,22 @@ const FaceIdModule: React.FC<{ user: any, classId: string, onShowToast: any }> =
         return;
       }
       setCameraError(null);
-      onShowToast('Loading on-device face recognition models...', 'info');
-      await LocalMLService.loadModels();
+      const { data: openSession, error: sessionError } = await (supabase.from('attendance_sessions') as any)
+        .select('id')
+        .eq('classroom_id', classId)
+        .eq('teacher_id', currentUserId)
+        .eq('status', 'open')
+        .gt('ends_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (sessionError) throw sessionError;
+      if (!openSession?.id) {
+        onShowToast('Open a teacher attendance session before scanning students.', 'warn');
+        return;
+      }
+      setActiveSessionId(openSession.id);
+      onShowToast('Server-side ArcFace attendance is active. Look at the camera.', 'success');
       const stream = await CameraService.startCamera();
       if (!videoRef.current) return;
       videoRef.current.srcObject = stream;
@@ -1634,56 +1645,52 @@ const FaceIdModule: React.FC<{ user: any, classId: string, onShowToast: any }> =
         if (!videoRef.current?.srcObject || !scanActiveRef.current || isRecognizingRef.current) return;
         isRecognizingRef.current = true;
         try {
-          const enrolled = students
-            .map(student => ({
-              id: student.id,
-              name: student.name,
-              descriptor: parseFaceDescriptor(student.face_descriptor)
-            }))
-            .filter((student): student is { id: string; name: string; descriptor: Float32Array } => Boolean(student.descriptor));
+          if (!activeSessionId) return;
+          const canvas = document.createElement('canvas');
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+          const context = canvas.getContext('2d');
+          if (!context) return;
+          context.drawImage(videoRef.current, 0, 0);
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+          if (!blob) return;
 
-          if (!enrolled.length) {
-            onShowToast('No enrolled face descriptors found. Ask students to re-enroll biometrics.', 'warn');
-            return;
-          }
-
-          const match = await LocalMLService.matchFace(videoRef.current, enrolled);
-          if (!match?.studentId || !match.name) {
+          const payload = await sendAttendanceFrame(classId, activeSessionId, blob);
+          const results = Array.isArray(payload.results) ? payload.results : [];
+          if (!results.length) {
             setDetectionBox(null);
             return;
           }
 
-          const box = match.box;
-          if (box && videoRef.current.videoWidth && videoRef.current.videoHeight) {
-            setDetectionBox({
-              x: (box.x / videoRef.current.videoWidth) * 100,
-              y: (box.y / videoRef.current.videoHeight) * 100,
-              w: (box.width / videoRef.current.videoWidth) * 100,
-              h: (box.height / videoRef.current.videoHeight) * 100
-            });
-          }
-
-          if (seenStudentIdsRef.current.has(match.studentId) || pendingMatch) return;
-          const student = students.find(candidate => candidate.id === match.studentId);
+          const result = results.find((candidate: any) => candidate.student_id) || results[0];
+          const student = result.student_id ? students.find(candidate => candidate.id === result.student_id) : null;
+          const numericConfidence = typeof result.confidence === 'number'
+            ? result.confidence <= 1 ? Math.round(result.confidence * 100) : Math.round(result.confidence)
+            : typeof result.similarity === 'number' ? Math.round(result.similarity * 100) : 0;
+          const matchId = result.student_id || null;
+          const matchName = student?.name || 'Unknown person';
           const matchData = {
             ...student,
-            id: match.studentId,
-            name: match.name,
-            confidence: match.confidence,
+            id: matchId,
+            name: matchName,
+            confidence: numericConfidence,
+            observationId: result.observation_id,
             time: new Date().toLocaleTimeString(),
-            uniqueId: uuidv4()
+            uniqueId: uuidv4(),
           };
 
-          if (match.confidence >= 80) {
-            const saved = await logAttendance(match.studentId, match.name);
+          if (result.status === 'MATCHED' && matchId && !seenStudentIdsRef.current.has(matchId)) {
+            const saved = await logAttendance(matchId, matchName);
             if (saved) {
-              seenStudentIdsRef.current.add(match.studentId);
+              seenStudentIdsRef.current.add(matchId);
               setIdentified(prev => [matchData, ...prev]);
-              onShowToast(`Student recognized: ${match.name} (${match.confidence}%)`, 'success');
+              onShowToast(`Student recognized by Render AI: ${matchName} (${numericConfidence}%)`, 'success');
             }
-          } else {
+          } else if ((result.status === 'REVIEW' || result.status === 'AMBIGUOUS') && matchId && !pendingMatch) {
             setPendingMatch(matchData);
             onShowToast('Potential match detected. Manual confirmation required.', 'warn');
+          } else if (result.status === 'UNKNOWN') {
+            onShowToast('Unknown face detected; no attendance was recorded.', 'info');
           }
         } catch (error) {
           console.error('[Attendance] Recognition error:', error);

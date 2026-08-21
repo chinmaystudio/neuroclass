@@ -4,7 +4,6 @@ import { X, Camera, ArrowRight, CheckCircle2, RotateCcw, ShieldCheck, ArrowLeft,
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { CameraService } from '../../services/ml/CameraService';
-import { LocalMLService } from '../../services/ml/LocalMLService';
 
 interface JoinClassWizardProps {
   isOpen: boolean;
@@ -132,13 +131,8 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
       setError('You must be logged in.');
       return;
     }
-
-    // Determine face descriptor: use existing if available and not re-scanned
-    let finalDescriptor = existingFaceData?.descriptor || null;
-    let finalSamples = studentDetails.faceSamples;
-
-    if (!finalDescriptor && studentDetails.faceSamples.length < 5) {
-      setError('Please capture all 5 face samples first or enable your camera.');
+    if (studentDetails.faceSamples.length < 5 && !existingFaceData) {
+      setError('Please capture all 5 face samples first.');
       return;
     }
 
@@ -146,33 +140,17 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
     setError(null);
     
     try {
-      // If camera was used to capture new face samples, extract updated descriptor
-      if (videoRef.current && isCapturing) {
-        await LocalMLService.loadModels();
-        const newDescriptor = await LocalMLService.getFaceDescriptor(videoRef.current);
-        if (newDescriptor) {
-          finalDescriptor = JSON.stringify(Array.from(newDescriptor));
-        }
-      }
-
-      if (!finalDescriptor) {
-        throw new Error('Face descriptor missing. Please capture your face samples.');
-      }
-
-      // 1. Lookup Classroom
       const sanitizedCode = joinCode.trim().toUpperCase();
       const { data: classroom, error: classErr } = await supabase
         .from('classrooms')
         .select('*')
         .eq('code', sanitizedCode)
         .single();
-      
       if (classErr || !classroom) {
         throw new Error('Classroom not found. Please verify the 6-character code.');
       }
 
-      // 2. Insert into Students table for this classroom
-      const { error: enrollErr } = await supabase
+      const { data: student, error: enrollErr } = await supabase
         .from('students')
         .insert({
           classroom_id: classroom.id,
@@ -181,28 +159,24 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
           roll_number: studentDetails.rollNumber,
           phone: studentDetails.phoneNumber,
           email: user.email || '',
-          face_samples: finalSamples,
-          face_descriptor: typeof finalDescriptor === 'string' ? finalDescriptor : JSON.stringify(finalDescriptor),
-          joined_at: new Date().toISOString()
-        });
-      
-      if (enrollErr) {
-        if (enrollErr.message?.includes('unique') || enrollErr.code === '23505') {
+          face_samples: studentDetails.faceSamples,
+          joined_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+      if (enrollErr || !student) {
+        if (enrollErr?.message?.includes('unique') || enrollErr?.code === '23505') {
           throw new Error('You are already enrolled in this classroom.');
         }
-        throw enrollErr;
+        throw enrollErr || new Error('Unable to create student profile.');
       }
 
-      // 3. Update all student profiles for this user with the unified face descriptor
-      await supabase
-        .from('students')
-        .update({
-          face_descriptor: typeof finalDescriptor === 'string' ? finalDescriptor : JSON.stringify(finalDescriptor),
-          face_samples: finalSamples,
-        })
-        .eq('user_id', user.id);
+      if (studentDetails.faceSamples.length > 0) {
+        const { uploadFaceSamples } = await import('../../services/api/faceRegistration');
+        const blobs = await Promise.all(studentDetails.faceSamples.map(async (dataUrl) => (await fetch(dataUrl)).blob()));
+        await uploadFaceSamples(student.id, classroom.id, blobs);
+      }
 
-      // 4. Update Classroom student count
       await supabase
         .from('classrooms')
         .update({ students: (classroom.students || 0) + 1 })
