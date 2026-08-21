@@ -45,7 +45,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     }
   };
 
-  const openAttendanceSession = async () => {
+  const openAttendanceSession = async (): Promise<any | null> => {
     setSessionBusy(true);
     setCameraError(null);
     setSessionNotice(null);
@@ -60,7 +60,8 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Could not open an attendance session.');
       await startAttendanceSession(classId, payload.session.id);
-      setActiveSession({ ...payload.session, pin: payload.pin, challengeToken: payload.challengeToken });
+      const nextSession = { ...payload.session, pin: payload.pin, challengeToken: payload.challengeToken };
+      setActiveSession(nextSession);
       setSessionNotice(`Session PIN: ${payload.pin}. ${payload.warning || 'Session is ready.'}`);
       try {
         await startCamera();
@@ -68,8 +69,10 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       } catch (cameraStartError: any) {
         setCameraError(cameraStartError.message || 'Session opened, but camera access is still required.');
       }
+      return nextSession;
     } catch (error: any) {
       setCameraError(error.message || 'Could not open an attendance session.');
+      return null;
     } finally {
       setSessionBusy(false);
     }
@@ -120,7 +123,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   };
 
   const startCamera = async () => {
-    if (isCameraActive && streamRef.current) return;
+    if (streamRef.current) return;
     setCameraError(null);
     const stream = await CameraService.startCamera();
     const video = videoRef.current;
@@ -164,29 +167,44 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     }
   };
 
+  const waitForVideoFrame = async (video: HTMLVideoElement) => {
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0) return;
+    await new Promise<void>((resolve) => {
+      const onReady = () => {
+        video.removeEventListener('loadeddata', onReady);
+        video.removeEventListener('canplay', onReady);
+        resolve();
+      };
+      video.addEventListener('loadeddata', onReady, { once: true });
+      video.addEventListener('canplay', onReady, { once: true });
+      window.setTimeout(resolve, 1200);
+    });
+    if (video.videoWidth < 1 || video.videoHeight < 1) throw new Error('Camera is still warming up. Please wait one second and capture again.');
+  };
+
   const captureFrameBlob = async (video: HTMLVideoElement): Promise<Blob | null> => {
+    await waitForVideoFrame(video);
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
   };
 
   const processSingle = async () => {
-    if (!videoRef.current || !isCameraActive || !activeSession) {
-      setCameraError('Open an attendance session before scanning students.');
-      return;
-    }
     setIsAnalyzing(true);
-    
     try {
+      const sessionForScan = activeSession || await openAttendanceSession();
+      if (!sessionForScan) return;
+      if (!isCameraActive && !streamRef.current) await startCamera();
+      if (!videoRef.current) throw new Error('Camera preview is not ready.');
       const blob = await captureFrameBlob(videoRef.current);
       if (!blob) throw new Error('Could not capture frame');
       
       const { sendAttendanceFrame } = await import('../../services/api/attendance');
-      const result = await sendAttendanceFrame(classId, activeSession.id, blob);
+      const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
       
       if (result.results && result.results.length > 0) {
         for (const match of result.results) {
@@ -210,46 +228,51 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   };
 
   const registerFace = async () => {
-    if (!videoRef.current || !selectedStudentForReg) return;
+    setCameraError(null);
+    if (!selectedStudentForReg) {
+      setCameraError('Select a student before capturing face samples.');
+      return;
+    }
     setIsAnalyzing(true);
-    
     try {
+      if (!isCameraActive && !streamRef.current) await startCamera();
+      if (!videoRef.current) throw new Error('Camera preview is not ready.');
       const blob = await captureFrameBlob(videoRef.current);
-      if (!blob) throw new Error('Could not capture frame');
-      
+      if (!blob) throw new Error('Could not capture a camera frame.');
+
       const nextSamples = [...registrationSamples, blob].slice(-10);
+      setRegistrationSamples(nextSamples);
       if (nextSamples.length < 5) {
-        setRegistrationSamples(nextSamples);
-        setCameraError(`Sample ${nextSamples.length}/5 captured. Change your angle slightly and capture another sample.`);
+        setSessionNotice(`Sample ${nextSamples.length}/5 captured. Change your angle slightly and capture another sample.`);
         return;
       }
+      setSessionNotice('Uploading five face samples through the secure gateway…');
       const { uploadFaceSamples } = await import('../../services/api/faceRegistration');
       await uploadFaceSamples(selectedStudentForReg, classId, nextSamples);
-      
-      alert(`Face registered successfully with ${nextSamples.length} samples!`);
+
+      setSessionNotice(`Face registered successfully with ${nextSamples.length} samples.`);
       setRegistrationSamples([]);
-      fetchStudents();
+      await fetchStudents();
     } catch (e: any) {
       console.error('Face registration failed:', e);
-      alert(e.message || "Registration failed. Please try again.");
+      setCameraError(e.message || 'Registration failed. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const captureAndProcessGroup = async () => {
-    if (!videoRef.current || !isCameraActive || !activeSession) {
-      setCameraError(!activeSession ? 'Open an attendance session before scanning students.' : 'Activate the camera before scanning students.');
-      return;
-    }
     setIsAnalyzing(true);
-    
     try {
+      const sessionForScan = activeSession || await openAttendanceSession();
+      if (!sessionForScan) return;
+      if (!isCameraActive && !streamRef.current) await startCamera();
+      if (!videoRef.current) throw new Error('Camera preview is not ready.');
       const blob = await captureFrameBlob(videoRef.current);
       if (!blob) throw new Error('Could not capture frame');
       
       const { sendAttendanceFrame } = await import('../../services/api/attendance');
-      const result = await sendAttendanceFrame(classId, activeSession.id, blob);
+      const result = await sendAttendanceFrame(classId, sessionForScan.id, blob);
       
       if (result.results && result.results.length > 0) {
         for (const match of result.results) {
@@ -348,8 +371,11 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
 
                   <div className="relative z-30 pointer-events-auto flex flex-col gap-4">
             <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-slate-800/60 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">
-              {activeSession ? (isCameraActive ? 'Ready: session and camera are active.' : 'Next step: activate the camera.') : 'Next step: open an attendance session.'}
+              {mode === 'register'
+                ? (isCameraActive ? 'Registration ready: capture five samples. No attendance session is required.' : 'Next step: activate the camera.')
+                : (activeSession ? (isCameraActive ? 'Ready: session and camera are active.' : 'Next step: activate the camera.') : 'Ready to start: click Scan Group to open a session and scan.')}
             </div>
+            {cameraError && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-rose-600">{cameraError}</div>}
 
           {mode === 'register' ? (
             <div className="flex flex-col gap-3">
@@ -381,7 +407,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
                 onClick={mode === 'single' ? processSingle : captureAndProcessGroup}
                 className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-wait disabled:opacity-60"
               >
-                {mode === 'single' ? 'Analyze Individual' : 'Scan Group (10-12 Photos recommended)'}
+                {mode === 'single' ? (activeSession ? 'Analyze Individual' : 'Start Session & Analyze') : (activeSession ? 'Scan Group (10-12 Photos recommended)' : 'Start Session & Scan Group')}
               </button>
               <button type="button" onClick={toggleCamera} className="px-6 py-4 bg-rose-500/10 text-rose-500 rounded-[20px]">
                 <Camera size={20} />
