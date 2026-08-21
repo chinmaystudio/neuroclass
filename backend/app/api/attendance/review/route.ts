@@ -52,16 +52,35 @@ export async function POST(request: Request): Promise<Response> {
     if (updateError) throw new GatewayError('Unable to persist review decision', 500);
 
     if (studentId && decision !== 'ABSENT') {
-      const { error } = await auth.db.from('attendance').upsert({
-        session_id: sessionId,
-        classroom_id: session.classroom_id,
-        student_id: studentId,
-        student_name: enrolledStudent?.name || 'Student',
-        status: decision === 'LATE' ? 'Late' : 'Present',
-        confidence: observation.confidence,
-        verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
-      }, { onConflict: 'session_id,student_id' });
-      if (error) throw new GatewayError('Unable to persist reviewed attendance', 500);
+      // Avoid upsert due to partial index limitation on ON CONFLICT
+      const { data: existing, error: checkErr } = await auth.db
+        .from('attendance')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('student_id', studentId)
+        .maybeSingle();
+
+      if (checkErr) throw new GatewayError('Unable to check existing attendance', 500);
+
+      if (existing) {
+        const { error } = await auth.db.from('attendance').update({
+          status: decision === 'LATE' ? 'Late' : 'Present',
+          confidence: observation.confidence,
+          verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
+        }).eq('id', existing.id);
+        if (error) throw new GatewayError('Unable to persist reviewed attendance', 500);
+      } else {
+        const { error } = await auth.db.from('attendance').insert({
+          session_id: sessionId,
+          classroom_id: session.classroom_id,
+          student_id: studentId,
+          student_name: enrolledStudent?.name || 'Student',
+          status: decision === 'LATE' ? 'Late' : 'Present',
+          confidence: observation.confidence,
+          verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
+        });
+        if (error) throw new GatewayError('Unable to persist reviewed attendance', 500);
+      }
     }
 
     return withCors(NextResponse.json({ session_id: sessionId, observation_id: observationId, decision, student_id: studentId || null, status: 'REVIEW_RECORDED' }), request.headers.get('origin'));

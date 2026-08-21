@@ -158,12 +158,49 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
     confidence: typeof result.similarity === 'number' ? result.similarity : null,
     verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
   }));
-  const { error: attendanceError } = await auth.db
+
+  // Supabase/PostgreSQL ON CONFLICT cannot use a partial index (WHERE session_id IS NOT NULL).
+  // So we manually check for existing records and update/insert accordingly.
+  const { data: existingAttendance, error: fetchError } = await auth.db
     .from('attendance')
-    .upsert(attendanceRows, { onConflict: 'session_id,student_id' });
-  if (attendanceError) {
-    console.error('[attendance.manual] materialization failed', { message: attendanceError.message, code: attendanceError.code, details: attendanceError.details, hint: attendanceError.hint });
+    .select('id, student_id')
+    .eq('session_id', session.id)
+    .in('student_id', studentIds);
+
+  if (fetchError) {
+    console.error('[attendance.manual] fetch existing failed', fetchError);
     throw new GatewayError('Unable to persist reviewed attendance', 500);
+  }
+
+  const existingIds = new Set((existingAttendance || []).map(a => a.student_id));
+  const toInsert = attendanceRows.filter(row => !existingIds.has(row.student_id));
+  const toUpdate = attendanceRows.filter(row => existingIds.has(row.student_id));
+
+  if (toInsert.length > 0) {
+    const { error: insertError } = await auth.db.from('attendance').insert(toInsert);
+    if (insertError) {
+      console.error('[attendance.manual] insert failed', insertError);
+      throw new GatewayError('Unable to persist reviewed attendance', 500);
+    }
+  }
+
+  if (toUpdate.length > 0) {
+    // Supabase JS doesn't support bulk updates with different values per row easily,
+    // but in this case, the status and verified_method are the same for all.
+    // We can just update them all in one go.
+    const { error: updateError } = await auth.db
+      .from('attendance')
+      .update({
+        status: 'Present',
+        verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
+      })
+      .eq('session_id', session.id)
+      .in('student_id', Array.from(existingIds));
+      
+    if (updateError) {
+      console.error('[attendance.manual] update failed', updateError);
+      throw new GatewayError('Unable to persist reviewed attendance', 500);
+    }
   }
   const persistedIds = new Set(validPresent.map((result) => result.student_id));
   return results.map((result) => persistedIds.has(result.student_id) ? { ...result, attendance_persisted: true } : result);
