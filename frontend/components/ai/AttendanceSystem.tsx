@@ -1,11 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, Users, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { LocalMLService } from '../../services/ml/LocalMLService';
 import { CameraService } from '../../services/ml/CameraService';
 import { EmailService } from '../../services/ml/EmailService';
 import { supabase } from '../../database/supabase';
-import * as faceapi from '@vladmandic/face-api';
 import { logEvent } from '../../database/analytics';
 import { getApiUrl } from '../../config/apiConfig';
 
@@ -14,16 +12,7 @@ interface AttendanceSystemProps {
   className: string;
 }
 
-const toDescriptor = (value: unknown): Float32Array | null => {
-  if (!value) return null;
-  try {
-    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
-    if (Array.isArray(parsed) && parsed.length > 0) return new Float32Array(parsed.map(Number));
-    return null;
-  } catch {
-    return null;
-  }
-};
+
 
 export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, className }) => {
   const [mode, setMode] = useState<'single' | 'group' | 'register'>('single');
@@ -40,7 +29,6 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    LocalMLService.loadModels();
     fetchStudents();
   }, [classId]);
 
@@ -134,6 +122,16 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     }
   };
 
+  const captureFrameBlob = async (video: HTMLVideoElement): Promise<Blob | null> => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0);
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+  };
+
   const processSingle = async () => {
     if (!videoRef.current || !isCameraActive || !activeSession) {
       setCameraError('Open an attendance session before scanning students.');
@@ -141,59 +139,53 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     }
     setIsAnalyzing(true);
     
-    // Convert descriptors from strings back to Float32Array
-    const enrolled = students
-      .filter(s => s.face_descriptor)
-      .map(s => ({
-        id: s.id,
-        name: s.name,
-        descriptor: toDescriptor(s.face_descriptor)
-      })).filter((s): s is { id: string; name: string; descriptor: Float32Array } => Boolean(s.descriptor));
-
-    const match = await LocalMLService.matchFace(videoRef.current, enrolled);
-    
-    if (match) {
-      try {
-        await recordTeacherAttendance({ id: match.studentId, name: match.name }, match.confidence, 'single');
-      } catch (error: any) {
-        setCameraError(error.message || 'Failed to record attendance.');
-        setIsAnalyzing(false);
-        return;
+    try {
+      const blob = await captureFrameBlob(videoRef.current);
+      if (!blob) throw new Error('Could not capture frame');
+      
+      const { sendAttendanceFrame } = await import('../../services/api/attendance');
+      const result = await sendAttendanceFrame(classId, activeSession.id, blob);
+      
+      if (result.results && result.results.length > 0) {
+        for (const match of result.results) {
+          if (match.status === 'PRESENT' && match.student_id) {
+            if (!identified.find(i => i.studentId === match.student_id)) {
+              setIdentified(prev => [{ studentId: match.student_id, name: match.name, confidence: match.confidence === 'HIGH' ? 95 : 75 }, ...prev]);
+              const student = students.find(s => s.id === match.student_id);
+              if (student) {
+                logEvent('Attendance', 'Student Identified', student.name);
+                await EmailService.sendAttendanceEmail(student.email, student.name, className);
+              }
+            }
+          }
+        }
       }
-      setIdentified(prev => [match, ...prev]);
-      const student = students.find(s => s.id === match.studentId);
-      if (student) {
-        logEvent('Attendance', 'Student Identified', student.name);
-        await EmailService.sendAttendanceEmail(student.email, student.name, className);
-      }
+    } catch (error: any) {
+      setCameraError(error.message || 'Failed to record attendance via AI service.');
+    } finally {
+      setIsAnalyzing(false);
     }
-    setIsAnalyzing(false);
   };
 
   const registerFace = async () => {
     if (!videoRef.current || !selectedStudentForReg) return;
     setIsAnalyzing(true);
     
-    const descriptor = await LocalMLService.getFaceDescriptor(videoRef.current);
-    
-    if (descriptor) {
-      try {
-        const { error } = await (supabase.from('students') as any)
-          .update({ face_descriptor: JSON.stringify(Array.from(descriptor)) })
-          .eq('id', selectedStudentForReg);
-        
-        if (error) throw error;
-
-        alert("Face registered successfully!");
-        fetchStudents();
-      } catch (e) {
-        console.error('Face registration failed:', e);
-        alert("Registration failed. Please try again.");
-      }
-    } else {
-      alert("No face detected. Please look clearly at the camera.");
+    try {
+      const blob = await captureFrameBlob(videoRef.current);
+      if (!blob) throw new Error('Could not capture frame');
+      
+      const { uploadFaceSamples } = await import('../../services/api/faceRegistration');
+      await uploadFaceSamples(selectedStudentForReg, classId, [blob]);
+      
+      alert("Face registered successfully!");
+      fetchStudents();
+    } catch (e: any) {
+      console.error('Face registration failed:', e);
+      alert(e.message || "Registration failed. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
     }
-    setIsAnalyzing(false);
   };
 
   const captureAndProcessGroup = async () => {
@@ -203,42 +195,32 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     }
     setIsAnalyzing(true);
     
-    const enrolled = students
-      .filter(s => s.face_descriptor)
-      .map(s => ({
-        id: s.id,
-        name: s.name,
-        descriptor: toDescriptor(s.face_descriptor)
-      })).filter((s): s is { id: string; name: string; descriptor: Float32Array } => Boolean(s.descriptor));
-
-    // Find all faces in the current frame
-    const detections = await (faceapi as any).detectAllFaces(videoRef.current, new (faceapi as any).TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptors();
-
-    const faceMatcher = new (faceapi as any).FaceMatcher(
-      enrolled.map(d => new (faceapi as any).LabeledFaceDescriptors(d.id, [d.descriptor]))
-    );
-
-    const matches = detections.map((d: any) => faceMatcher.findBestMatch(d.descriptor));
-    
-    for (const match of matches) {
-      if (match.label !== 'unknown' && match.distance < 0.6) {
-        const student = students.find(s => s.id === match.label);
-        if (student && !identified.find(i => i.studentId === student.id)) {
-          try {
-            await recordTeacherAttendance(student, (1 - match.distance) * 100, 'group');
-          } catch (error: any) {
-            if (!String(error.message || '').toLowerCase().includes('already marked')) setCameraError(error.message || 'Failed to record attendance.');
-            continue;
+    try {
+      const blob = await captureFrameBlob(videoRef.current);
+      if (!blob) throw new Error('Could not capture frame');
+      
+      const { sendAttendanceFrame } = await import('../../services/api/attendance');
+      const result = await sendAttendanceFrame(classId, activeSession.id, blob);
+      
+      if (result.results && result.results.length > 0) {
+        for (const match of result.results) {
+          if (match.status === 'PRESENT' && match.student_id) {
+            if (!identified.find(i => i.studentId === match.student_id)) {
+              setIdentified(prev => [{ studentId: match.student_id, name: match.name, confidence: match.confidence === 'HIGH' ? 95 : 75 }, ...prev]);
+              const student = students.find(s => s.id === match.student_id);
+              if (student) {
+                logEvent('Attendance', 'Student Identified', student.name);
+                await EmailService.sendAttendanceEmail(student.email, student.name, className);
+              }
+            }
           }
-          setIdentified(prev => [{ studentId: student.id, name: student.name, confidence: (1 - match.distance) * 100 }, ...prev]);
-          await EmailService.sendAttendanceEmail(student.email, student.name, className);
         }
       }
+    } catch (error: any) {
+      setCameraError(error.message || 'Failed to record group attendance via AI service.');
+    } finally {
+      setIsAnalyzing(false);
     }
-
-    setIsAnalyzing(false);
   };
 
   return (
