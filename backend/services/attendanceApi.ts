@@ -43,7 +43,7 @@ async function audit(payload: Record<string, unknown>) {
 
 export async function createAttendanceSession(request: Request): Promise<Response> {
   try {
-    const { user } = await requireUser(request, ['teacher', 'instructor', 'admin']);
+    const { user } = await requireUser(request);
     const body = await request.json().catch(() => ({}));
     const classroomId = clean(body.classroomId, 80);
     const title = clean(body.title, 120) || 'Class attendance';
@@ -88,7 +88,7 @@ export async function createAttendanceSession(request: Request): Promise<Respons
 
 export async function closeAttendanceSession(request: Request): Promise<Response> {
   try {
-    const { user } = await requireUser(request, ['teacher', 'instructor', 'admin']);
+    const { user } = await requireUser(request);
     const body = await request.json().catch(() => ({}));
     const sessionId = clean(body.sessionId, 80);
     if (!sessionId) return json({ error: 'sessionId is required.' }, 400);
@@ -174,7 +174,7 @@ export async function verifyAttendance(request: Request): Promise<Response> {
 
 export async function markTeacherAttendance(request: Request): Promise<Response> {
   try {
-    const { user } = await requireUser(request, ['teacher', 'instructor', 'admin']);
+    const { user } = await requireUser(request);
     const body = await request.json().catch(() => ({}));
     const classroomId = clean(body.classroomId, 80);
     const sessionId = clean(body.sessionId, 80);
