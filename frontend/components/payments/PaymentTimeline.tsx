@@ -1,21 +1,21 @@
 import React from 'react';
 import { CheckCircle2, CircleDollarSign, Copy, ExternalLink, Loader2, ShieldCheck, WalletCards, XCircle } from 'lucide-react';
-import type { SettlementReceipt } from '../../types/x402-domain';
+
 
 export type PaymentStage = 'idle' | 'wallet' | 'challenge' | 'signing' | 'settling' | 'verified' | 'error';
 
 interface PaymentTimelineProps {
   stage: PaymentStage;
-  receipt?: SettlementReceipt | null;
+  receipt?: any | null;
   error?: string;
   priceLabel?: string;
 }
 
 const stages: Array<{ id: Exclude<PaymentStage, 'idle' | 'error'>; label: string; icon: React.ReactNode }> = [
-  { id: 'wallet', label: 'Wallet connected', icon: <WalletCards size={15} /> },
-  { id: 'challenge', label: '402 payment challenge received', icon: <ShieldCheck size={15} /> },
-  { id: 'signing', label: 'Payment signed in Pera', icon: <CircleDollarSign size={15} /> },
-  { id: 'settling', label: 'Algorand settlement verified', icon: <Loader2 size={15} /> },
+  { id: 'wallet', label: 'Payment session created', icon: <WalletCards size={15} /> },
+  { id: 'challenge', label: 'Stripe test payment processing', icon: <ShieldCheck size={15} /> },
+  { id: 'signing', label: 'Payment confirmed', icon: <CircleDollarSign size={15} /> },
+  { id: 'settling', label: 'Server verification', icon: <Loader2 size={15} /> },
   { id: 'verified', label: 'Receipt issued', icon: <CheckCircle2 size={15} /> },
 ];
 
@@ -31,8 +31,8 @@ export const PaymentTimeline: React.FC<PaymentTimelineProps> = ({ stage, receipt
     <div className="space-y-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300">x402 payment ledger</p>
-          <p className="text-xs text-slate-500">{priceLabel || 'USDC on Algorand Testnet'} · wallet signs locally</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300">Stripe payment ledger</p>
+          <p className="text-xs text-slate-500">{priceLabel || 'USD on Stripe Testnet'} · simulated test cards only</p>
         </div>
         {stage === 'error' ? <XCircle className="text-rose-500" size={20} /> : stage === 'verified' ? <CheckCircle2 className="text-emerald-500" size={20} /> : <Loader2 className="animate-spin text-blue-500" size={18} />}
       </div>

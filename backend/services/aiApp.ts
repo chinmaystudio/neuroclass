@@ -1,7 +1,8 @@
 import { cors } from 'hono/cors';
 import type { Context } from 'hono';
 import { aiGenerationService } from './aiGenerationService';
-import { addSettlementReceipt, x402App } from './x402Routes';
+import { Hono } from 'hono';
+export const aiApp = new Hono();
 import { supabase } from '../database/supabase';
 
 const boundedText = (value: unknown, field: string, maxLength: number): string => {
@@ -108,29 +109,29 @@ const withHandlerErrors = async (c: Context, handler: () => Promise<Response>) =
   }
 };
 
-x402App.use('*', cors({
+aiApp.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'X-PAYMENT'],
   exposeHeaders: ['PAYMENT-RESPONSE', 'X-402-Transaction-Id'],
 }));
 
-x402App.options('*', (c) => c.body(null, 204));
+aiApp.options('*', (c) => c.body(null, 204));
 
-x402App.post('/api/ai/generate-test', async (c) => withHandlerErrors(c, async () => {
+aiApp.post('/api/ai/generate-test', async (c) => withHandlerErrors(c, async () => {
   const params = validateTestBody(await getObjectBody(c));
   const test = await aiGenerationService.generateTest(params);
   return c.json({ success: true, test });
 }));
 
-x402App.post('/api/ai/generate-assignment', async (c) => withHandlerErrors(c, async () => {
+aiApp.post('/api/ai/generate-assignment', async (c) => withHandlerErrors(c, async () => {
   const assignment = await aiGenerationService.generateAssignment(
     validateAssignmentBody(await getObjectBody(c)),
   );
   return c.json({ success: true, assignment });
 }));
 
-x402App.post('/api/ai/project-idea', async (c) => withHandlerErrors(c, async () => {
+aiApp.post('/api/ai/project-idea', async (c) => withHandlerErrors(c, async () => {
   const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return c.json({ error: 'Authentication is required.' }, 401);
   const { data: authData, error: authError } = await supabase.auth.getUser(token);
@@ -141,7 +142,7 @@ x402App.post('/api/ai/project-idea', async (c) => withHandlerErrors(c, async () 
   return c.json({ success: true, project });
 }));
 
-x402App.post('/api/ai/classroom-answer', async (c) => withHandlerErrors(c, async () => {
+aiApp.post('/api/ai/classroom-answer', async (c) => withHandlerErrors(c, async () => {
   const { classroomId, question, threadId, learnerProfile } = validateClassroomAnswerBody(await getObjectBody(c));
   const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return c.json({ error: 'Authentication is required.' }, 401);
@@ -214,7 +215,7 @@ x402App.post('/api/ai/classroom-answer', async (c) => withHandlerErrors(c, async
   return c.json({ success: true, threadId: thread.id, userMessageId: userMessage.id, assistantMessageId: assistantMessage.id, answer, sources: (materials || []).map((item: any) => item.name) });
 }));
 
-x402App.get('/api/ai/classroom-analytics', async (c) => withHandlerErrors(c, async () => {
+aiApp.get('/api/ai/classroom-analytics', async (c) => withHandlerErrors(c, async () => {
   const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return c.json({ error: 'Authentication is required.' }, 401);
   const { data: authData, error: authError } = await supabase.auth.getUser(token);
@@ -234,7 +235,7 @@ x402App.get('/api/ai/classroom-analytics', async (c) => withHandlerErrors(c, asy
   return c.json({ analytics: { classroomId, classroomName: classroom.name, threadCount: threadCount || 0, messageCount: messageCount || 0, feedbackCount: feedbackCount || 0, materialCount: materialCount || 0, readyMaterialCount: readyMaterialCount || 0 } });
 }));
 
-x402App.post('/api/ai/feedback', async (c) => withHandlerErrors(c, async () => {
+aiApp.post('/api/ai/feedback', async (c) => withHandlerErrors(c, async () => {
   const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return c.json({ error: 'Authentication is required.' }, 401);
   const { data: authData, error: authError } = await supabase.auth.getUser(token);
@@ -254,7 +255,6 @@ x402App.post('/api/ai/feedback', async (c) => withHandlerErrors(c, async () => {
   return c.json({ success: true });
 }));
 
-export async function handleX402AiRequest(request: Request): Promise<Response> {
-  const response = await x402App.fetch(request);
-  return addSettlementReceipt(request, response);
+export async function handleAiRequest(request: Request): Promise<Response> {
+  return aiApp.fetch(request);
 }

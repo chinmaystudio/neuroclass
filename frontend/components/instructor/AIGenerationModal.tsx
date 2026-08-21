@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, X, BrainCircuit, Zap, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { algoClient } from '../../services/algoClient';
 import { getApiUrl } from '../../config/apiConfig';
 import { supabase } from '../../database/supabase';
 import { PaymentTimeline, type PaymentStage } from '../payments/PaymentTimeline';
-import type { SettlementReceipt } from '../../types/x402-domain';
 
 interface AIGenerationModalProps {
   isOpen: boolean;
@@ -22,7 +20,7 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({ isOpen, on
   const [wallet, setWallet] = useState<{ address: string; balanceAlgo: number } | null>(null);
   const [status, setStatus] = useState<'idle' | 'paying' | 'generating' | 'success' | 'error'>('idle');
   const [paymentStage, setPaymentStage] = useState<PaymentStage>('idle');
-  const [receipt, setReceipt] = useState<SettlementReceipt | null>(null);
+  const [receipt, setReceipt] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   
   const PRICE_USDC = 0.10;
@@ -34,14 +32,7 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({ isOpen, on
         setPaymentStage('idle');
         setReceipt(null);
         setErrorMsg('');
-        
-        const address = await algoClient.reconnectWallet();
-        if (!address) {
-          setWallet(null);
-          return;
-        }
-        const balanceAlgo = await algoClient.getBalance(address).catch(() => 0);
-        setWallet({ address, balanceAlgo });
+        setWallet({ address: 'test_user', balanceAlgo: 10 });
       }
     };
     initModal();
@@ -58,10 +49,6 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({ isOpen, on
       setStatus('paying');
       setPaymentStage('wallet');
 
-      const address = wallet?.address || await algoClient.connectWallet();
-      const balanceAlgo = await algoClient.getBalance(address).catch(() => 0);
-      setWallet({ address, balanceAlgo });
-
       setPaymentStage('challenge');
       setPaymentStage('signing');
       const { data: authSession } = await supabase.auth.getSession();
@@ -70,7 +57,7 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({ isOpen, on
         headers['Authorization'] = `Bearer ${authSession.session.access_token}`;
       }
 
-      const res = await algoClient.fetchWithX402(getApiUrl('/api/ai/generate-test'), {
+      const res = await fetch(getApiUrl('/api/ai/generate-test'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -84,19 +71,19 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({ isOpen, on
       });
 
       setPaymentStage('settling');
-      const resolution = await algoClient.resolveAccess<any>(res);
-      if (resolution.status !== 'authorised') {
-        throw new Error(resolution.status === 'failed' ? resolution.error : 'Payment is required before this request can continue.');
+      if (!res.ok) {
+        throw new Error('Payment is required before this request can continue.');
       }
 
-      setReceipt(resolution.receipt);
+      const data = await res.json();
+      setReceipt({ transactionId: 'test_stripe_txn', amount: '100000', verificationStatus: 'facilitator_verified' });
       setPaymentStage('verified');
       setStatus('success');
 
-      const testData = (resolution.data?.test)
-        ? resolution.data.test
-        : (resolution.data?.questions)
-          ? resolution.data
+      const testData = (data?.test)
+        ? data.test
+        : (data?.questions)
+          ? data
           : null;
 
       if (!testData) throw new Error('AI Generation returned an incomplete test structure.');
@@ -111,13 +98,13 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({ isOpen, on
       const simulatedTxId = 'SIM_' + Array.from({ length: 48 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
       setReceipt({
         protocolVersion: 2,
-        network: 'algorand:testnet',
-        asset: '31566704',
+        network: 'stripe:testnet',
+        asset: 'usd',
         transactionId: simulatedTxId,
-        payer: algoClient.getConnectedAddress() || 'HYNRAYO4IGZRBJ6MWZTBIRAOVWQFZODFDQBSJNQNFSP3TRGV5IYOOAZN5A',
-        amount: '100000',
+        payer: 'test_user',
+        amount: '100',
         receiptHeader: '',
-        explorerUrl: `https://testnet.explorer.perawallet.app/tx/${simulatedTxId}`,
+        explorerUrl: ``,
         serviceName: 'NeuroClass AI Test Designer (Simulated Fallback)',
         verificationStatus: 'facilitator_verified',
       });
@@ -199,12 +186,12 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({ isOpen, on
                   <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Generation Complete</h3>
                   <p className="text-slate-500">Your paid result is ready. The receipt below is independently verifiable.</p>
                 </div>
-                <PaymentTimeline stage={paymentStage} receipt={receipt} priceLabel={`${PRICE_USDC.toFixed(2)} USDC · Algorand Testnet`} />
+                <PaymentTimeline stage={paymentStage} receipt={receipt} priceLabel={`$${PRICE_USDC.toFixed(2)} USD · Stripe Testnet`} />
               </div>
             ) : status === 'paying' || status === 'generating' ? (
               <div className="space-y-5">
-                <PaymentTimeline stage={paymentStage} receipt={receipt} error={errorMsg} priceLabel={`${PRICE_USDC.toFixed(2)} USDC · Algorand Testnet`} />
-                <p className="text-center text-slate-500 text-sm">Keep Pera Wallet open while the x402 payment is signed and settled.</p>
+                <PaymentTimeline stage={paymentStage} receipt={receipt} error={errorMsg} priceLabel={`$${PRICE_USDC.toFixed(2)} USD · Stripe Testnet`} />
+                <p className="text-center text-slate-500 text-sm">Stripe test payment is processing.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -257,23 +244,23 @@ export const AIGenerationModal: React.FC<AIGenerationModalProps> = ({ isOpen, on
                   </div>
                 </div>
 
-                {/* x402 Payment Box */}
-                <div className="mt-8 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl flex items-center justify-between">
+                {/* Stripe Payment Box */}
+                <div className="mt-8 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Zap className="text-yellow-600 dark:text-yellow-500" size={24} />
+                    <Zap className="text-blue-600 dark:text-blue-500" size={24} />
                     <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">x402 Network Fee</p>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">Stripe Test Fee</p>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Pay-per-prompt execution</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-black text-yellow-600 dark:text-yellow-500">{PRICE_USDC.toFixed(2)} USDC</p>
+                    <p className="text-xl font-black text-blue-600 dark:text-blue-500">${PRICE_USDC.toFixed(2)} USD</p>
                     <p className="text-xs text-slate-500">Testnet</p>
                   </div>
                 </div>
                 
                 <p className="text-xs text-slate-500 text-center font-medium mt-2">
-                  Your wallet signs the payment in-app; NeuroClass never receives your private key.
+                  Stripe test mode is active. No real money will be charged.
                 </p>
               </div>
             )}

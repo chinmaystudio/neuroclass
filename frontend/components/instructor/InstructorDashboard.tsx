@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { ClassroomList } from './ClassroomList';
 import { ClassroomDetail } from './ClassroomDetail';
-import { ProtocolDashboard } from './x402/ProtocolDashboard';
+import { StripeDashboard } from './stripe/StripeDashboard';
 import { TestDesigner } from './TestDesigner';
 import { InstructorSettings } from './InstructorSettings';
 import { AttendanceSystem } from '../ai/AttendanceSystem';
@@ -29,8 +29,8 @@ export const InstructorDashboard: React.FC = () => {
         return <ClassroomList onSelect={handleSelectClass} />;
       case 'dashboard':
         return <ClassroomList onSelect={handleSelectClass} />;
-      case 'x402':
-        return <ProtocolDashboard />;
+      case 'stripe':
+        return <StripeDashboard />;
       case 'tests':
         return <TestDesigner />;
       case 'attendance':

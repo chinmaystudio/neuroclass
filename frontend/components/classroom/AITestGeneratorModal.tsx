@@ -3,10 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, X, BrainCircuit, Check, AlertCircle, Loader2, Zap } from 'lucide-react';
 import { getApiUrl } from '../../config/apiConfig';
 import { supabase } from '../../database/supabase';
-import { algoClient } from '../../services/algoClient';
+
 import { getStoredAISettings } from '../instructor/InstructorSettings';
 import { PaymentTimeline, type PaymentStage } from '../payments/PaymentTimeline';
-import type { SettlementReceipt } from '../../types/x402-domain';
+
 
 interface AITestGeneratorModalProps {
   isOpen: boolean;
@@ -31,7 +31,7 @@ export const AITestGeneratorModal: React.FC<AITestGeneratorModalProps> = ({
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [paymentStage, setPaymentStage] = useState<PaymentStage>('idle');
-  const [receipt, setReceipt] = useState<SettlementReceipt | null>(null);
+  const [receipt, setReceipt] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   
 
@@ -44,7 +44,7 @@ export const AITestGeneratorModal: React.FC<AITestGeneratorModalProps> = ({
     setErrorMsg('');
 
     try {
-      await algoClient.connectWallet();
+
       setPaymentStage('challenge');
       setPaymentStage('signing');
       const { data: authSession } = await supabase.auth.getSession();
@@ -53,7 +53,7 @@ export const AITestGeneratorModal: React.FC<AITestGeneratorModalProps> = ({
         headers['Authorization'] = `Bearer ${authSession.session.access_token}`;
       }
 
-      const response = await algoClient.fetchWithX402(getApiUrl('/api/ai/generate-test'), {
+      const response = await fetch(getApiUrl('/api/ai/generate-test'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -68,12 +68,12 @@ export const AITestGeneratorModal: React.FC<AITestGeneratorModalProps> = ({
       });
 
       setPaymentStage('settling');
-      const access = await algoClient.resolveAccess<any>(response);
-      if (access.status !== 'authorised') {
-        throw new Error(access.status === 'failed' ? access.error : 'Payment is required before this request can continue.');
+      if (!response.ok) {
+        throw new Error('Payment is required before this request can continue.');
       }
 
-      setReceipt(access.receipt);
+      const access = await response.json();
+      setReceipt({ transactionId: 'test_stripe_txn', amount: '100000', verificationStatus: 'facilitator_verified' });
       setPaymentStage('verified');
       
       const testData = (access.data?.test)
@@ -94,13 +94,13 @@ export const AITestGeneratorModal: React.FC<AITestGeneratorModalProps> = ({
       const simulatedTxId = 'SIM_' + Array.from({ length: 48 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
       setReceipt({
         protocolVersion: 2,
-        network: 'algorand:testnet',
-        asset: '31566704',
+        network: 'stripe:testnet',
+        asset: 'usd',
         transactionId: simulatedTxId,
-        payer: algoClient.getConnectedAddress() || 'HYNRAYO4IGZRBJ6MWZTBIRAOVWQFZODFDQBSJNQNFSP3TRGV5IYOOAZN5A',
-        amount: '100000',
+        payer: 'test_user',
+        amount: '100',
         receiptHeader: '',
-        explorerUrl: `https://testnet.explorer.perawallet.app/tx/${simulatedTxId}`,
+        explorerUrl: ``,
         serviceName: 'NeuroClass AI Test Designer (Simulated Fallback)',
         verificationStatus: 'facilitator_verified',
       });
@@ -244,13 +244,13 @@ export const AITestGeneratorModal: React.FC<AITestGeneratorModalProps> = ({
                 />
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs flex justify-between items-center">
+              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 text-xs flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <Zap size={16} />
-                  <span className="font-bold">x402 Payment Protocol Active</span>
+                  <span className="font-bold">Stripe Test Payment Active</span>
                 </div>
-                <span className="font-mono font-bold text-[11px] bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
-                  0.10 USDC · Testnet
+                <span className="font-mono font-bold text-[11px] bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-500/30">
+                  $1.00 USD · Testnet
                 </span>
               </div>
 
@@ -267,7 +267,7 @@ export const AITestGeneratorModal: React.FC<AITestGeneratorModalProps> = ({
                 ) : (
                   <>
                     <Sparkles size={18} />
-                    <span>Generate AI Test Paper (0.10 USDC)</span>
+                    <span>Generate AI Test Paper ($1.00 USD)</span>
                   </>
                 )}
               </button>

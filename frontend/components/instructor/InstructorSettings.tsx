@@ -6,14 +6,14 @@ import {
   CheckCircle2, Sliders, Sparkles, Monitor, Key, RefreshCw
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import { algoClient } from '../../services/algoClient';
+
 
 // Storage keys
 export const STORAGE_KEYS = {
   PROFILE: 'neuroclass_instructor_profile',
   AI: 'neuroclass_ai_settings',
   PROCTORING: 'neuroclass_proctoring_settings',
-  X402: 'neuroclass_x402_settings',
+  STRIPE: 'neuroclass_stripe_settings',
   SYSTEM: 'neuroclass_system_settings',
 };
 
@@ -53,14 +53,11 @@ export interface ProctoringSettings {
   gazeTracking: boolean;
 }
 
-export interface X402Settings {
-  treasuryAddress: string;
-  network: string;
-  autoConnectPera: boolean;
+export interface StripeSettings {
+  testModeEnabled: boolean;
   showTransactionToasts: boolean;
-  explorerUrl: 'algoexplorer' | 'pera';
-  testPriceUsdcMicro: number;
-  assignmentPriceUsdcMicro: number;
+  testPriceUsd: number;
+  assignmentPriceUsd: number;
 }
 
 export interface SystemSettings {
@@ -106,14 +103,11 @@ export const DEFAULT_PROCTORING: ProctoringSettings = {
   gazeTracking: true,
 };
 
-export const DEFAULT_X402: X402Settings = {
-  treasuryAddress: 'HYNRAYO4IGZRBJ6MWZTBIRAOVWQFZODFDQBSJNQNFSP3TRGV5IYOOAZN5A',
-  network: 'Algorand Testnet (SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=)',
-  autoConnectPera: true,
+export const DEFAULT_STRIPE: StripeSettings = {
+  testModeEnabled: true,
   showTransactionToasts: true,
-  explorerUrl: 'pera',
-  testPriceUsdcMicro: 100000,
-  assignmentPriceUsdcMicro: 50000,
+  testPriceUsd: 1.00,
+  assignmentPriceUsd: 0.50,
 };
 
 export const DEFAULT_SYSTEM: SystemSettings = {
@@ -151,12 +145,12 @@ export function getStoredProctoringSettings(): ProctoringSettings {
   }
 }
 
-export function getStoredX402Settings(): X402Settings {
+export function getStoredStripeSettings(): StripeSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.X402);
-    return raw ? { ...DEFAULT_X402, ...JSON.parse(raw) } : DEFAULT_X402;
+    const raw = localStorage.getItem(STORAGE_KEYS.STRIPE);
+    return raw ? { ...DEFAULT_STRIPE, ...JSON.parse(raw) } : DEFAULT_STRIPE;
   } catch {
-    return DEFAULT_X402;
+    return DEFAULT_STRIPE;
   }
 }
 
@@ -179,13 +173,13 @@ const AVATAR_OPTIONS = [
 
 export const InstructorSettings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'profile' | 'ai' | 'proctoring' | 'x402' | 'system'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'ai' | 'proctoring' | 'stripe' | 'system'>('profile');
 
   // State slices
   const [profile, setProfile] = useState<InstructorProfile>(getStoredInstructorProfile);
   const [aiSettings, setAiSettings] = useState<AISettings>(getStoredAISettings);
   const [proctoring, setProctoring] = useState<ProctoringSettings>(getStoredProctoringSettings);
-  const [x402, setX402] = useState<X402Settings>(getStoredX402Settings);
+  const [stripe, setStripe] = useState<StripeSettings>(getStoredStripeSettings);
   const [system, setSystem] = useState<SystemSettings>(getStoredSystemSettings);
 
   // UI state
@@ -195,14 +189,14 @@ export const InstructorSettings: React.FC = () => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
   useEffect(() => {
-    setWalletAddress(algoClient.getConnectedAddress());
+    setWalletAddress('test_user');
   }, []);
 
   const handleSave = () => {
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
     localStorage.setItem(STORAGE_KEYS.AI, JSON.stringify(aiSettings));
     localStorage.setItem(STORAGE_KEYS.PROCTORING, JSON.stringify(proctoring));
-    localStorage.setItem(STORAGE_KEYS.X402, JSON.stringify(x402));
+    localStorage.setItem(STORAGE_KEYS.STRIPE, JSON.stringify(stripe));
     localStorage.setItem(STORAGE_KEYS.SYSTEM, JSON.stringify(system));
 
     setSaveStatus('Settings successfully saved!');
@@ -214,13 +208,13 @@ export const InstructorSettings: React.FC = () => {
       setProfile(DEFAULT_PROFILE);
       setAiSettings(DEFAULT_AI);
       setProctoring(DEFAULT_PROCTORING);
-      setX402(DEFAULT_X402);
+      setStripe(DEFAULT_STRIPE);
       setSystem(DEFAULT_SYSTEM);
 
       localStorage.removeItem(STORAGE_KEYS.PROFILE);
       localStorage.removeItem(STORAGE_KEYS.AI);
       localStorage.removeItem(STORAGE_KEYS.PROCTORING);
-      localStorage.removeItem(STORAGE_KEYS.X402);
+      localStorage.removeItem(STORAGE_KEYS.STRIPE);
       localStorage.removeItem(STORAGE_KEYS.SYSTEM);
 
       setSaveStatus('Settings reset to defaults.');
@@ -228,22 +222,13 @@ export const InstructorSettings: React.FC = () => {
     }
   };
 
-  const checkTestnetBalance = async () => {
-    setIsCheckingBalance(true);
-    try {
-      setAlgoBalance(10.5);
-    } catch {
-      setAlgoBalance(0.0);
-    } finally {
-      setIsCheckingBalance(false);
-    }
-  };
+
 
   const tabs = [
     { id: 'profile', label: 'Profile & Account', icon: <User size={18} /> },
     { id: 'ai', label: 'AI & Assessment', icon: <BrainCircuit size={18} /> },
     { id: 'proctoring', label: 'Proctoring & Security', icon: <ShieldCheck size={18} /> },
-    { id: 'x402', label: 'Algorand & x402', icon: <Zap size={18} /> },
+    { id: 'stripe', label: 'Stripe Payments', icon: <Zap size={18} /> },
     { id: 'system', label: 'System & Theme', icon: <Sliders size={18} /> },
   ] as const;
 
@@ -274,7 +259,7 @@ export const InstructorSettings: React.FC = () => {
             <h1 className="text-2xl md:text-3xl font-black tracking-tight">Instructor Settings</h1>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            Configure default AI parameters, proctoring security levels, Algorand x402 payment options, and personal profile.
+            Configure default AI parameters, proctoring security levels, Stripe test payment options, and personal profile.
           </p>
         </div>
 
@@ -647,8 +632,8 @@ export const InstructorSettings: React.FC = () => {
           </motion.div>
         )}
 
-        {/* ALGORAND & X402 TAB */}
-        {activeTab === 'x402' && (
+        {/* STRIPE TAB */}
+        {activeTab === 'stripe' && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -656,78 +641,43 @@ export const InstructorSettings: React.FC = () => {
           >
             <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-6 rounded-3xl border border-black/5 dark:border-white/10 space-y-5">
               <h2 className="text-sm font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <Zap size={16} className="text-amber-500" />
-                <span>Algorand Treasury & Protocol Options</span>
+                <Zap size={16} className="text-blue-500" />
+                <span>Stripe Test Configuration</span>
               </h2>
 
               <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Treasury Receiver Address
-                  </label>
-                  <input
-                    type="text"
-                    value={x402.treasuryAddress}
-                    onChange={(e) => setX402({ ...x402, treasuryAddress: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-2xl text-xs font-mono font-semibold focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold">Balance Verification</div>
+                    <div className="text-xs font-bold">Test Mode Active</div>
                     <div className="text-[10px] text-slate-400">
-                      {walletAddress ? `Connected: ${walletAddress.slice(0, 8)}...` : 'Pera Wallet Status'}
+                      Transactions will use simulated cards and no real money.
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {algoBalance !== null && (
-                      <span className="text-xs font-mono font-bold text-emerald-500">{algoBalance} ALGO</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={checkTestnetBalance}
-                      disabled={isCheckingBalance}
-                      className="px-3 py-2 rounded-xl bg-amber-500/20 text-amber-500 font-bold text-xs flex items-center gap-1.5 hover:bg-amber-500/30 transition-all"
-                    >
-                      <RefreshCw size={14} className={isCheckingBalance ? 'animate-spin' : ''} />
-                      <span>Check</span>
-                    </button>
-                  </div>
+                  <input
+                    type="checkbox"
+                    checked={stripe.testModeEnabled}
+                    onChange={(e) => setStripe({ ...stripe, testModeEnabled: e.target.checked })}
+                    className="w-5 h-5 accent-blue-500 rounded"
+                  />
                 </div>
               </div>
             </div>
 
             <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-6 rounded-3xl border border-black/5 dark:border-white/10 space-y-5">
               <h2 className="text-sm font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <Key size={16} className="text-blue-500" />
-                <span>Pricing & Wallet Toggles</span>
+                <Key size={16} className="text-purple-500" />
+                <span>Simulated Pricing</span>
               </h2>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 space-y-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-blue-400">AI Test Fee</div>
-                  <div className="text-lg font-mono font-black text-blue-500">$0.10 USDC</div>
+                  <div className="text-lg font-mono font-black text-blue-500">${stripe.testPriceUsd.toFixed(2)} USD</div>
                 </div>
                 <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 space-y-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-purple-400">Assignment Fee</div>
-                  <div className="text-lg font-mono font-black text-purple-500">$0.05 USDC</div>
+                  <div className="text-lg font-mono font-black text-purple-500">${stripe.assignmentPriceUsd.toFixed(2)} USD</div>
                 </div>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <label className="flex items-center justify-between cursor-pointer p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-black/5 dark:border-white/10">
-                  <div>
-                    <div className="text-xs font-bold">Auto-Prompt Pera Wallet</div>
-                    <div className="text-[10px] text-slate-400">Auto trigger wallet prompt on 402</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={x402.autoConnectPera}
-                    onChange={(e) => setX402({ ...x402, autoConnectPera: e.target.checked })}
-                    className="w-5 h-5 accent-amber-500 rounded"
-                  />
-                </label>
               </div>
             </div>
           </motion.div>
