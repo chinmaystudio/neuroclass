@@ -73,6 +73,7 @@ export async function POST(request: Request): Promise<Response> {
           session_id: sessionId,
           classroom_id: session.classroom_id,
           student_id: studentId,
+          student_id_legacy: studentId, // Satisfy live database NOT NULL constraint
           student_name: enrolledStudent?.name || 'Student',
           status: decision === 'LATE' ? 'Late' : 'Present',
           verified_method: 'Teacher Face-ID Biometric (Manual Capture)',

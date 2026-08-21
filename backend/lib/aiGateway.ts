@@ -163,6 +163,7 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
     session_id: session.id,
     classroom_id: session.classroom_id,
     student_id: result.student_id,
+    student_id_legacy: result.student_id, // Satisfy live database NOT NULL constraint
     student_name: studentById.get(result.student_id)?.name || 'Student',
     status: 'Present',
     verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
