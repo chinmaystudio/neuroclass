@@ -23,8 +23,9 @@ async function requireUser(request: Request, roles: string[] = []) {
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) throw Object.assign(new Error('Authentication is invalid or expired.'), { status: 401 });
   const { data: profile } = await supabase.from('users').select('role').eq('uid', data.user.id).maybeSingle();
-  const role = String(profile?.role || '');
-  if (roles.length > 0 && !roles.includes(role)) {
+  const role = String(profile?.role || data.user.user_metadata?.role || '').trim().toLowerCase();
+  const allowedRoles = roles.map((allowedRole) => allowedRole.trim().toLowerCase());
+  if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
     throw Object.assign(new Error('This attendance action is not available for your account.'), { status: 403 });
   }
   return { user: data.user, role };

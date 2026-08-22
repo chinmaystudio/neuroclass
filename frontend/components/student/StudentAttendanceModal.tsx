@@ -136,9 +136,20 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   };
 
   const locationErrorToStatus = (positionError: GeolocationPositionError): LocationStatus => {
-    if (positionError.code === positionError.PERMISSION_DENIED) return 'LOCATION_PERMISSION_DENIED';
+    if (positionError.code === 1) return 'LOCATION_PERMISSION_DENIED';
     return 'LOCATION_UNAVAILABLE';
   };
+
+  const locationErrorMessage = (positionError: GeolocationPositionError) => {
+    if (positionError.code === 1) return 'Location permission is blocked for this site. Allow location for neuroclass.pages.dev in your mobile browser settings, then reload.';
+    if (positionError.code === 2) return 'Your phone has location enabled, but no location fix was returned. Turn on precise location/GPS, move near a window, and try again.';
+    if (positionError.code === 3) return 'The location request timed out. Turn on precise location/GPS and try again.';
+    return 'Your location could not be determined. Try again with device location enabled.';
+  };
+
+  const readBrowserPosition = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
 
   const handleLocationAction = () => {
     if (locationTapLockRef.current || isCheckingLocation || isVerifying || isSuccess) return;
@@ -162,13 +173,15 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
     setIsCheckingLocation(true);
     setError(null);
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0,
-        });
-      });
+      let position: GeolocationPosition;
+      try {
+        position = await readBrowserPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      } catch (firstError: any) {
+        if (firstError?.code === 1) throw firstError;
+        // Some Android devices expose location but fail the first GPS-only fix.
+        // Retry with a network/cached fix so the server can evaluate accuracy honestly.
+        position = await readBrowserPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again before verifying your location.');
       const response = await fetch(getApiUrl('/api/attendance/location'), {
@@ -203,7 +216,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       if (e?.code) {
         const status = locationErrorToStatus(e as GeolocationPositionError);
         setLocationCheck({ status, radiusMeters: activeSession.radius_meters });
-        setError(status === 'LOCATION_PERMISSION_DENIED' ? 'Location permission is required to verify attendance.' : 'Your location could not be determined. Try again in an open area.');
+        setError(locationErrorMessage(e as GeolocationPositionError));
       } else {
         setError(e.message || 'Location verification failed.');
       }
