@@ -52,12 +52,23 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
     }
     
     try {
-      const { error } = await supabase
-        .from('classrooms')
-        .delete()
-        .eq('id', classId);
-        
-      if (error) throw error;
+      const { getApiAuthHeaders } = await import('../../../lib/api-auth');
+      const { getApiUrl } = await import('../../../config/apiConfig');
+      
+      const response = await fetch(getApiUrl('/api/classrooms/delete'), {
+        method: 'POST',
+        headers: {
+          ...(await getApiAuthHeaders()),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ classroom_id: classId })
+      });
+      
+      const data = await response.json().catch(() => ({}));
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.detail || 'Failed to delete classroom');
+      }
       
       fetchClassrooms();
     } catch (err: any) {
