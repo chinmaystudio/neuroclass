@@ -35,11 +35,6 @@ import { supabase, isSupabaseConfigured } from '../../database/supabase';
 import { getApiUrl } from '../../config/apiConfig';
 import { logClassroomCreated } from '../../database/analytics';
 import { Test, Theme, LayoutModuleType } from '../../types';
-import BuilderTab from '../tabs/BuilderTab';
-import DesignerTab from '../tabs/DesignerTab';
-import PreviewTab from '../tabs/PreviewTab';
-import ProctoringTab from '../tabs/ProctoringTab';
-import SettingsTab from '../tabs/SettingsTab';
 
 
 function cn(...inputs: ClassValue[]) {
@@ -2167,11 +2162,12 @@ const CreateTestModule: React.FC<{ user: any, onShowToast: any, classId?: string
             transition={{ duration: 0.3 }}
             className="min-h-[600px]"
           >
-            {activeTab === 'builder' && <BuilderTab test={test} setTest={setTest} onShowToast={onShowToast} />}
-            {activeTab === 'designer' && <DesignerTab test={test} setTest={setTest} selectedModuleId={selectedModuleId} setSelectedModuleId={setSelectedModuleId} />}
-            {activeTab === 'proctoring' && <ProctoringTab test={test} setTest={setTest} />}
-            {activeTab === 'settings' && <SettingsTab test={test} setTest={setTest} />}
-            {activeTab === 'preview' && <PreviewTab test={test} />}
+            <div className="flex min-h-[420px] items-center justify-center rounded-3xl border border-blue-500/20 bg-blue-500/5 p-8 text-center">
+              <div className="max-w-md space-y-3">
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">External test designer</h3>
+                <p className="text-sm leading-6 text-slate-500 dark:text-slate-300">The legacy in-page designer has been replaced by the secured external test portal. Open a classroom and select Test Designer to continue.</p>
+              </div>
+            </div>
           </motion.div>
        </AnimatePresence>
     </div>
