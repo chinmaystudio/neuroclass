@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, Users, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Camera, Users, CheckCircle2, AlertCircle, Loader2, Wifi, Copy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CameraService } from '../../services/ml/CameraService';
 import { EmailService } from '../../services/ml/EmailService';
@@ -37,6 +37,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   const [registrationSamples, setRegistrationSamples] = useState<Blob[]>([]);
   const [liveBoxes, setLiveBoxes] = useState<LiveAttendanceBox[]>([]);
   const [isLiveScanning, setIsLiveScanning] = useState(false);
+  const [copiedSessionCode, setCopiedSessionCode] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -80,17 +81,21 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Could not open an attendance session.');
       await startAttendanceSession(classId, payload.session.id);
-      const nextSession = { ...payload.session, pin: payload.pin, challengeToken: payload.challengeToken };
+      const nextSession = { ...payload.session, pin: payload.pin, sessionCode: payload.sessionCode, challengeToken: payload.challengeToken };
       identifiedIdsRef.current.clear();
       setIdentified([]);
       setFinalReport(null);
       setActiveSession(nextSession);
       setSessionNotice(`Session PIN: ${payload.pin}. ${payload.warning || 'Session is ready.'}`);
-      try {
-        await startCamera();
-        setSessionNotice(`Session PIN: ${payload.pin}. Camera is ready; start live face preview or capture a photo to analyze.`);
-      } catch (cameraStartError: any) {
-        setCameraError(cameraStartError.message || 'Session opened, but camera access is still required.');
+      if (mode === 'single') {
+        setSessionNotice(`Multi-Level Attendance is active. Students should join the same classroom Wi-Fi and open Verify Attendance. Session code: ${payload.sessionCode}.`);
+      } else {
+        try {
+          await startCamera();
+          setSessionNotice(`Session PIN: ${payload.pin}. Camera is ready for Manual Mode.`);
+        } catch (cameraStartError: any) {
+          setCameraError(cameraStartError.message || 'Session opened, but camera access is still required.');
+        }
       }
       return nextSession;
     } catch (error: any) {
@@ -164,6 +169,33 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     });
     await video.play().catch(() => undefined);
     setIsCameraActive(true);
+  };
+
+  const switchMode = (nextMode: 'single' | 'group' | 'register') => {
+    if (nextMode === 'single') {
+      liveScanActiveRef.current = false;
+      if (liveScanTimerRef.current !== null) window.clearTimeout(liveScanTimerRef.current);
+      CameraService.stopCamera(streamRef.current);
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      setIsCameraActive(false);
+      setIsLiveScanning(false);
+      setLiveBoxes([]);
+      setSessionNotice(activeSession ? 'Multi-Level Attendance is active. Students use the face-ID portal from their own devices.' : null);
+    }
+    setMode(nextMode);
+  };
+
+  const copySessionCode = async () => {
+    const code = activeSession?.session_code || activeSession?.sessionCode;
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedSessionCode(true);
+      window.setTimeout(() => setCopiedSessionCode(false), 1600);
+    } catch {
+      setCameraError('Unable to copy the session code.');
+    }
   };
 
   const toggleCamera = async () => {
@@ -406,21 +438,21 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
         <div className="relative z-30 pointer-events-auto flex gap-4 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit">
           <button 
             type="button"
-            onClick={() => setMode('single')}
+            onClick={() => switchMode('single')}
             className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'single' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
           >
             Multi-Level Attendance
           </button>
           <button 
             type="button"
-            onClick={() => setMode('group')}
+            onClick={() => switchMode('group')}
             className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'group' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
           >
             Manual Mode
           </button>
           <button 
             type="button"
-            onClick={() => setMode('register')}
+            onClick={() => switchMode('register')}
             className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'register' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
           >
             Register Face
@@ -428,73 +460,103 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
         </div>
 
         {activeSession && (
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-            <div className="flex items-center justify-between gap-3">
-              <span>Local Attendance Network</span>
-              <span>NeuroClass-Attendance</span>
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-4 text-emerald-700 dark:text-emerald-300">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest">Student Face-ID Portal</p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">Students must join the classroom Wi-Fi provided by the instructor, then open Verify Attendance on their own devices.</p>
+              </div>
+              <Wifi size={18} className="shrink-0" />
             </div>
-            <div className="mt-1 text-[9px] font-semibold tracking-wide opacity-70">
-              Session code: {activeSession.session_code || activeSession.sessionCode || 'Active'} · Multi-level verification enabled
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-white/50 px-3 py-2 dark:bg-black/10">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest opacity-60">Session code</p>
+                <p className="font-mono text-sm font-black tracking-widest">{activeSession.session_code || activeSession.sessionCode || 'Active'}</p>
+              </div>
+              <button type="button" onClick={copySessionCode} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-white">
+                <Copy size={13} /> {copiedSessionCode ? 'Copied' : 'Copy code'}
+              </button>
             </div>
+            <p className="mt-2 text-[9px] font-semibold uppercase tracking-wide opacity-60">This browser cannot create an open Wi-Fi hotspot. Use the classroom router or device hotspot and share its Wi-Fi credentials separately.</p>
           </div>
         )}
 
-        <div className="relative aspect-video bg-black rounded-[24px] overflow-hidden group">
-          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-          
-          {!isCameraActive && (
-            <div className="absolute inset-0 z-20 pointer-events-auto flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md text-white gap-4 p-6 text-center">
-              {cameraError ? (
-                <>
-                  <AlertCircle size={48} className="text-rose-500 mb-2" />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500">Permission Error</p>
-                  <button onClick={toggleCamera} className="mt-2 px-6 py-2 bg-white/10 rounded-full text-[8px]">Try Again</button>
-                </>
-              ) : (
-                <>
-                  <Camera size={48} className="opacity-20" />
-                  <button onClick={toggleCamera} className="px-8 py-3 bg-blue-600 rounded-full text-[10px]">Activate Camera</button>
-                </>
-              )}
-            </div>
-          )}
-
-          {sessionNotice && !isAnalyzing && (
-            <div className="absolute left-4 right-4 bottom-4 z-25 rounded-xl bg-blue-950/85 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-blue-100">
-              {sessionNotice}
-            </div>
-          )}
-
-          {liveBoxes.length > 0 && (
-            <div className="absolute inset-0 z-20 pointer-events-none">
-              {liveBoxes.map((box) => {
-                const [x1, y1, x2, y2] = box.bbox;
-                const width = Math.max(0, x2 - x1);
-                const height = Math.max(0, y2 - y1);
-                return (
-                  <div
-                    key={box.trackId}
-                    className="absolute border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(16,185,129,0.45)]"
-                    style={{ left: `${x1 / Math.max(1, videoRef.current?.videoWidth || 1) * 100}%`, top: `${y1 / Math.max(1, videoRef.current?.videoHeight || 1) * 100}%`, width: `${width / Math.max(1, videoRef.current?.videoWidth || 1) * 100}%`, height: `${height / Math.max(1, videoRef.current?.videoHeight || 1) * 100}%` }}
-                  >
-                    <span className="absolute -top-6 left-0 whitespace-nowrap rounded bg-emerald-500 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-white">
-                      {box.name} · {box.confidence.toFixed(0)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {isAnalyzing && (
-            <div className="absolute inset-0 z-30 pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm">
-              <div className="flex flex-col items-center gap-4 text-white">
-                <Loader2 className="animate-spin" size={32} />
-                <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Local Neural Engine Active...</p>
+        {mode === 'single' ? (
+          <div className="relative aspect-video rounded-[24px] overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-emerald-950 via-slate-900 to-blue-950 p-6 text-white">
+            <div className="flex h-full flex-col justify-between gap-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">Teacher camera disabled</p>
+                  <h3 className="mt-2 text-xl font-black tracking-tight">Student Face-ID Portal</h3>
+                  <p className="mt-2 max-w-md text-xs leading-5 text-slate-300">Multi-Level Attendance does not scan faces from the teacher device. Students verify themselves from their own connected devices.</p>
+                </div>
+                <Wifi size={28} className="shrink-0 text-emerald-300" />
+              </div>
+              <div className="grid gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-200 sm:grid-cols-3">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">1.</span> Join classroom Wi-Fi</div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">2.</span> Open Verify Attendance</div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">3.</span> Complete Face ID</div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="relative aspect-video bg-black rounded-[24px] overflow-hidden group">
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+
+            {!isCameraActive && (
+              <div className="absolute inset-0 z-20 pointer-events-auto flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md text-white gap-4 p-6 text-center">
+                {cameraError ? (
+                  <>
+                    <AlertCircle size={48} className="text-rose-500 mb-2" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500">Permission Error</p>
+                    <button onClick={toggleCamera} className="mt-2 px-6 py-2 bg-white/10 rounded-full text-[8px]">Try Again</button>
+                  </>
+                ) : (
+                  <>
+                    <Camera size={48} className="opacity-20" />
+                    <button onClick={toggleCamera} className="px-8 py-3 bg-blue-600 rounded-full text-[10px]">Activate Camera</button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {sessionNotice && !isAnalyzing && (
+              <div className="absolute left-4 right-4 bottom-4 z-25 rounded-xl bg-blue-950/85 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-blue-100">
+                {sessionNotice}
+              </div>
+            )}
+
+            {liveBoxes.length > 0 && (
+              <div className="absolute inset-0 z-20 pointer-events-none">
+                {liveBoxes.map((box) => {
+                  const [x1, y1, x2, y2] = box.bbox;
+                  const width = Math.max(0, x2 - x1);
+                  const height = Math.max(0, y2 - y1);
+                  return (
+                    <div
+                      key={box.trackId}
+                      className="absolute border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(16,185,129,0.45)]"
+                      style={{ left: `${x1 / Math.max(1, videoRef.current?.videoWidth || 1) * 100}%`, top: `${y1 / Math.max(1, videoRef.current?.videoHeight || 1) * 100}%`, width: `${width / Math.max(1, videoRef.current?.videoWidth || 1) * 100}%`, height: `${height / Math.max(1, videoRef.current?.videoHeight || 1) * 100}%` }}
+                    >
+                      <span className="absolute -top-6 left-0 whitespace-nowrap rounded bg-emerald-500 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-white">
+                        {box.name} · {box.confidence.toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {isAnalyzing && (
+              <div className="absolute inset-0 z-30 pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-4 text-white">
+                  <Loader2 className="animate-spin" size={32} />
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Local Neural Engine Active...</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
                   <div className="relative z-30 pointer-events-auto flex flex-col gap-4">
             <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-slate-800/60 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">
@@ -553,19 +615,14 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
               </button>
             </div>
           ) : (
-            <div className="flex gap-4">
-              <button
-                type="button"
-                disabled={isAnalyzing}
-                title={activeSession && isCameraActive ? 'Capture a frame and send it to the secure Vercel attendance gateway.' : 'Open a session and activate the camera before scanning.'}
-                onClick={processSingle}
-                className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-wait disabled:opacity-60"
-              >
-                {activeSession ? 'Analyze Individual' : 'Start Session & Analyze'}
-              </button>
-              <button type="button" onClick={toggleCamera} className="px-6 py-4 bg-rose-500/10 text-rose-500 rounded-[20px]">
-                <Camera size={20} />
-              </button>
+            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
+              <div className="flex items-center gap-3">
+                <Wifi size={18} className="text-blue-500" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Waiting for connected students</p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">The teacher device does not capture faces in Multi-Level Attendance. Students complete Face ID from the student portal.</p>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -6,6 +6,7 @@ import {
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { getApiUrl } from '../../config/apiConfig';
+import { StudentAttendanceModal } from './StudentAttendanceModal';
 
 interface EnrolledClassDetailProps {
   classroom: any;
@@ -30,6 +31,7 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
   const [attendancePin, setAttendancePin] = useState('');
   const [attendanceMessage, setAttendanceMessage] = useState('');
   const [attendanceVerifying, setAttendanceVerifying] = useState(false);
+  const [isFacePortalOpen, setIsFacePortalOpen] = useState(false);
 
   useEffect(() => {
     if (classroom && user) {
@@ -254,7 +256,20 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
                 </div>
                 <Clock size={18} className="text-emerald-600 shrink-0" />
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="rounded-xl border border-emerald-300/60 bg-white/70 dark:border-emerald-500/20 dark:bg-black/10 p-4">
+                <p className="text-xs font-bold text-slate-900 dark:text-white">Multi-Level Face-ID verification</p>
+                <p className="mt-1 text-[11px] leading-5 text-slate-500">Join the classroom Wi-Fi, then use the secure face-ID portal on this device. Your face is not scanned by the teacher’s computer.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsFacePortalOpen(true)}
+                  className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white"
+                >
+                  Open Face-ID Portal
+                </button>
+              </div>
+              <details className="rounded-xl border border-slate-200 dark:border-white/10 p-3">
+                <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest text-slate-500">Use classroom PIN instead</summary>
+                <div className="mt-3 flex flex-col sm:flex-row gap-3">
                 <input
                   value={attendancePin}
                   onChange={(event) => setAttendancePin(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
@@ -271,9 +286,20 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
                   {attendanceVerifying ? 'Verifying…' : 'Verify presence'}
                 </button>
               </div>
-              {attendanceMessage && <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">{attendanceMessage}</p>}
+                {attendanceMessage && <p className="mt-3 text-xs font-semibold text-emerald-700 dark:text-emerald-300">{attendanceMessage}</p>}
+              </details>
             </div>
           )}
+          <StudentAttendanceModal
+            isOpen={isFacePortalOpen}
+            classroomId={classroom.id}
+            classroomName={classroom.name}
+            onClose={() => setIsFacePortalOpen(false)}
+            onSuccess={() => {
+              setIsFacePortalOpen(false);
+              fetchClassroomData();
+            }}
+          />
           {attendanceLogs.length === 0 ? (
             <div className="p-12 border border-dashed border-black/10 dark:border-white/10 rounded-3xl text-center space-y-2 text-slate-400 text-xs">
               <ShieldCheck size={40} className="mx-auto opacity-50 mb-2" />

@@ -254,7 +254,9 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
           {useMultiLevel ? (
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Local Network Check</h3>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Classroom Network & Session Check</h3>
+                <p className="mb-3 text-xs leading-5 text-slate-500">Join the classroom Wi-Fi provided by your instructor. The teacher device does not scan your face; this portal performs Face ID on your device.</p>
+                {activeSession?.session_code && <p className="mb-3 rounded-lg bg-white/60 px-3 py-2 font-mono text-xs font-bold tracking-widest text-purple-600 dark:bg-black/10 dark:text-purple-300">Session: {activeSession.session_code}</p>}
                 <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 size={16} className="text-emerald-500" />
@@ -276,13 +278,13 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
                     ) : (
                       <WifiOff size={16} className="text-rose-500" />
                     )}
-                    Connection established
+                    Student portal connected
                   </li>
                 </ul>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500">
-                  {isConnected ? "Ready for face verification" : "Waiting for connection..."}
+                  {isConnected ? "Ready for Face ID verification" : "Waiting for the classroom session connection..."}
                 </span>
                 <button 
                   onClick={() => setUseMultiLevel(false)}
@@ -333,7 +335,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
               className="flex-1 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
               {isVerifying ? (
-                <>Verifying Biometrics...</>
+                <>Verifying Face ID...</>
               ) : (
                 <>
                   <ShieldCheck size={16} /> {useMultiLevel ? 'Verify Attendance' : 'Mark Present'}
