@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, AlertCircle, LoaderCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../database/supabase';
+import { getApiUrl } from '../../config/apiConfig';
 import { AttendanceSystem } from '../ai/AttendanceSystem';
 import { StudentAttendanceModal } from '../student/StudentAttendanceModal';
 
@@ -26,11 +27,12 @@ function parseAttendancePortalQuery(search: string): AttendancePortalQuery {
   }
 }
 
-function useAttendanceClassroom() {
+function useAttendanceClassroom(expectedRole: 'teacher' | 'student') {
   const location = useLocation();
   const { classroomId, returnTo } = parseAttendancePortalQuery(location.search);
   const [classroomName, setClassroomName] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(classroomId));
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,20 +42,32 @@ function useAttendanceClassroom() {
     }
     void (async () => {
       try {
-        const { data } = await supabase
-          .from('classrooms')
-          .select('name')
-          .eq('id', classroomId)
-          .maybeSingle();
-        if (!cancelled) setClassroomName(data?.name || null);
+        const { data: authData } = await supabase.auth.getSession();
+        const token = authData.session?.access_token;
+        if (!token) return;
+        const response = await fetch(`${getApiUrl('/api/attendance/mobile-handoff/resolve')}?classroomId=${encodeURIComponent(classroomId)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.classroom || (payload.role !== 'teacher' && payload.role !== 'student')) return;
+        if (payload.role !== expectedRole) {
+          const target = new URL(`/attendance/${payload.role}`, window.location.origin);
+          target.search = location.search;
+          window.location.replace(target.toString());
+          return;
+        }
+        if (!cancelled) {
+          setClassroomName(typeof payload.classroom.name === 'string' ? payload.classroom.name : null);
+          setAuthorized(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [classroomId]);
+  }, [classroomId, expectedRole, location.search]);
 
-  return { classroomId, classroomName, loading, returnTo };
+  return { classroomId, classroomName, loading, returnTo, authorized };
 }
 
 const PortalLoading = () => (
@@ -77,14 +91,14 @@ const PortalError = ({ onReturn }: { onReturn: () => void }) => (
 
 export const MobileTeacherAttendancePortal: React.FC = () => {
   const navigate = useNavigate();
-  const { classroomId, classroomName, loading, returnTo } = useAttendanceClassroom();
+  const { classroomId, classroomName, loading, returnTo, authorized } = useAttendanceClassroom('teacher');
   const returnToApp = useCallback(() => {
     if (returnTo) window.location.assign(returnTo);
     else navigate('/teacher', { replace: true });
   }, [navigate, returnTo]);
 
   if (loading) return <PortalLoading />;
-  if (!classroomId || !classroomName) return <PortalError onReturn={returnToApp} />;
+  if (!classroomId || !classroomName || !authorized) return <PortalError onReturn={returnToApp} />;
 
   return (
     <div className="fixed inset-0 z-[120] flex flex-col overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#0a0a0a] dark:text-white">
@@ -99,14 +113,14 @@ export const MobileTeacherAttendancePortal: React.FC = () => {
 
 export const MobileStudentAttendancePortal: React.FC = () => {
   const navigate = useNavigate();
-  const { classroomId, classroomName, loading, returnTo } = useAttendanceClassroom();
+  const { classroomId, classroomName, loading, returnTo, authorized } = useAttendanceClassroom('student');
   const returnToApp = useCallback(() => {
     if (returnTo) window.location.assign(returnTo);
     else navigate('/student', { replace: true });
   }, [navigate, returnTo]);
 
   if (loading) return <PortalLoading />;
-  if (!classroomId || !classroomName) return <PortalError onReturn={returnToApp} />;
+  if (!classroomId || !classroomName || !authorized) return <PortalError onReturn={returnToApp} />;
 
   return (
     <div className="fixed inset-0 z-[120] bg-slate-950">

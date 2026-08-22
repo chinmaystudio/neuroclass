@@ -56,11 +56,11 @@ const AppContent = () => {
           <Route path="/attendance/mobile-handoff" element={<MobileAttendanceHandoff />} />
           <Route
             path="/attendance/teacher"
-            element={<SessionGuardian allowedRole="teacher"><MobileTeacherAttendancePortal /></SessionGuardian>}
+            element={<SessionGuardian><MobileTeacherAttendancePortal /></SessionGuardian>}
           />
           <Route
             path="/attendance/student"
-            element={<SessionGuardian allowedRole="student"><MobileStudentAttendancePortal /></SessionGuardian>}
+            element={<SessionGuardian><MobileStudentAttendancePortal /></SessionGuardian>}
           />
           
           <Route 
