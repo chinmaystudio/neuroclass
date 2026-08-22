@@ -53,6 +53,7 @@ export async function createAttendanceSession(request: Request): Promise<Respons
 
     const challengeToken = randomBytes(24).toString('base64url');
     const pin = String(randomInt(100000, 1000000));
+    const sessionCode = `NC-${randomBytes(2).toString('hex').toUpperCase()}-${randomBytes(2).toString('hex').toUpperCase()}`;
     const expiresAt = new Date(Date.now() + durationMinutes * 60_000).toISOString();
     const now = new Date().toISOString();
     const { data: session, error } = await supabase.from('attendance_sessions').insert({
@@ -65,10 +66,11 @@ export async function createAttendanceSession(request: Request): Promise<Respons
       ends_at: expiresAt,
       challenge_token_hash: hash(challengeToken),
       pin_hash: hash(pin),
+      session_code: sessionCode,
       challenge_expires_at: expiresAt,
       challenge_rotated_at: now,
-      verification_policy: { pin: true, teacher_face: true, liveness: false },
-    }).select('id,classroom_id,title,status,starts_at,ends_at,challenge_expires_at,verification_policy').single();
+      verification_policy: { pin: true, teacher_face: true, liveness: true, multi_level: true },
+    }).select('id,classroom_id,title,status,starts_at,ends_at,challenge_expires_at,verification_policy,session_code').single();
     if (error || !session) return json({ error: 'Unable to open the attendance session.' }, 500);
 
     await audit({
@@ -80,7 +82,7 @@ export async function createAttendanceSession(request: Request): Promise<Respons
       payload: { durationMinutes, verificationPolicy: session.verification_policy },
     });
 
-    return json({ session, challengeToken, pin, warning: 'Display the PIN or QR challenge only to students physically present in this classroom.' });
+    return json({ session, challengeToken, pin, sessionCode, warning: 'Display the PIN or QR challenge only to students physically present in this classroom.' });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to open the attendance session.' }, error.status || 500);
   }
@@ -139,6 +141,44 @@ export async function getActiveAttendanceSession(request: Request): Promise<Resp
   }
 }
 
+export async function connectToSession(request: Request): Promise<Response> {
+  try {
+    const { user } = await requireUser(request, ['student']);
+    const body = await request.json().catch(() => ({}));
+    const sessionId = clean(body.sessionId, 80);
+    if (!sessionId) return json({ error: 'sessionId is required.' }, 400);
+
+    const { data: session, error: sessionError } = await supabase.from('attendance_sessions').select('id,classroom_id,status,ends_at').eq('id', sessionId).maybeSingle();
+    if (sessionError || !session) return json({ error: 'Attendance session not found.' }, 404);
+    
+    const { data: enrollment } = await supabase.from('students').select('id,name').eq('classroom_id', session.classroom_id).eq('user_id', user.id).maybeSingle();
+    if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
+
+    const now = Date.now();
+    const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= now;
+    if (expired) return json({ error: 'This attendance session is closed or expired.' }, 403);
+
+    // Upsert the verification state
+    const { data: verification, error: verifError } = await supabase.from('attendance_verifications').upsert({
+      attendance_session_id: session.id,
+      student_id: enrollment.id,
+      student_user_id: user.id,
+      classroom_id: session.classroom_id,
+      network_connected: true,
+      authentication_verified: true,
+      classroom_verified: true,
+      session_verified: true,
+      verification_status: 'CONNECTED'
+    }, { onConflict: 'attendance_session_id,student_id' }).select('*').single();
+
+    if (verifError) return json({ error: 'Unable to establish local session connection.' }, 500);
+
+    return json({ ok: true, verification });
+  } catch (error: any) {
+    return json({ error: error.message || 'Unable to connect to session.' }, error.status || 500);
+  }
+}
+
 export async function verifyAttendance(request: Request): Promise<Response> {
   try {
     const { user } = await requireUser(request, ['student']);
@@ -146,8 +186,11 @@ export async function verifyAttendance(request: Request): Promise<Response> {
     const sessionId = clean(body.sessionId, 80);
     const pin = clean(body.pin, 12);
     const challengeToken = clean(body.challengeToken, 160);
+    const faceMatchScore = Number(body.faceMatchScore) || 0;
+    const livenessScore = Number(body.livenessScore) || 0;
+    const faceDetected = Boolean(body.faceDetected);
     const idempotencyKey = clean(request.headers.get('idempotency-key') || body.idempotencyKey, 120);
-    if (!sessionId || !idempotencyKey || (!pin && !challengeToken)) return json({ error: 'sessionId, idempotency key, and a PIN or challenge token are required.' }, 400);
+    if (!sessionId || !idempotencyKey) return json({ error: 'sessionId and idempotency key are required.' }, 400);
 
     const { data: existing } = await supabase.from('attendance_verification_attempts').select('id,status,failure_reason').eq('session_id', sessionId).eq('student_user_id', user.id).eq('idempotency_key', idempotencyKey).maybeSingle();
     if (existing) {
@@ -160,22 +203,42 @@ export async function verifyAttendance(request: Request): Promise<Response> {
     const { data: enrollment } = await supabase.from('students').select('id,name').eq('classroom_id', session.classroom_id).eq('user_id', user.id).maybeSingle();
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
 
-    const challengeDigest = hash(pin || challengeToken);
     const now = Date.now();
-    const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= now || (session.challenge_expires_at && new Date(session.challenge_expires_at).getTime() <= now);
+    const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= now;
+    
+    // In multi-level mode, we rely on face verification if pin is absent
+    const useMultiLevel = !pin && !challengeToken;
     const validPin = Boolean(pin && session.pin_hash && hash(pin) === session.pin_hash);
     const validToken = Boolean(challengeToken && session.challenge_token_hash && hash(challengeToken) === session.challenge_token_hash);
-    if (expired || (!validPin && !validToken)) {
-      const failureReason = expired ? 'This attendance session is closed or expired.' : 'The attendance PIN or challenge token is invalid.';
-      const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({ session_id: session.id, classroom_id: session.classroom_id, student_user_id: user.id, student_id: enrollment.id, idempotency_key: idempotencyKey, challenge_digest: challengeDigest, status: expired ? 'expired' : 'rejected', failure_reason: failureReason, device_fingerprint: clean(body.deviceFingerprint, 160), proximity_metadata: body.proximityMetadata || {}, liveness_metadata: body.livenessMetadata || {} }).select('id,status,failure_reason').single();
+    
+    const validFace = useMultiLevel && faceDetected && faceMatchScore >= 60 && livenessScore >= 50;
+    const finalConfidence = useMultiLevel ? Math.min(faceMatchScore, livenessScore) : 100;
+
+    if (expired || (!validPin && !validToken && !validFace)) {
+      const failureReason = expired ? 'This attendance session is closed or expired.' : (useMultiLevel ? 'Face verification failed.' : 'The attendance PIN or challenge token is invalid.');
+      const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({ session_id: session.id, classroom_id: session.classroom_id, student_user_id: user.id, student_id: enrollment.id, idempotency_key: idempotencyKey, challenge_digest: hash(pin || challengeToken || 'face'), status: expired ? 'expired' : 'rejected', failure_reason: failureReason, device_fingerprint: clean(body.deviceFingerprint, 160), proximity_metadata: body.proximityMetadata || {}, liveness_metadata: { ...body.livenessMetadata, faceMatchScore, livenessScore } }).select('id,status,failure_reason').single();
       await audit({ classroom_id: session.classroom_id, session_id: session.id, actor_user_id: user.id, actor_role: 'student', event_type: expired ? 'verification_expired' : 'verification_rejected', payload: { attemptId: attempt?.id, reason: failureReason } });
+      
+      if (useMultiLevel) {
+        await supabase.from('attendance_verifications').update({
+          face_detected: faceDetected,
+          liveness_score: livenessScore,
+          face_match_score: faceMatchScore,
+          final_confidence: finalConfidence,
+          verification_status: 'FACE_FAILED'
+        }).eq('attendance_session_id', session.id).eq('student_id', enrollment.id);
+      }
+      
       return json({ error: failureReason, attempt }, 403);
     }
 
-    const { data: attempt, error: attemptError } = await supabase.from('attendance_verification_attempts').insert({ session_id: session.id, classroom_id: session.classroom_id, student_user_id: user.id, student_id: enrollment.id, idempotency_key: idempotencyKey, challenge_digest: challengeDigest, status: 'accepted', device_fingerprint: clean(body.deviceFingerprint, 160), proximity_metadata: body.proximityMetadata || {}, liveness_metadata: body.livenessMetadata || {} }).select('id,status,created_at').single();
+    const { data: attempt, error: attemptError } = await supabase.from('attendance_verification_attempts').insert({ session_id: session.id, classroom_id: session.classroom_id, student_user_id: user.id, student_id: enrollment.id, idempotency_key: idempotencyKey, challenge_digest: hash(pin || challengeToken || 'face'), status: 'accepted', device_fingerprint: clean(body.deviceFingerprint, 160), proximity_metadata: body.proximityMetadata || {}, liveness_metadata: { ...body.livenessMetadata, faceMatchScore, livenessScore } }).select('id,status,created_at').single();
     if (attemptError || !attempt) return json({ error: 'Unable to record the verification attempt.' }, 500);
 
-    const { data: attendance, error: attendanceError } = await supabase.from('attendance').insert({ classroom_id: session.classroom_id, session_id: session.id, student_id: enrollment.id, student_name: enrollment.name, status: 'Present', verified_method: validPin ? 'Student PIN + Teacher Session' : 'Session Challenge + Teacher Session', marked_by: session.teacher_id, verification_attempt_id: attempt.id, capture_metadata: { source: 'server-attendance-verification', proximity: body.proximityMetadata || {}, liveness: body.livenessMetadata || {} } }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
+    const verifiedMethod = useMultiLevel ? 'Multi-Level Face Verification' : (validPin ? 'Student PIN + Teacher Session' : 'Session Challenge + Teacher Session');
+    
+    const { data: attendance, error: attendanceError } = await supabase.from('attendance').insert({ classroom_id: session.classroom_id, session_id: session.id, student_id: enrollment.id, student_name: enrollment.name, status: 'Present', verified_method: verifiedMethod, marked_by: session.teacher_id, verification_attempt_id: attempt.id, confidence: finalConfidence, capture_metadata: { source: 'server-attendance-verification', proximity: body.proximityMetadata || {}, liveness: { faceMatchScore, livenessScore } } }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
+    
     if (attendanceError) {
       if (attendanceError.code === '23505') {
         await supabase.from('attendance_verification_attempts').update({ status: 'duplicate', failure_reason: 'Attendance is already recorded for this session.' }).eq('id', attempt.id);
@@ -185,8 +248,19 @@ export async function verifyAttendance(request: Request): Promise<Response> {
       return json({ error: 'Attendance record could not be created.' }, 500);
     }
 
+    if (useMultiLevel) {
+      await supabase.from('attendance_verifications').update({
+        face_detected: faceDetected,
+        liveness_score: livenessScore,
+        face_match_score: faceMatchScore,
+        final_confidence: finalConfidence,
+        verification_status: 'VERIFIED',
+        verified_at: new Date().toISOString()
+      }).eq('attendance_session_id', session.id).eq('student_id', enrollment.id);
+    }
+
     await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: attendance.verified_method } });
-    return json({ ok: true, attendance, attempt });
+    return json({ ok: true, attendance, attempt, stats: { score: faceMatchScore, liveness: livenessScore, confidence: finalConfidence } });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to verify attendance.' }, error.status || 500);
   }

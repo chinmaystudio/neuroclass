@@ -52,13 +52,13 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
     }
     
     try {
-      const { getApiAuthHeaders } = await import('../../../lib/api-auth');
-      const { getApiUrl } = await import('../../../config/apiConfig');
+      const { getApiUrl } = await import('../../config/apiConfig');
+      const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(getApiUrl('/api/classrooms/delete'), {
         method: 'POST',
         headers: {
-          ...(await getApiAuthHeaders()),
+          'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ classroom_id: classId })
