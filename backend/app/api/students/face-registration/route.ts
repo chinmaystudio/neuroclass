@@ -26,9 +26,18 @@ export async function POST(request: Request): Promise<Response> {
     if (files.length < 1 || files.length > 10) throw new GatewayError('Provide between 1 and 10 face samples', 400);
 
     const response = await forwardMultipartToRender('/ai/v1/enrollment', form, ['student_id', 'classroom_id', 'registration_session_id', 'files']);
-    const data = await response.json().catch(() => ({}));
+    let data: any = {};
+    let rawText = '';
+    try {
+      rawText = await response.text();
+      data = JSON.parse(rawText);
+    } catch (e) {
+      data = { _raw: rawText };
+    }
+
     if (!response.ok) {
-      const detailMsg = data.rejection_reasons ? data.rejection_reasons.join(', ') : (data.error || data.detail || 'Unknown error');
+      console.error('Render AI Enrollment Error:', response.status, rawText);
+      const detailMsg = data.rejection_reasons ? data.rejection_reasons.join(', ') : (data.error || data.detail || `HTTP ${response.status} ${response.statusText} - ${rawText.substring(0, 100)}`);
       return withCors(NextResponse.json({ 
         error: `AI Service rejected the enrollment: ${detailMsg}`, 
         detail: data 
