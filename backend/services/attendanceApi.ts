@@ -515,29 +515,35 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
       return fallback;
     };
     const scoreForResult = (result: any) => numericScore(
-      result.similarity ?? result.similarity_score ?? result.face_match_score ?? result.match_score ?? result.faceMatchScore ?? result.score ?? result.confidence,
+      result.similarity ?? result.similarity_score ?? result.face_match_score ?? result.match_score ?? result.faceMatchScore ?? result.match_percent ?? result.matchPercent ?? result.score ?? result.confidence ?? result.match?.similarity ?? result.match?.score,
       String(result.confidence || '').toUpperCase() === 'HIGH' ? 95 : 0,
     );
+    const studentIdForResult = (result: any) => result.student_id ?? result.studentId ?? result.student_id_legacy ?? result.matched_student_id ?? result.matchedStudentId ?? result.match?.student_id ?? result.match?.studentId ?? result.identity?.student_id ?? result.identity?.studentId;
     // Match the authenticated enrollee by ID and score, not by the AI display status.
-    // The upstream service may label a valid enrolled match REVIEW even when its similarity is usable.
-    const enrolledStudentId = String(enrollment.id).trim().toLowerCase();
-    const identityCandidates = results.filter((result: any) => String(result.student_id ?? result.studentId ?? result.matched_student_id ?? '').trim().toLowerCase() === enrolledStudentId);
+    // The upstream service may label a valid enrolled match REVIEW, or may return the auth user ID instead of students.id.
+    const allowedAIStudentIds = new Set([String(enrollment.id), String(user.id)].map((value) => value.trim().toLowerCase()).filter(Boolean));
+    const identityCandidates = results.filter((result: any) => allowedAIStudentIds.has(String(studentIdForResult(result) || '').trim().toLowerCase()));
     const identityMatches = identityCandidates.filter((result: any) => scoreForResult(result) > 0);
     const identityMatch = [...identityMatches].sort((left: any, right: any) => scoreForResult(right) - scoreForResult(left))[0];
-    const faceDetected = resultSets.some((frameResults) => frameResults.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4)) || Boolean(identityMatch);
-    const faceMatchScore = identityMatch ? scoreForResult(identityMatch) : 0;
+    const bestObservedResult = [...results].filter((result: any) => scoreForResult(result) > 0).sort((left: any, right: any) => scoreForResult(right) - scoreForResult(left))[0];
+    const identityMatchScore = identityMatch ? scoreForResult(identityMatch) : 0;
+    const bestObservedScore = bestObservedResult ? scoreForResult(bestObservedResult) : 0;
+    // Preserve the useful detected percentage in the response even when the AI did not attach the expected ID.
+    const faceMatchScore = identityMatchScore || bestObservedScore;
+    const faceDetected = resultSets.some((frameResults) => frameResults.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4)) || Boolean(bestObservedResult);
     const detectedFace = results.find((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4);
-    const faceBox = (identityMatch?.bbox || detectedFace?.bbox || null) as number[] | null;
-    const identityVerified = Boolean(identityMatch) && faceMatchScore >= 60;
-    const overallConfidence = Math.min(locationConfidence, faceMatchScore);
+    const faceBox = (identityMatch?.bbox || bestObservedResult?.bbox || detectedFace?.bbox || null) as number[] | null;
+    const identityVerified = Boolean(identityMatch) && identityMatchScore >= 60;
+    console.info('[attendance.student-face] matcher summary', { frameCount: files.length, resultCounts: resultSets.map((frameResults) => frameResults.length), resultCount: results.length, identityCandidateCount: identityCandidates.length, positiveIdentityCount: identityMatches.length, identityMatchScore, bestObservedScore, faceDetected });
+    const overallConfidence = Math.min(locationConfidence, identityVerified ? identityMatchScore : 0);
     const accepted = faceDetected && identityVerified;
 
     if (!accepted) {
       const failureReason = !faceDetected
         ? 'No face was detected.'
         : !identityMatch
-          ? 'Your face could not be matched to the logged-in student.'
-          : `Face match was ${Math.round(faceMatchScore)}%; at least 60% is required.`;
+          ? `A face was detected at ${Math.round(faceMatchScore)}% similarity, but it could not be matched to the logged-in student.`
+          : `Face match was ${Math.round(identityMatchScore)}%; at least 60% is required.`;
       await updateVerification({ face_detected: faceDetected, face_match_score: faceMatchScore, overall_confidence: overallConfidence, final_confidence: overallConfidence, verification_status: 'FACE_FAILED' });
       const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({
         session_id: session.id,
