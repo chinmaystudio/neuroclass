@@ -162,7 +162,7 @@ export async function getActiveAttendanceSession(request: Request): Promise<Resp
     if (!classroomId) return json({ error: 'classroomId is required.' }, 400);
     const { data: enrollment } = await supabase.from('students').select('id').eq('classroom_id', classroomId).eq('user_id', user.id).maybeSingle();
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
-    const { data, error } = await supabase.from('attendance_sessions').select('id,classroom_id,title,status,starts_at,started_at,ends_at,expires_at,challenge_expires_at,verification_policy,session_code,radius_meters').eq('classroom_id', classroomId).eq('status', 'open').gt('ends_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const { data, error } = await supabase.from('attendance_sessions').select('id,classroom_id,title,status,starts_at,started_at,ends_at,expires_at,challenge_expires_at,verification_policy,session_code,radius_meters').eq('classroom_id', classroomId).eq('status', 'open').contains('verification_policy', { geofence: true }).gt('ends_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (error) return json({ error: 'Unable to read the active attendance session.' }, 500);
     return json({ session: data || null });
   } catch (error: any) {

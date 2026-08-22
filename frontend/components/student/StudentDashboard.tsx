@@ -29,6 +29,7 @@ export const StudentDashboard: React.FC = () => {
   useEffect(() => {
     if (!user?.id) return;
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let pollTimer: number | null = null;
     let cancelled = false;
 
     const subscribeToAttendanceAnnouncements = async () => {
@@ -57,6 +58,19 @@ export const StudentDashboard: React.FC = () => {
         }
       }
 
+      const pollForActiveAttendance = async () => {
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (!authSession?.access_token || cancelled) return;
+        const activeSessions = await Promise.all(classroomIds.map(async (classroomId) => {
+          const response = await fetch(`${getApiUrl('/api/attendance/active')}?classroomId=${encodeURIComponent(classroomId)}`, { headers: { Authorization: `Bearer ${authSession.access_token}` } });
+          const payload = await response.json().catch(() => ({}));
+          return payload.session ? { ...payload.session, classroomId } : null;
+        }));
+        const active = activeSessions.find(Boolean) as any;
+        if (!cancelled && active) setAttendanceAlert({ sessionId: active.id, classroomId: active.classroomId, classroomName: classroomMap.get(active.classroomId) || 'your classroom', sessionCode: active.session_code });
+      };
+      pollTimer = window.setInterval(() => void pollForActiveAttendance(), 15000);
+
       channel = supabase
         .channel(`student-attendance-announcements-${user.id}`)
         .on(
@@ -79,6 +93,7 @@ export const StudentDashboard: React.FC = () => {
     void subscribeToAttendanceAnnouncements();
     return () => {
       cancelled = true;
+      if (pollTimer !== null) window.clearInterval(pollTimer);
       if (channel) void supabase.removeChannel(channel);
     };
   }, [user?.id]);
