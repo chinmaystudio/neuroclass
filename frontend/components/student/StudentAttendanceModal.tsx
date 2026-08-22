@@ -51,6 +51,8 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verificationStats, setVerificationStats] = useState<{ distance: number | null; accuracy: number | null; score: number; liveness: number } | null>(null);
+  const [faceBox, setFaceBox] = useState<[number, number, number, number] | null>(null);
+  const [faceMatchPercent, setFaceMatchPercent] = useState<number | null>(null);
   const [activeSession, setActiveSession] = useState<{ id: string; ends_at?: string; session_code?: string; radius_meters?: number } | null>(null);
   const [attendancePin, setAttendancePin] = useState('');
   const [locationCheck, setLocationCheck] = useState<LocationCheck | null>(null);
@@ -74,6 +76,8 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       setLocationCheck(null);
       setError(null);
       setVerificationStats(null);
+      setFaceBox(null);
+      setFaceMatchPercent(null);
       setIsSuccess(false);
       setUseMultiLevel(true);
     }
@@ -272,6 +276,8 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
     setIsVerifying(true);
     setError(null);
     setVerificationStats(null);
+    setFaceBox(null);
+    setFaceMatchPercent(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again.');
@@ -308,6 +314,12 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       }
 
       const payload = await response.json().catch(() => ({}));
+      const returnedFaceBox = Array.isArray(payload.faceBox) && payload.faceBox.length === 4
+        ? payload.faceBox.map((value: unknown) => Number(value)) as [number, number, number, number]
+        : null;
+      setFaceBox(returnedFaceBox);
+      const returnedMatchPercent = Number(payload.matchPercent ?? payload.stats?.matchPercent ?? payload.stats?.faceMatchScore);
+      setFaceMatchPercent(Number.isFinite(returnedMatchPercent) ? Math.max(0, Math.min(100, returnedMatchPercent)) : null);
       if (!response.ok) {
         if (payload.locationStatus) {
           setLocationCheck((previous) => ({
@@ -380,6 +392,23 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
 
           <div className="relative aspect-video rounded-3xl overflow-hidden bg-black border border-slate-200 dark:border-white/10 flex items-center justify-center">
             {isCapturing && <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />}
+            {faceBox && (
+              <div className="absolute inset-0 z-10 pointer-events-none">
+                <div
+                  className="absolute border-4 border-emerald-400 bg-emerald-400/10 shadow-[0_0_0_2px_rgba(16,185,129,0.35)]"
+                  style={{
+                    left: `${100 - (faceBox[2] / Math.max(1, videoRef.current?.videoWidth || 1)) * 100}%`,
+                    top: `${(faceBox[1] / Math.max(1, videoRef.current?.videoHeight || 1)) * 100}%`,
+                    width: `${((faceBox[2] - faceBox[0]) / Math.max(1, videoRef.current?.videoWidth || 1)) * 100}%`,
+                    height: `${((faceBox[3] - faceBox[1]) / Math.max(1, videoRef.current?.videoHeight || 1)) * 100}%`,
+                  }}
+                >
+                  <span className="absolute -top-8 left-0 whitespace-nowrap rounded-lg bg-emerald-500 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-white shadow-lg">
+                    Face detected{faceMatchPercent !== null ? ` · ${faceMatchPercent.toFixed(0)}% match` : ''}
+                  </span>
+                </div>
+              </div>
+            )}
             {isSuccess && (
               <div className="absolute inset-0 bg-emerald-600/90 backdrop-blur-md flex flex-col items-center justify-center text-white space-y-2">
                 <CheckCircle2 size={48} />
@@ -400,6 +429,12 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
               </div>
             )}
           </div>
+
+          {faceMatchPercent !== null && !isSuccess && (
+            <div className="rounded-2xl border border-emerald-300/60 bg-emerald-50/70 px-4 py-3 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-300">
+              Face match detected: {faceMatchPercent.toFixed(0)}%. Keep your face centered while the verification sequence completes.
+            </div>
+          )}
 
           {error && (
             <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-semibold flex items-center gap-2">
