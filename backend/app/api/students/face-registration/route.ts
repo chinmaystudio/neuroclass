@@ -27,7 +27,13 @@ export async function POST(request: Request): Promise<Response> {
 
     const response = await forwardMultipartToRender('/ai/v1/enrollment', form, ['student_id', 'classroom_id', 'registration_session_id', 'files']);
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) return withCors(NextResponse.json({ error: 'AI Service rejected the enrollment', detail: data }, { status: response.status }), request.headers.get('origin'));
+    if (!response.ok) {
+      const detailMsg = data.rejection_reasons ? data.rejection_reasons.join(', ') : (data.detail || 'Unknown error');
+      return withCors(NextResponse.json({ 
+        error: `AI Service rejected the enrollment: ${detailMsg}`, 
+        detail: data 
+      }, { status: response.status }), request.headers.get('origin'));
+    }
 
     if (data.success) {
       const acceptedSamples = Number(data.accepted_samples || 0);
