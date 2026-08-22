@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StudentSidebar } from './StudentSidebar';
 import { EnrolledClasses } from './EnrolledClasses';
 import { JoinClassWizard } from './JoinClassWizard';
@@ -10,12 +10,70 @@ import { StudentHistory } from './StudentHistory';
 import { StudentSettings } from './StudentSettings';
 import { ProjectAdvisor } from './ProjectAdvisor';
 import { ClassroomLearningBot } from './ClassroomLearningBot';
+import { StudentAttendanceModal } from './StudentAttendanceModal';
+import { supabase } from '../../database/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { Bell } from 'lucide-react';
 
 export const StudentDashboard: React.FC = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isSidebarHovered, setSidebarHovered] = useState(false);
   const [isJoinWizardOpen, setJoinWizardOpen] = useState(false);
-  const [activeTestId, setActiveTestId] = useState<string | null>(null);
+    const [activeTestId, setActiveTestId] = useState<string | null>(null);
+  const [attendanceAlert, setAttendanceAlert] = useState<{ sessionId: string; classroomId: string; classroomName: string; sessionCode?: string } | null>(null);
+  const [isAttendancePortalOpen, setIsAttendancePortalOpen] = useState(false);
+  const [attendancePortal, setAttendancePortal] = useState<{ sessionId: string; classroomId: string; classroomName: string; sessionCode?: string } | null>(null);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    const subscribeToAttendanceAnnouncements = async () => {
+      const { data: enrollments, error } = await supabase
+        .from('students')
+        .select('classroom_id, classrooms(id,name)')
+        .eq('user_id', user.id);
+      if (cancelled || error || !enrollments?.length) return;
+
+      const classroomMap = new Map<string, string>();
+      enrollments.forEach((enrollment: any) => {
+        if (enrollment.classroom_id) classroomMap.set(enrollment.classroom_id, enrollment.classrooms?.name || 'your classroom');
+      });
+      const classroomIds = [...classroomMap.keys()];
+      if (!classroomIds.length) return;
+
+      channel = supabase
+        .channel(`student-attendance-announcements-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'attendance_session_announcements',
+            filter: `classroom_id=in.(${classroomIds.join(',')})`,
+          },
+          (payload) => {
+            const announcement: any = payload.new;
+            if (announcement.event_type !== 'attendance_started') return;
+            setAttendanceAlert({
+              sessionId: announcement.attendance_session_id,
+              classroomId: announcement.classroom_id,
+              classroomName: classroomMap.get(announcement.classroom_id) || 'your classroom',
+              sessionCode: announcement.session_code,
+            });
+          },
+        )
+        .subscribe();
+    };
+
+    void subscribeToAttendanceAnnouncements();
+    return () => {
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const renderContent = () => {
     switch (activeSection) {
@@ -73,6 +131,36 @@ export const StudentDashboard: React.FC = () => {
       >
         {renderContent()}
       </main>
+
+      {attendanceAlert && (
+        <div className="fixed inset-0 z-[95] flex items-start justify-center bg-black/40 p-4 pt-20 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-purple-200 bg-white p-6 shadow-2xl dark:border-purple-500/20 dark:bg-[#121212]">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-purple-500/10 p-3 text-purple-500"><Bell size={20} /></div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-purple-500">Attendance Verification</p>
+                <h2 className="mt-1 text-lg font-black text-slate-900 dark:text-white">Your teacher started attendance</h2>
+                <p className="mt-2 text-xs leading-5 text-slate-500">Verify your presence now for <span className="font-bold">{attendanceAlert.classroomName}</span>. You will need to allow location and complete Face ID on your own device.</p>
+                {attendanceAlert.sessionCode && <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-purple-500">Session: {attendanceAlert.sessionCode}</p>}
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <button type="button" onClick={() => setAttendanceAlert(null)} className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:bg-white/10 dark:text-slate-300">Later</button>
+              <button type="button" onClick={() => { setAttendancePortal(attendanceAlert); setIsAttendancePortalOpen(true); setAttendanceAlert(null); }} className="flex-1 rounded-xl bg-purple-600 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white">Verify Attendance</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAttendancePortalOpen && attendancePortal && (
+        <StudentAttendanceModal
+          isOpen={isAttendancePortalOpen}
+          classroomId={attendancePortal.classroomId}
+          classroomName={attendancePortal.classroomName}
+          onClose={() => { setIsAttendancePortalOpen(false); setAttendancePortal(null); }}
+          onSuccess={() => { setIsAttendancePortalOpen(false); setAttendancePortal(null); }}
+        />
+      )}
 
       {/* Biometric Join Wizard */}
       <JoinClassWizard 

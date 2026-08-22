@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { supabase, isSupabaseServiceRoleConfigured } from '../database/supabase';
 import { withCors } from '../lib/cors';
+import { evaluateGeofence, isValidGeoPoint, type LocationStatus } from '../lib/geofence';
 
 const ATTENDANCE_STATUSES = ['Present', 'Late', 'Excused', 'Absent', 'Pending Review'] as const;
 type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
@@ -47,8 +48,17 @@ export async function createAttendanceSession(request: Request): Promise<Respons
     const body = await request.json().catch(() => ({}));
     const classroomId = clean(body.classroomId, 80);
     const title = clean(body.title, 120) || 'Class attendance';
-    const durationMinutes = Math.max(5, Math.min(Number(body.durationMinutes) || 90, 180));
+    const durationMinutes = Math.max(5, Math.min(Number(body.durationMinutes) || 15, 180));
+    const attendanceMode = clean(body.attendanceMode, 30) || 'multi_level';
+    const usesGeofence = attendanceMode === 'multi_level';
+    const teacherLatitude = Number(body.teacherLatitude);
+    const teacherLongitude = Number(body.teacherLongitude);
+    const teacherLocationAccuracy = Number(body.teacherLocationAccuracy);
+    const radiusMeters = Math.round(Number(body.radiusMeters) || 100);
     if (!classroomId) return json({ error: 'classroomId is required.' }, 400);
+    if (usesGeofence && (!isValidGeoPoint({ latitude: teacherLatitude, longitude: teacherLongitude }) || !Number.isFinite(teacherLocationAccuracy) || teacherLocationAccuracy < 0 || radiusMeters < 25 || radiusMeters > 1000)) {
+      return json({ error: 'A valid teacher location, accuracy, and radius between 25 and 1000 meters are required.' }, 400);
+    }
     const classroom = await ownedClassroom(classroomId, user.id);
 
     const challengeToken = randomBytes(24).toString('base64url');
@@ -69,9 +79,28 @@ export async function createAttendanceSession(request: Request): Promise<Respons
       session_code: sessionCode,
       challenge_expires_at: expiresAt,
       challenge_rotated_at: now,
-      verification_policy: { pin: true, teacher_face: false, student_face: true, liveness: true, multi_level: true },
+      teacher_latitude: usesGeofence ? teacherLatitude : null,
+      teacher_longitude: usesGeofence ? teacherLongitude : null,
+      teacher_location_accuracy: usesGeofence ? teacherLocationAccuracy : null,
+      radius_meters: usesGeofence ? radiusMeters : null,
+      started_at: now,
+      expires_at: expiresAt,
+      verification_policy: usesGeofence
+        ? { pin: true, teacher_face: false, student_face: true, liveness: true, geofence: true, multi_level: true }
+        : { pin: true, teacher_face: true, student_face: false, liveness: true, geofence: false, multi_level: false },
     }).select('id,classroom_id,title,status,starts_at,ends_at,challenge_expires_at,verification_policy,session_code').single();
     if (error || !session) return json({ error: 'Unable to open the attendance session.' }, 500);
+
+    if (usesGeofence) {
+      const { error: announcementError } = await supabase.from('attendance_session_announcements').insert({
+        attendance_session_id: session.id,
+        classroom_id: classroom.id,
+        event_type: 'attendance_started',
+        session_code: sessionCode,
+        expires_at: expiresAt,
+      });
+      if (announcementError) console.error('[attendance.announcement]', announcementError.message);
+    }
 
     await audit({
       classroom_id: classroom.id,
@@ -79,10 +108,10 @@ export async function createAttendanceSession(request: Request): Promise<Respons
       actor_user_id: user.id,
       actor_role: 'teacher',
       event_type: 'session_opened',
-      payload: { durationMinutes, verificationPolicy: session.verification_policy },
+      payload: { durationMinutes, attendanceMode, radiusMeters: usesGeofence ? radiusMeters : null, verificationPolicy: session.verification_policy },
     });
 
-    return json({ session, challengeToken, pin, sessionCode, warning: 'Display the PIN or QR challenge only to students physically present in this classroom.' });
+    return json({ session, challengeToken, pin, sessionCode, attendanceMode, radiusMeters: usesGeofence ? radiusMeters : null, warning: usesGeofence ? 'Students will be notified in the portal and must pass the geofence and Face ID checks.' : 'Display the PIN or QR challenge only to students physically present in this classroom.' });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to open the attendance session.' }, error.status || 500);
   }
@@ -97,7 +126,7 @@ export async function closeAttendanceSession(request: Request): Promise<Response
     const { data: current, error: readError } = await supabase.from('attendance_sessions').select('id,classroom_id,status').eq('id', sessionId).eq('teacher_id', user.id).maybeSingle();
     if (readError || !current) return json({ error: 'Attendance session not found.' }, 404);
     const now = new Date().toISOString();
-    const { data: session, error } = await supabase.from('attendance_sessions').update({ status: 'closed', closed_at: now, ends_at: now }).eq('id', sessionId).eq('teacher_id', user.id).select('id,classroom_id,status,closed_at').single();
+    const { data: session, error } = await supabase.from('attendance_sessions').update({ status: 'closed', closed_at: now, ended_at: now, ends_at: now, expires_at: now }).eq('id', sessionId).eq('teacher_id', user.id).select('id,classroom_id,status,closed_at,ended_at').single();
     if (error) return json({ error: 'Unable to close the attendance session.' }, 500);
 
     const [{ count: rosterCount, error: rosterError }, { data: attendanceRows, error: attendanceError }, { count: observationCount, error: observationError }] = await Promise.all([
@@ -133,7 +162,7 @@ export async function getActiveAttendanceSession(request: Request): Promise<Resp
     if (!classroomId) return json({ error: 'classroomId is required.' }, 400);
     const { data: enrollment } = await supabase.from('students').select('id').eq('classroom_id', classroomId).eq('user_id', user.id).maybeSingle();
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
-    const { data, error } = await supabase.from('attendance_sessions').select('id,classroom_id,title,status,starts_at,ends_at,challenge_expires_at,verification_policy,session_code').eq('classroom_id', classroomId).eq('status', 'open').gt('ends_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const { data, error } = await supabase.from('attendance_sessions').select('id,classroom_id,title,status,starts_at,started_at,ends_at,expires_at,challenge_expires_at,verification_policy,session_code,radius_meters').eq('classroom_id', classroomId).eq('status', 'open').gt('ends_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (error) return json({ error: 'Unable to read the active attendance session.' }, 500);
     return json({ session: data || null });
   } catch (error: any) {
@@ -141,41 +170,77 @@ export async function getActiveAttendanceSession(request: Request): Promise<Resp
   }
 }
 
-export async function connectToSession(request: Request): Promise<Response> {
+export async function verifyAttendanceLocation(request: Request): Promise<Response> {
   try {
     const { user } = await requireUser(request, ['student']);
     const body = await request.json().catch(() => ({}));
     const sessionId = clean(body.sessionId, 80);
+    const studentLatitude = Number(body.studentLatitude);
+    const studentLongitude = Number(body.studentLongitude);
+    const locationAccuracy = Number(body.locationAccuracy);
     if (!sessionId) return json({ error: 'sessionId is required.' }, 400);
 
-    const { data: session, error: sessionError } = await supabase.from('attendance_sessions').select('id,classroom_id,status,ends_at').eq('id', sessionId).maybeSingle();
+    const { data: session, error: sessionError } = await supabase
+      .from('attendance_sessions')
+      .select('id,classroom_id,status,ends_at,teacher_latitude,teacher_longitude,radius_meters')
+      .eq('id', sessionId)
+      .maybeSingle();
     if (sessionError || !session) return json({ error: 'Attendance session not found.' }, 404);
-    
-    const { data: enrollment } = await supabase.from('students').select('id,name').eq('classroom_id', session.classroom_id).eq('user_id', user.id).maybeSingle();
+
+    const { data: enrollment } = await supabase
+      .from('students')
+      .select('id,name')
+      .eq('classroom_id', session.classroom_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
 
-    const now = Date.now();
-    const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= now;
-    if (expired) return json({ error: 'This attendance session is closed or expired.' }, 403);
+    const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= Date.now();
+    if (expired) return json({ error: 'This attendance session is closed or expired.', locationStatus: 'LOCATION_UNAVAILABLE' }, 403);
 
-    // Upsert the verification state
-    const { data: verification, error: verifError } = await supabase.from('attendance_verifications').upsert({
+    const hasStudentLocation = isValidGeoPoint({ latitude: studentLatitude, longitude: studentLongitude }) && Number.isFinite(locationAccuracy) && locationAccuracy >= 0;
+    const hasTeacherLocation = isValidGeoPoint({ latitude: Number(session.teacher_latitude), longitude: Number(session.teacher_longitude) });
+    const radiusMeters = Math.max(25, Number(session.radius_meters) || 100);
+    const locationResult = hasStudentLocation && hasTeacherLocation
+      ? evaluateGeofence(
+          { latitude: Number(session.teacher_latitude), longitude: Number(session.teacher_longitude) },
+          { latitude: studentLatitude, longitude: studentLongitude },
+          locationAccuracy,
+          radiusMeters,
+        )
+      : { status: 'LOCATION_UNAVAILABLE' as LocationStatus, distanceMeters: null, accuracyMeters: Number.isFinite(locationAccuracy) ? Math.max(0, locationAccuracy) : null };
+
+    const { data: verification, error: verificationError } = await supabase.from('attendance_verifications').upsert({
       attendance_session_id: session.id,
       student_id: enrollment.id,
       student_user_id: user.id,
       classroom_id: session.classroom_id,
-      network_connected: true,
       authentication_verified: true,
       classroom_verified: true,
       session_verified: true,
-      verification_status: 'CONNECTED'
-    }, { onConflict: 'attendance_session_id,student_id' }).select('*').single();
+      location_status: locationResult.status,
+      location_verified: locationResult.status === 'LOCATION_VERIFIED',
+      student_latitude: hasStudentLocation ? studentLatitude : null,
+      student_longitude: hasStudentLocation ? studentLongitude : null,
+      location_accuracy: locationResult.accuracyMeters,
+      distance_from_teacher: locationResult.distanceMeters,
+      verification_status: locationResult.status,
+    }, { onConflict: 'attendance_session_id,student_id' }).select('id,attendance_session_id,location_status,location_verified,location_accuracy,distance_from_teacher,verification_status').single();
+    if (verificationError) return json({ error: 'Unable to record the location verification state.' }, 500);
 
-    if (verifError) return json({ error: 'Unable to establish local session connection.' }, 500);
+    await audit({
+      classroom_id: session.classroom_id,
+      session_id: session.id,
+      actor_user_id: user.id,
+      actor_role: 'student',
+      event_type: 'attendance_location_checked',
+      payload: { verificationId: verification?.id, locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
+    });
 
-    return json({ ok: true, verification });
+    const ok = locationResult.status === 'LOCATION_VERIFIED';
+    return json({ ok, locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, verification }, ok ? 200 : 403);
   } catch (error: any) {
-    return json({ error: error.message || 'Unable to connect to session.' }, error.status || 500);
+    return json({ error: error.message || 'Unable to verify your location.' }, error.status || 500);
   }
 }
 
@@ -189,6 +254,9 @@ export async function verifyAttendance(request: Request): Promise<Response> {
     const faceMatchScore = Number(body.faceMatchScore) || 0;
     const livenessScore = Number(body.livenessScore) || 0;
     const faceDetected = Boolean(body.faceDetected);
+    const studentLatitude = Number(body.studentLatitude);
+    const studentLongitude = Number(body.studentLongitude);
+    const locationAccuracy = Number(body.locationAccuracy);
     const idempotencyKey = clean(request.headers.get('idempotency-key') || body.idempotencyKey, 120);
     if (!sessionId || !idempotencyKey) return json({ error: 'sessionId and idempotency key are required.' }, 400);
 
@@ -198,7 +266,7 @@ export async function verifyAttendance(request: Request): Promise<Response> {
       return json({ error: existing.failure_reason || 'This verification request has already been processed.', attempt: existing }, 409);
     }
 
-    const { data: session, error: sessionError } = await supabase.from('attendance_sessions').select('id,classroom_id,teacher_id,status,ends_at,challenge_expires_at,challenge_token_hash,pin_hash').eq('id', sessionId).maybeSingle();
+    const { data: session, error: sessionError } = await supabase.from('attendance_sessions').select('id,classroom_id,teacher_id,status,ends_at,expires_at,challenge_expires_at,challenge_token_hash,pin_hash,teacher_latitude,teacher_longitude,teacher_location_accuracy,radius_meters,verification_policy').eq('id', sessionId).maybeSingle();
     if (sessionError || !session) return json({ error: 'Attendance session not found.' }, 404);
     const { data: enrollment } = await supabase.from('students').select('id,name').eq('classroom_id', session.classroom_id).eq('user_id', user.id).maybeSingle();
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
@@ -210,17 +278,38 @@ export async function verifyAttendance(request: Request): Promise<Response> {
     const useMultiLevel = !pin && !challengeToken;
     const validPin = Boolean(pin && session.pin_hash && hash(pin) === session.pin_hash);
     const validToken = Boolean(challengeToken && session.challenge_token_hash && hash(challengeToken) === session.challenge_token_hash);
-    
-    const validFace = useMultiLevel && faceDetected && faceMatchScore >= 60 && livenessScore >= 50;
+    const hasStudentLocation = isValidGeoPoint({ latitude: studentLatitude, longitude: studentLongitude }) && Number.isFinite(locationAccuracy) && locationAccuracy >= 0;
+    const hasTeacherLocation = isValidGeoPoint({ latitude: Number(session.teacher_latitude), longitude: Number(session.teacher_longitude) });
+    const radiusMeters = Math.max(25, Number(session.radius_meters) || 100);
+    const locationResult = hasStudentLocation && hasTeacherLocation
+      ? evaluateGeofence(
+          { latitude: Number(session.teacher_latitude), longitude: Number(session.teacher_longitude) },
+          { latitude: studentLatitude, longitude: studentLongitude },
+          locationAccuracy,
+          radiusMeters,
+        )
+      : { status: 'LOCATION_UNAVAILABLE' as LocationStatus, distanceMeters: null, accuracyMeters: Number.isFinite(locationAccuracy) ? Math.max(0, locationAccuracy) : null };
+    const locationAllowed = !useMultiLevel || locationResult.status === 'LOCATION_VERIFIED';
+    const validFace = useMultiLevel && locationAllowed && faceDetected && faceMatchScore >= 60 && livenessScore >= 50;
     const finalConfidence = useMultiLevel ? Math.min(faceMatchScore, livenessScore) : 100;
 
     if (expired || (!validPin && !validToken && !validFace)) {
-      const failureReason = expired ? 'This attendance session is closed or expired.' : (useMultiLevel ? 'Face verification failed.' : 'The attendance PIN or challenge token is invalid.');
-      const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({ session_id: session.id, classroom_id: session.classroom_id, student_user_id: user.id, student_id: enrollment.id, idempotency_key: idempotencyKey, challenge_digest: hash(pin || challengeToken || 'face'), status: expired ? 'expired' : 'rejected', failure_reason: failureReason, device_fingerprint: clean(body.deviceFingerprint, 160), proximity_metadata: body.proximityMetadata || {}, liveness_metadata: { ...body.livenessMetadata, faceMatchScore, livenessScore } }).select('id,status,failure_reason').single();
+      const failureReason = expired
+        ? 'This attendance session is closed or expired.'
+        : (useMultiLevel && locationResult.status !== 'LOCATION_VERIFIED'
+          ? `Attendance blocked: ${locationResult.status === 'OUTSIDE_RADIUS' ? 'you are outside the attendance zone.' : locationResult.status === 'LOCATION_UNCERTAIN' ? 'your location is too uncertain to verify automatically.' : 'your location could not be verified.'}`
+          : (useMultiLevel ? 'Face verification failed.' : 'The attendance PIN or challenge token is invalid.'));
+      const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({ session_id: session.id, classroom_id: session.classroom_id, student_user_id: user.id, student_id: enrollment.id, idempotency_key: idempotencyKey, challenge_digest: hash(pin || challengeToken || 'face'), status: expired ? 'expired' : 'rejected', failure_reason: failureReason, device_fingerprint: clean(body.deviceFingerprint, 160), proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, liveness_metadata: { ...body.livenessMetadata, faceMatchScore, livenessScore } }).select('id,status,failure_reason').single();
       await audit({ classroom_id: session.classroom_id, session_id: session.id, actor_user_id: user.id, actor_role: 'student', event_type: expired ? 'verification_expired' : 'verification_rejected', payload: { attemptId: attempt?.id, reason: failureReason } });
       
       if (useMultiLevel) {
         await supabase.from('attendance_verifications').update({
+          location_status: locationResult.status,
+          location_verified: locationResult.status === 'LOCATION_VERIFIED',
+          student_latitude: hasStudentLocation ? studentLatitude : null,
+          student_longitude: hasStudentLocation ? studentLongitude : null,
+          location_accuracy: locationResult.accuracyMeters,
+          distance_from_teacher: locationResult.distanceMeters,
           face_detected: faceDetected,
           liveness_score: livenessScore,
           face_match_score: faceMatchScore,
@@ -232,12 +321,12 @@ export async function verifyAttendance(request: Request): Promise<Response> {
       return json({ error: failureReason, attempt }, 403);
     }
 
-    const { data: attempt, error: attemptError } = await supabase.from('attendance_verification_attempts').insert({ session_id: session.id, classroom_id: session.classroom_id, student_user_id: user.id, student_id: enrollment.id, idempotency_key: idempotencyKey, challenge_digest: hash(pin || challengeToken || 'face'), status: 'accepted', device_fingerprint: clean(body.deviceFingerprint, 160), proximity_metadata: body.proximityMetadata || {}, liveness_metadata: { ...body.livenessMetadata, faceMatchScore, livenessScore } }).select('id,status,created_at').single();
+    const { data: attempt, error: attemptError } = await supabase.from('attendance_verification_attempts').insert({ session_id: session.id, classroom_id: session.classroom_id, student_user_id: user.id, student_id: enrollment.id, idempotency_key: idempotencyKey, challenge_digest: hash(pin || challengeToken || 'face'), status: 'accepted', device_fingerprint: clean(body.deviceFingerprint, 160), proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, liveness_metadata: { ...body.livenessMetadata, faceMatchScore, livenessScore } }).select('id,status,created_at').single();
     if (attemptError || !attempt) return json({ error: 'Unable to record the verification attempt.' }, 500);
 
     const verifiedMethod = useMultiLevel ? 'Multi-Level Face Verification' : (validPin ? 'Student PIN + Teacher Session' : 'Session Challenge + Teacher Session');
     
-    const { data: attendance, error: attendanceError } = await supabase.from('attendance').insert({ classroom_id: session.classroom_id, session_id: session.id, student_id: enrollment.id, student_name: enrollment.name, status: 'Present', verified_method: verifiedMethod, marked_by: session.teacher_id, verification_attempt_id: attempt.id, confidence: finalConfidence, capture_metadata: { source: 'server-attendance-verification', proximity: body.proximityMetadata || {}, liveness: { faceMatchScore, livenessScore } } }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
+    const { data: attendance, error: attendanceError } = await supabase.from('attendance').insert({ classroom_id: session.classroom_id, session_id: session.id, student_id: enrollment.id, student_name: enrollment.name, status: 'Present', verified_method: verifiedMethod, marked_by: session.teacher_id, verification_attempt_id: attempt.id, confidence: finalConfidence, capture_metadata: { source: 'server-attendance-verification', geofence: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, liveness: { faceMatchScore, livenessScore } } }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
     
     if (attendanceError) {
       if (attendanceError.code === '23505') {
@@ -254,13 +343,20 @@ export async function verifyAttendance(request: Request): Promise<Response> {
         liveness_score: livenessScore,
         face_match_score: faceMatchScore,
         final_confidence: finalConfidence,
+        overall_confidence: finalConfidence,
+        location_status: locationResult.status,
+        location_verified: true,
+        student_latitude: hasStudentLocation ? studentLatitude : null,
+        student_longitude: hasStudentLocation ? studentLongitude : null,
+        location_accuracy: locationResult.accuracyMeters,
+        distance_from_teacher: locationResult.distanceMeters,
         verification_status: 'VERIFIED',
         verified_at: new Date().toISOString()
       }).eq('attendance_session_id', session.id).eq('student_id', enrollment.id);
     }
 
     await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: attendance.verified_method } });
-    return json({ ok: true, attendance, attempt, stats: { score: faceMatchScore, liveness: livenessScore, confidence: finalConfidence } });
+    return json({ ok: true, attendance, attempt, stats: { score: faceMatchScore, liveness: livenessScore, confidence: finalConfidence, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters } });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to verify attendance.' }, error.status || 500);
   }
@@ -292,6 +388,174 @@ export async function markTeacherAttendance(request: Request): Promise<Response>
     return json({ attendance });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to record attendance.' }, error.status || 500);
+  }
+}
+
+export async function verifyStudentFaceAttendance(request: Request): Promise<Response> {
+  try {
+    const { user } = await requireUser(request, ['student']);
+    const form = await request.formData();
+    const sessionId = clean(form.get('sessionId'), 80);
+    const file = form.get('file');
+    const idempotencyKey = clean(request.headers.get('idempotency-key') || form.get('idempotencyKey'), 120);
+    const studentLatitude = Number(form.get('studentLatitude'));
+    const studentLongitude = Number(form.get('studentLongitude'));
+    const locationAccuracy = Number(form.get('locationAccuracy'));
+    if (!sessionId || !idempotencyKey) return json({ error: 'sessionId, camera frame, and idempotency key are required.' }, 400);
+    if (!(file instanceof File)) return json({ error: 'A camera frame is required for Face ID.' }, 400);
+
+    const { data: existing } = await supabase.from('attendance_verification_attempts').select('id,status,failure_reason').eq('session_id', sessionId).eq('student_user_id', user.id).eq('idempotency_key', idempotencyKey).maybeSingle();
+    if (existing) {
+      if (existing.status === 'accepted') return json({ ok: true, replay: true, attempt: existing });
+      return json({ error: existing.failure_reason || 'This verification request has already been processed.', attempt: existing }, 409);
+    }
+
+    const { data: session, error: sessionError } = await supabase.from('attendance_sessions').select('id,classroom_id,teacher_id,status,ends_at,teacher_latitude,teacher_longitude,radius_meters').eq('id', sessionId).maybeSingle();
+    if (sessionError || !session) return json({ error: 'Attendance session not found.' }, 404);
+    const { data: enrollment } = await supabase.from('students').select('id,name,face_registration_status').eq('classroom_id', session.classroom_id).eq('user_id', user.id).maybeSingle();
+    if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
+
+    const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= Date.now();
+    const hasStudentLocation = isValidGeoPoint({ latitude: studentLatitude, longitude: studentLongitude }) && Number.isFinite(locationAccuracy) && locationAccuracy >= 0;
+    const hasTeacherLocation = isValidGeoPoint({ latitude: Number(session.teacher_latitude), longitude: Number(session.teacher_longitude) });
+    const radiusMeters = Math.max(25, Number(session.radius_meters) || 100);
+    const locationResult = hasStudentLocation && hasTeacherLocation
+      ? evaluateGeofence(
+          { latitude: Number(session.teacher_latitude), longitude: Number(session.teacher_longitude) },
+          { latitude: studentLatitude, longitude: studentLongitude },
+          locationAccuracy,
+          radiusMeters,
+        )
+      : { status: 'LOCATION_UNAVAILABLE' as LocationStatus, distanceMeters: null, accuracyMeters: Number.isFinite(locationAccuracy) ? Math.max(0, locationAccuracy) : null };
+    const locationConfidence = locationResult.distanceMeters === null ? 0 : Math.max(0, Math.min(100, (1 - locationResult.distanceMeters / radiusMeters) * 100));
+
+    const updateVerification = async (fields: Record<string, unknown>) => {
+      await supabase.from('attendance_verifications').upsert({
+        attendance_session_id: session.id,
+        student_id: enrollment.id,
+        student_user_id: user.id,
+        classroom_id: session.classroom_id,
+        authentication_verified: true,
+        classroom_verified: true,
+        session_verified: !expired,
+        location_status: locationResult.status,
+        location_verified: locationResult.status === 'LOCATION_VERIFIED',
+        student_latitude: hasStudentLocation ? studentLatitude : null,
+        student_longitude: hasStudentLocation ? studentLongitude : null,
+        location_accuracy: locationResult.accuracyMeters,
+        distance_from_teacher: locationResult.distanceMeters,
+        ...fields,
+      }, { onConflict: 'attendance_session_id,student_id' });
+    };
+
+    if (expired || locationResult.status !== 'LOCATION_VERIFIED') {
+      const failureReason = expired
+        ? 'This attendance session is closed or expired.'
+        : locationResult.status === 'OUTSIDE_RADIUS'
+          ? 'You are outside the attendance zone.'
+          : locationResult.status === 'LOCATION_UNCERTAIN'
+            ? 'Your location is too uncertain to verify automatically.'
+            : 'Your location could not be verified.';
+      await updateVerification({ verification_status: locationResult.status });
+      const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({
+        session_id: session.id,
+        classroom_id: session.classroom_id,
+        student_user_id: user.id,
+        student_id: enrollment.id,
+        idempotency_key: idempotencyKey,
+        challenge_digest: hash('student-face'),
+        status: expired ? 'expired' : 'rejected',
+        failure_reason: failureReason,
+        proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
+      }).select('id,status,failure_reason').single();
+      return json({ error: failureReason, locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, attempt }, 403);
+    }
+
+    if (String(enrollment.face_registration_status || '').toUpperCase() !== 'REGISTERED') {
+      await updateVerification({ verification_status: 'FACE_FAILED' });
+      return json({ error: 'Face ID is not enrolled for this student.' }, 403);
+    }
+
+    const outgoing = new FormData();
+    outgoing.append('classroom_id', session.classroom_id);
+    outgoing.append('session_id', session.id);
+    outgoing.append('capture_mode', 'student_face');
+    outgoing.append('file', file, file.name || 'student-face.jpg');
+    const aiBaseUrl = process.env.AI_SERVICE_URL?.replace(/\/$/, '');
+    const aiSecret = process.env.AI_SERVICE_SECRET;
+    if (!aiBaseUrl || !aiSecret) return json({ error: 'AI service configuration is missing.' }, 500);
+    const aiResponse = await fetch(`${aiBaseUrl}/ai/v1/attendance/frame`, { method: 'POST', headers: { Authorization: `Bearer ${aiSecret}` }, body: outgoing });
+    const aiPayload = await aiResponse.json().catch(() => ({}));
+    if (!aiResponse.ok) return json({ error: 'Face ID service could not process this frame.' }, 502);
+
+    const results = Array.isArray(aiPayload.results) ? aiPayload.results : [];
+    const identityMatch = results.find((result: any) => String(result.student_id || '') === String(enrollment.id) && String(result.status || '').toUpperCase() === 'PRESENT');
+    const faceDetected = results.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4) || Boolean(identityMatch);
+    const numericScore = (value: unknown, fallback = 0) => {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed <= 1 ? parsed * 100 : parsed;
+      return fallback;
+    };
+    const faceMatchScore = identityMatch ? numericScore(identityMatch.similarity ?? identityMatch.face_match_score ?? identityMatch.confidence, String(identityMatch.confidence || '').toUpperCase() === 'HIGH' ? 95 : 0) : 0;
+    const livenessScore = identityMatch ? numericScore(identityMatch.liveness_score ?? identityMatch.livenessScore ?? identityMatch.liveness, identityMatch.liveness === true ? 100 : 0) : 0;
+    const livenessVerified = livenessScore >= 50;
+    const identityVerified = Boolean(identityMatch) && faceMatchScore >= 60;
+    const overallConfidence = Math.min(locationConfidence, faceMatchScore, livenessScore);
+    const accepted = faceDetected && identityVerified && livenessVerified;
+
+    if (!accepted) {
+      const failureReason = !faceDetected ? 'No face was detected.' : !livenessVerified ? 'Liveness verification failed.' : 'Face identity could not be matched to the logged-in student.';
+      await updateVerification({ face_detected: faceDetected, liveness_score: livenessScore, face_match_score: faceMatchScore, overall_confidence: overallConfidence, final_confidence: overallConfidence, verification_status: 'FACE_FAILED' });
+      const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({
+        session_id: session.id,
+        classroom_id: session.classroom_id,
+        student_user_id: user.id,
+        student_id: enrollment.id,
+        idempotency_key: idempotencyKey,
+        challenge_digest: hash('student-face'),
+        status: 'rejected',
+        failure_reason: failureReason,
+        proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
+        liveness_metadata: { faceDetected, identityVerified, livenessVerified, faceMatchScore, livenessScore },
+      }).select('id,status,failure_reason').single();
+      return json({ error: failureReason, faceDetected, faceMatchScore, livenessScore, attempt }, 403);
+    }
+
+    const { data: attempt, error: attemptError } = await supabase.from('attendance_verification_attempts').insert({
+      session_id: session.id,
+      classroom_id: session.classroom_id,
+      student_user_id: user.id,
+      student_id: enrollment.id,
+      idempotency_key: idempotencyKey,
+      challenge_digest: hash('student-face'),
+      status: 'accepted',
+      proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
+      liveness_metadata: { faceDetected, identityVerified, livenessVerified, faceMatchScore, livenessScore },
+    }).select('id,status,created_at').single();
+    if (attemptError || !attempt) return json({ error: 'Unable to record the verification attempt.' }, 500);
+
+    const { data: attendance, error: attendanceError } = await supabase.from('attendance').insert({
+      classroom_id: session.classroom_id,
+      session_id: session.id,
+      student_id: enrollment.id,
+      student_name: enrollment.name,
+      status: 'Present',
+      verified_method: 'Multi-Level Geofence + Face ID',
+      marked_by: session.teacher_id,
+      verification_attempt_id: attempt.id,
+      confidence: overallConfidence,
+      capture_metadata: { source: 'server-student-face-verification', geofence: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, face: { faceMatchScore, livenessScore } },
+    }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
+    if (attendanceError) {
+      if (attendanceError.code === '23505') return json({ error: 'Attendance is already recorded for this session.' }, 409);
+      return json({ error: 'Attendance record could not be created.' }, 500);
+    }
+
+    await updateVerification({ face_detected: faceDetected, liveness_score: livenessScore, face_match_score: faceMatchScore, final_confidence: overallConfidence, overall_confidence: overallConfidence, verification_status: 'VERIFIED', verified_at: new Date().toISOString() });
+    await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: 'Multi-Level Geofence + Face ID', distanceMeters: locationResult.distanceMeters, faceMatchScore, livenessScore } });
+    return json({ ok: true, attendance, attempt, stats: { distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, faceMatchScore, livenessScore, confidence: overallConfidence } });
+  } catch (error: any) {
+    return json({ error: error.message || 'Unable to complete student Face ID verification.' }, error.status || 500);
   }
 }
 

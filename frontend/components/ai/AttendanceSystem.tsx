@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, Users, CheckCircle2, AlertCircle, Loader2, Wifi, Copy } from 'lucide-react';
+import { Camera, Users, CheckCircle2, AlertCircle, Loader2, MapPin, LocateFixed, Copy } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CameraService } from '../../services/ml/CameraService';
 import { EmailService } from '../../services/ml/EmailService';
@@ -12,6 +12,12 @@ interface AttendanceSystemProps {
   classId: string;
   className: string;
 }
+
+type TeacherLocation = {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+};
 
 type LiveAttendanceBox = {
   trackId: string;
@@ -38,6 +44,11 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
   const [liveBoxes, setLiveBoxes] = useState<LiveAttendanceBox[]>([]);
   const [isLiveScanning, setIsLiveScanning] = useState(false);
   const [copiedSessionCode, setCopiedSessionCode] = useState(false);
+  const [teacherLocation, setTeacherLocation] = useState<TeacherLocation | null>(null);
+  const [locationState, setLocationState] = useState<'idle' | 'requesting' | 'granted' | 'denied' | 'unavailable'>('idle');
+  const [radiusMeters, setRadiusMeters] = useState(100);
+  const [durationMinutes, setDurationMinutes] = useState(15);
+  const [verificationRows, setVerificationRows] = useState<any[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -56,6 +67,36 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     };
   }, [classId]);
 
+  useEffect(() => {
+    if (!activeSession?.id) {
+      setVerificationRows([]);
+      return;
+    }
+    let cancelled = false;
+    const loadVerificationRows = async () => {
+      const { data } = await (supabase.from('attendance_verifications') as any)
+        .select('student_id,verification_status,location_status,distance_from_teacher,location_accuracy,overall_confidence')
+        .eq('attendance_session_id', activeSession.id);
+      if (!cancelled) setVerificationRows(data || []);
+    };
+    void loadVerificationRows();
+    const channel = supabase
+      .channel(`teacher-attendance-verifications-${activeSession.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_verifications', filter: `attendance_session_id=eq.${activeSession.id}` }, (payload) => {
+        const nextRow: any = payload.new;
+        setVerificationRows((previous) => {
+          const index = previous.findIndex((row) => row.student_id === nextRow.student_id);
+          if (index === -1) return [...previous, nextRow];
+          return previous.map((row, rowIndex) => rowIndex === index ? { ...row, ...nextRow } : row);
+        });
+      })
+      .subscribe();
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [activeSession?.id]);
+
   const fetchStudents = async () => {
     try {
       const { data, error } = await (supabase.from('students') as any).select('id,name,email,face_registration_status').eq('classroom_id', classId).order('name');
@@ -66,29 +107,63 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     }
   };
 
+  const requestTeacherLocation = async (): Promise<TeacherLocation | null> => {
+    if (!navigator.geolocation) {
+      setLocationState('unavailable');
+      setCameraError('This device does not provide browser location services.');
+      return null;
+    }
+    setLocationState('requesting');
+    setCameraError(null);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      });
+      const nextLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy };
+      setTeacherLocation(nextLocation);
+      setLocationState('granted');
+      return nextLocation;
+    } catch (error: any) {
+      setLocationState(error?.code === 1 ? 'denied' : 'unavailable');
+      setCameraError(error?.code === 1 ? 'Location permission is required to establish the attendance zone.' : 'Unable to determine your location. Try again in an open area.');
+      return null;
+    }
+  };
+
   const openAttendanceSession = async (): Promise<any | null> => {
     setSessionBusy(true);
     setCameraError(null);
     setSessionNotice(null);
     try {
+      const teacherPoint = mode === 'single' ? (teacherLocation || await requestTeacherLocation()) : null;
+      if (mode === 'single' && !teacherPoint) return null;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again before opening attendance.');
       const response = await fetch(getApiUrl('/api/attendance/session'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classroomId: classId, title: `${className} attendance`, durationMinutes: 90 }),
+        body: JSON.stringify({
+          classroomId: classId,
+          title: `${className} attendance`,
+          durationMinutes: mode === 'single' ? durationMinutes : 90,
+          attendanceMode: mode === 'single' ? 'multi_level' : 'manual',
+          teacherLatitude: teacherPoint?.latitude,
+          teacherLongitude: teacherPoint?.longitude,
+          teacherLocationAccuracy: teacherPoint?.accuracy,
+          radiusMeters: mode === 'single' ? radiusMeters : undefined,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Could not open an attendance session.');
-      await startAttendanceSession(classId, payload.session.id);
-      const nextSession = { ...payload.session, pin: payload.pin, sessionCode: payload.sessionCode, challengeToken: payload.challengeToken };
+      if (mode !== 'single') await startAttendanceSession(classId, payload.session.id);
+      const nextSession = { ...payload.session, pin: payload.pin, sessionCode: payload.sessionCode, radiusMeters: payload.radiusMeters, challengeToken: payload.challengeToken };
       identifiedIdsRef.current.clear();
       setIdentified([]);
       setFinalReport(null);
       setActiveSession(nextSession);
       setSessionNotice(`Session PIN: ${payload.pin}. ${payload.warning || 'Session is ready.'}`);
       if (mode === 'single') {
-        setSessionNotice(`Multi-Level Attendance is active. Students should join the same classroom Wi-Fi and open Verify Attendance. Session code: ${payload.sessionCode}.`);
+        setSessionNotice(`Multi-Level Attendance is active. Students have been notified and can verify from their own devices. Session code: ${payload.sessionCode}.`);
       } else {
         try {
           await startCamera();
@@ -459,25 +534,65 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
           </button>
         </div>
 
+        {mode === 'single' && !activeSession && (
+          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 text-slate-700 dark:text-slate-200">
+            <div className="flex items-start gap-3">
+              <MapPin size={20} className="mt-0.5 shrink-0 text-blue-500" />
+              <div className="flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Location Access</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">NeuroClass needs your location to establish the classroom attendance zone. No Wi-Fi, hotspot, BLE, or teacher camera is required.</p>
+                {teacherLocation ? (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid grid-cols-3 gap-2 rounded-xl bg-white/60 p-3 text-[10px] dark:bg-black/10">
+                      <div><p className="font-bold uppercase tracking-wide opacity-60">Latitude</p><p className="mt-1 font-mono">{teacherLocation.latitude.toFixed(6)}</p></div>
+                      <div><p className="font-bold uppercase tracking-wide opacity-60">Longitude</p><p className="mt-1 font-mono">{teacherLocation.longitude.toFixed(6)}</p></div>
+                      <div><p className="font-bold uppercase tracking-wide opacity-60">Accuracy</p><p className="mt-1 font-mono">±{Math.round(teacherLocation.accuracy)} m</p></div>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest opacity-60">Attendance Radius</p>
+                      <div className="grid grid-cols-5 gap-2">
+                        {[50, 100, 150, 250].map((radius) => (
+                          <button key={radius} type="button" onClick={() => setRadiusMeters(radius)} className={`rounded-lg border px-2 py-2 text-[10px] font-bold ${radiusMeters === radius ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-200 bg-white/60 dark:border-white/10 dark:bg-white/5'}`}>{radius} m</button>
+                        ))}
+                        <input type="number" min={25} max={1000} value={![50, 100, 150, 250].includes(radiusMeters) ? radiusMeters : ''} placeholder="Custom" onChange={(event) => setRadiusMeters(Math.max(25, Math.min(1000, Number(event.target.value) || 100)))} className="w-full rounded-lg border border-slate-200 bg-white/60 px-2 py-2 text-center text-[10px] font-bold outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/5" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest opacity-60" htmlFor="attendance-duration">Attendance Duration</label>
+                      <select id="attendance-duration" value={durationMinutes} onChange={(event) => setDurationMinutes(Number(event.target.value))} className="w-full rounded-lg border border-slate-200 bg-white/60 px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-white/5">
+                        {[10, 15, 20, 30].map((duration) => <option key={duration} value={duration}>{duration} minutes</option>)}
+                      </select>
+                    </div>
+                    <button type="button" onClick={() => void requestTeacherLocation()} disabled={locationState === 'requesting' || sessionBusy} className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">{locationState === 'requesting' ? 'Updating location…' : 'Adjust location'}</button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => void requestTeacherLocation()} disabled={locationState === 'requesting'} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-50">
+                    <LocateFixed size={14} /> {locationState === 'requesting' ? 'Requesting location…' : 'Allow Location'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeSession && (
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-4 text-emerald-700 dark:text-emerald-300">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest">Student Face-ID Portal</p>
-                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">Students must join the classroom Wi-Fi provided by the instructor, then open Verify Attendance on their own devices.</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest">AI Multi-Level Attendance</p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">Students are notified automatically. Each student must pass authentication, classroom membership, session, geofence, Face ID, and liveness checks.</p>
               </div>
-              <Wifi size={18} className="shrink-0" />
+              <MapPin size={18} className="shrink-0" />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
+              <div className="rounded-xl border border-emerald-500/20 bg-white/50 px-2 py-2 dark:bg-black/10"><p className="font-bold uppercase tracking-wide opacity-60">Radius</p><p className="mt-1 font-mono text-sm font-black">{activeSession.radius_meters || activeSession.radiusMeters || radiusMeters} m</p></div>
+              <div className="rounded-xl border border-emerald-500/20 bg-white/50 px-2 py-2 dark:bg-black/10"><p className="font-bold uppercase tracking-wide opacity-60">Verified</p><p className="mt-1 font-mono text-sm font-black">{verificationRows.filter((row) => row.verification_status === 'VERIFIED').length} / {students.length}</p></div>
+              <div className="rounded-xl border border-emerald-500/20 bg-white/50 px-2 py-2 dark:bg-black/10"><p className="font-bold uppercase tracking-wide opacity-60">Pending</p><p className="mt-1 font-mono text-sm font-black">{Math.max(0, students.length - verificationRows.filter((row) => row.verification_status === 'VERIFIED').length)}</p></div>
             </div>
             <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-white/50 px-3 py-2 dark:bg-black/10">
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-widest opacity-60">Session code</p>
-                <p className="font-mono text-sm font-black tracking-widest">{activeSession.session_code || activeSession.sessionCode || 'Active'}</p>
-              </div>
-              <button type="button" onClick={copySessionCode} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-white">
-                <Copy size={13} /> {copiedSessionCode ? 'Copied' : 'Copy code'}
-              </button>
+              <div><p className="text-[9px] font-bold uppercase tracking-widest opacity-60">Session code</p><p className="font-mono text-sm font-black tracking-widest">{activeSession.session_code || activeSession.sessionCode || 'Active'}</p></div>
+              <button type="button" onClick={copySessionCode} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-white"><Copy size={13} /> {copiedSessionCode ? 'Copied' : 'Copy code'}</button>
             </div>
-            <p className="mt-2 text-[9px] font-semibold uppercase tracking-wide opacity-60">This browser cannot create an open Wi-Fi hotspot. Use the classroom router or device hotspot and share its Wi-Fi credentials separately.</p>
           </div>
         )}
 
@@ -488,13 +603,13 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">Teacher camera disabled</p>
                   <h3 className="mt-2 text-xl font-black tracking-tight">Student Face-ID Portal</h3>
-                  <p className="mt-2 max-w-md text-xs leading-5 text-slate-300">Multi-Level Attendance does not scan faces from the teacher device. Students verify themselves from their own connected devices.</p>
+                  <p className="mt-2 max-w-md text-xs leading-5 text-slate-300">Multi-Level Attendance does not scan faces or request location from the teacher device after setup. Students verify themselves from their own devices.</p>
                 </div>
-                <Wifi size={28} className="shrink-0 text-emerald-300" />
+                <MapPin size={28} className="shrink-0 text-emerald-300" />
               </div>
               <div className="grid gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-200 sm:grid-cols-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">1.</span> Join classroom Wi-Fi</div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">2.</span> Open Verify Attendance</div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">1.</span> Teacher location set</div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">2.</span> Student popup opens</div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">3.</span> Complete Face ID</div>
               </div>
             </div>
@@ -617,9 +732,9 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
           ) : (
             <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
               <div className="flex items-center gap-3">
-                <Wifi size={18} className="text-blue-500" />
+                <MapPin size={18} className="text-blue-500" />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Waiting for connected students</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Waiting for student verifications</p>
                   <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">The teacher device does not capture faces in Multi-Level Attendance. Students complete Face ID from the student portal.</p>
                 </div>
               </div>
