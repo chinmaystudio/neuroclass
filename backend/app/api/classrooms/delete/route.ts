@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { handleOptions, withCors } from '../../../../../lib/cors';
-import { requireGatewayAuth, assertTeacherOwnsClassroom, jsonError, requireUuid } from '../../../../../lib/aiGateway';
+import { handleOptions, withCors } from '../../../../lib/cors';
+import { requireGatewayAuth, assertTeacherOwnsClassroom, jsonError, requireUuid } from '../../../../lib/aiGateway';
 
 export const runtime = 'nodejs';
 
