@@ -149,12 +149,23 @@ aiApp.post('/api/ai/classroom-answer', async (c) => withHandlerErrors(c, async (
   const { data: authData, error: authError } = await supabase.auth.getUser(token);
   if (authError || !authData.user) return c.json({ error: 'Authentication is invalid or expired.' }, 401);
 
-  const { data: membership, error: membershipError } = await (supabase.from('students') as any)
-    .select('id,name,roll_number')
+  let { data: membership, error: membershipError } = await (supabase.from('students') as any)
+    .select('id,name,roll_number,email')
     .eq('user_id', authData.user.id)
     .eq('classroom_id', classroomId)
     .limit(1)
     .maybeSingle();
+  const loginEmail = authData.user.email?.trim().toLowerCase();
+  if (!membership && loginEmail) {
+    const fallback = await (supabase.from('students') as any)
+      .select('id,name,roll_number,email')
+      .eq('classroom_id', classroomId)
+      .ilike('email', loginEmail)
+      .limit(1)
+      .maybeSingle();
+    membership = fallback.data;
+    membershipError = fallback.error;
+  }
   if (membershipError || !membership) return c.json({ error: 'You are not enrolled in this classroom.' }, 403);
 
   const { data: materials } = await (supabase.from('classroom_materials') as any)

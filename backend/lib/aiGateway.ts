@@ -51,19 +51,24 @@ export async function assertTeacherOwnsClassroom(auth: GatewayAuth, classroomId:
 }
 
 export async function assertStudentOwnsClassroom(auth: GatewayAuth, studentId: string, classroomId: string): Promise<void> {
-  const { data, error } = await auth.db.from('students').select('id').eq('id', studentId).eq('classroom_id', classroomId).eq('user_id', auth.user.id).maybeSingle();
+  const { data, error } = await auth.db.from('students').select('id,user_id,email').eq('id', studentId).eq('classroom_id', classroomId).maybeSingle();
   if (error || !data) throw new GatewayError('You do not own this student enrollment', 403);
+  const loginEmail = auth.user.email?.trim().toLowerCase();
+  const enrollmentEmail = String(data.email || '').trim().toLowerCase();
+  if (data.user_id !== auth.user.id && (!loginEmail || enrollmentEmail !== loginEmail)) throw new GatewayError('You do not own this student enrollment', 403);
 }
 
 export async function assertTeacherOrStudentCanRegister(auth: GatewayAuth, studentId: string, classroomId: string): Promise<void> {
   const { data: enrollment, error: enrollmentError } = await auth.db
     .from('students')
-    .select('id,user_id')
+    .select('id,user_id,email')
     .eq('id', studentId)
     .eq('classroom_id', classroomId)
     .maybeSingle();
   if (enrollmentError || !enrollment) throw new GatewayError('Student enrollment was not found in this classroom', 404);
-  if (String(enrollment.user_id || '') === auth.user.id) return;
+  const loginEmail = auth.user.email?.trim().toLowerCase();
+  const enrollmentEmail = String(enrollment.email || '').trim().toLowerCase();
+  if (String(enrollment.user_id || '') === auth.user.id || Boolean(loginEmail && enrollmentEmail === loginEmail)) return;
 
   const { data: classroom, error: classroomError } = await auth.db
     .from('classrooms')
@@ -85,6 +90,18 @@ export async function getAuthorizedSession(auth: GatewayAuth, sessionId: string)
 export function sessionIsOpen(session: { status?: string; ends_at?: string | null }): boolean {
   const status = String(session.status || '').toLowerCase();
   return ['open', 'active', 'started'].includes(status) && (!session.ends_at || new Date(session.ends_at).getTime() > Date.now());
+}
+
+export async function assertStudentInAttendanceSession(auth: GatewayAuth, studentId: string, classroomId: string, sessionId: string): Promise<void> {
+  const { data: session, error: sessionError } = await auth.db.from('attendance_sessions').select('id,classroom_id,status,ends_at').eq('id', sessionId).eq('classroom_id', classroomId).maybeSingle();
+  if (sessionError || !session) throw new GatewayError('Attendance session not found', 404);
+  if (!sessionIsOpen(session)) throw new GatewayError('Attendance session is not active', 409);
+  const { data: enrollment, error: enrollmentError } = await auth.db.from('students').select('id,user_id,email').eq('id', studentId).eq('classroom_id', classroomId).maybeSingle();
+  if (enrollmentError || !enrollment) throw new GatewayError('Student enrollment was not found in this classroom', 404);
+  const loginEmail = auth.user.email?.trim().toLowerCase();
+  const enrollmentEmail = String(enrollment.email || '').trim().toLowerCase();
+  const isStudent = enrollment.user_id === auth.user.id || Boolean(loginEmail && enrollmentEmail === loginEmail);
+  if (!isStudent) throw new GatewayError('You do not own this student enrollment', 403);
 }
 
 export async function forwardMultipartToRender(path: string, source: FormData, names: string[]): Promise<Response> {

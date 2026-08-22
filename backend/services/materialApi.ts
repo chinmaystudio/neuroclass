@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { isSupabaseServiceRoleConfigured, supabase } from '../database/supabase';
 import { withCors } from '../lib/cors';
+import { normalizeBackendRole } from '../lib/roles';
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -24,8 +25,8 @@ async function requireUser(request: Request, roles: string[] = []) {
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) throw Object.assign(new Error('Authentication is invalid or expired.'), { status: 401 });
   const { data: profile } = await supabase.from('users').select('role').eq('uid', data.user.id).maybeSingle();
-  const role = String(profile?.role || '');
-  if (roles.length && !roles.includes(role)) throw Object.assign(new Error('You do not have access to classroom materials.'), { status: 403 });
+  const role = normalizeBackendRole(profile?.role);
+  if (roles.length && !roles.includes(role) && !(role === 'admin' && roles.includes('admin'))) throw Object.assign(new Error('You do not have access to classroom materials.'), { status: 403 });
   return { user: data.user, role };
 }
 
@@ -35,9 +36,22 @@ async function ownedClassroom(classroomId: string, userId: string) {
   return data;
 }
 
-async function enrolledClassroom(classroomId: string, userId: string) {
-  const { data } = await supabase.from('students').select('id').eq('classroom_id', classroomId).eq('user_id', userId).maybeSingle();
-  if (!data) throw Object.assign(new Error('You are not enrolled in this classroom.'), { status: 403 });
+async function enrolledClassroom(classroomId: string, userId: string, email?: string | null) {
+  const { data: byUser } = await supabase.from('students').select('id').eq('classroom_id', classroomId).eq('user_id', userId).maybeSingle();
+  if (byUser) return;
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (normalizedEmail) {
+    const { data: byEmail } = await supabase.from('students').select('id').eq('classroom_id', classroomId).ilike('email', normalizedEmail).maybeSingle();
+    if (byEmail) return;
+  }
+  throw Object.assign(new Error('You are not enrolled in this classroom.'), { status: 403 });
+}
+
+async function authorizeClassroomRead(classroomId: string, userId: string, email?: string | null) {
+  const { data: owned } = await supabase.from('classrooms').select('id').eq('id', classroomId).eq('user_id', userId).maybeSingle();
+  if (owned) return 'teacher' as const;
+  await enrolledClassroom(classroomId, userId, email);
+  return 'student' as const;
 }
 
 const extensionFor = (name: string) => name.toLowerCase().split('.').pop() || '';
@@ -52,7 +66,7 @@ const chunkText = (text: string, size = 1800) => {
 
 export async function uploadClassroomMaterial(request: Request): Promise<Response> {
   try {
-    const { user } = await requireUser(request, ['teacher', 'instructor', 'admin']);
+    const { user } = await requireUser(request);
     const form = await request.formData();
     const classroomId = clean(form.get('classroomId'), 80);
     const file = form.get('file');
@@ -104,11 +118,10 @@ export async function uploadClassroomMaterial(request: Request): Promise<Respons
 
 export async function listClassroomMaterials(request: Request): Promise<Response> {
   try {
-    const { user, role } = await requireUser(request, ['teacher', 'instructor', 'admin', 'student']);
+    const { user } = await requireUser(request);
     const classroomId = clean(new URL(request.url).searchParams.get('classroomId'), 80);
     if (!classroomId) return json({ error: 'classroomId is required.' }, 400, request);
-    if (['teacher', 'instructor', 'admin'].includes(role)) await ownedClassroom(classroomId, user.id);
-    else await enrolledClassroom(classroomId, user.id);
+    await authorizeClassroomRead(classroomId, user.id, user.email);
     const { data, error } = await supabase.from('classroom_materials').select('id,classroom_id,name,mime_type,extraction_status,visibility,size_bytes,checksum_sha256,chunk_count,extraction_error,created_at,processed_at').eq('classroom_id', classroomId).eq('visibility', 'classroom').order('created_at', { ascending: false }).limit(100);
     if (error) return json({ error: 'Unable to load classroom materials.' }, 500, request);
     return json({ materials: data || [] }, 200, request);

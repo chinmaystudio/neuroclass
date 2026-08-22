@@ -106,7 +106,7 @@ Respond ONLY with valid JSON matching this schema:
     try {
       const ai = getAIClient();
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: prompt,
         config: {
           temperature: 0.4,
@@ -175,7 +175,7 @@ Return ONLY valid JSON:
 `;
     const ai = getAIClient();
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
       config: { temperature: 0.2, responseMimeType: 'application/json' }
     });
@@ -224,7 +224,7 @@ Make the plan realistic for the stated constraints, avoid unsupported claims, an
     try {
       const ai = getAIClient();
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: prompt,
         config: { temperature: 0.55, responseMimeType: 'application/json' }
       });
@@ -282,7 +282,7 @@ Respond ONLY in JSON matching this schema:
     try {
       const ai = getAIClient();
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: prompt,
         config: {
           temperature: 0.4,

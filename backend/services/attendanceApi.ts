@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { supabase, isSupabaseServiceRoleConfigured } from '../database/supabase';
 import { withCors } from '../lib/cors';
 import { evaluateGeofence, isValidGeoPoint, type LocationStatus } from '../lib/geofence';
+import { normalizeBackendRole } from '../lib/roles';
 
 const ATTENDANCE_STATUSES = ['Present', 'Late', 'Excused', 'Absent', 'Pending Review'] as const;
 type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
@@ -23,8 +24,8 @@ async function requireUser(request: Request, roles: string[] = []) {
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) throw Object.assign(new Error('Authentication is invalid or expired.'), { status: 401 });
   const { data: profile } = await supabase.from('users').select('role').eq('uid', data.user.id).maybeSingle();
-  const role = String(profile?.role || data.user.user_metadata?.role || '').trim().toLowerCase();
-  const allowedRoles = roles.map((allowedRole) => allowedRole.trim().toLowerCase());
+  const role = normalizeBackendRole(profile?.role || data.user.user_metadata?.role);
+  const allowedRoles = roles.map((allowedRole) => normalizeBackendRole(allowedRole));
   if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
     throw Object.assign(new Error('This attendance action is not available for your account.'), { status: 403 });
   }
@@ -41,6 +42,17 @@ async function ownedClassroom(classroomId: string, teacherId: string) {
 async function audit(payload: Record<string, unknown>) {
   const { error } = await supabase.from('attendance_audit_events').insert(payload);
   if (error) console.error('[attendance.audit]', error.message);
+}
+
+async function enrolledStudent(classroomId: string, user: { id: string; email?: string | null }) {
+  const { data: byUser } = await supabase.from('students').select('id,name').eq('classroom_id', classroomId).eq('user_id', user.id).maybeSingle();
+  if (byUser) return byUser;
+  const normalizedEmail = user.email?.trim().toLowerCase();
+  if (normalizedEmail) {
+    const { data: byEmail } = await supabase.from('students').select('id,name').eq('classroom_id', classroomId).ilike('email', normalizedEmail).maybeSingle();
+    if (byEmail) return byEmail;
+  }
+  return null;
 }
 
 export async function createAttendanceSession(request: Request): Promise<Response> {
@@ -159,10 +171,10 @@ export async function closeAttendanceSession(request: Request): Promise<Response
 
 export async function getActiveAttendanceSession(request: Request): Promise<Response> {
   try {
-    const { user } = await requireUser(request, ['student']);
+    const { user } = await requireUser(request);
     const classroomId = clean(new URL(request.url).searchParams.get('classroomId'), 80);
     if (!classroomId) return json({ error: 'classroomId is required.' }, 400);
-    const { data: enrollment } = await supabase.from('students').select('id').eq('classroom_id', classroomId).eq('user_id', user.id).maybeSingle();
+    const enrollment = await enrolledStudent(classroomId, user);
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
     const { data, error } = await supabase.from('attendance_sessions').select('id,classroom_id,title,status,starts_at,started_at,ends_at,expires_at,challenge_expires_at,verification_policy,session_code,radius_meters').eq('classroom_id', classroomId).eq('status', 'open').contains('verification_policy', { geofence: true }).gt('ends_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (error) return json({ error: 'Unable to read the active attendance session.' }, 500);
@@ -174,7 +186,7 @@ export async function getActiveAttendanceSession(request: Request): Promise<Resp
 
 export async function verifyAttendanceLocation(request: Request): Promise<Response> {
   try {
-    const { user } = await requireUser(request, ['student']);
+    const { user } = await requireUser(request);
     const body = await request.json().catch(() => ({}));
     const sessionId = clean(body.sessionId, 80);
     const studentLatitude = Number(body.studentLatitude);
@@ -188,13 +200,7 @@ export async function verifyAttendanceLocation(request: Request): Promise<Respon
       .eq('id', sessionId)
       .maybeSingle();
     if (sessionError || !session) return json({ error: 'Attendance session not found.' }, 404);
-
-    const { data: enrollment } = await supabase
-      .from('students')
-      .select('id,name')
-      .eq('classroom_id', session.classroom_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const enrollment = await enrolledStudent(session.classroom_id, user);
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
 
     const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= Date.now();
@@ -248,7 +254,7 @@ export async function verifyAttendanceLocation(request: Request): Promise<Respon
 
 export async function verifyAttendance(request: Request): Promise<Response> {
   try {
-    const { user } = await requireUser(request, ['student']);
+    const { user } = await requireUser(request);
     const body = await request.json().catch(() => ({}));
     const sessionId = clean(body.sessionId, 80);
     const pin = clean(body.pin, 12);
@@ -270,7 +276,7 @@ export async function verifyAttendance(request: Request): Promise<Response> {
 
     const { data: session, error: sessionError } = await supabase.from('attendance_sessions').select('id,classroom_id,teacher_id,status,ends_at,expires_at,challenge_expires_at,challenge_token_hash,pin_hash,teacher_latitude,teacher_longitude,teacher_location_accuracy,radius_meters,verification_policy').eq('id', sessionId).maybeSingle();
     if (sessionError || !session) return json({ error: 'Attendance session not found.' }, 404);
-    const { data: enrollment } = await supabase.from('students').select('id,name').eq('classroom_id', session.classroom_id).eq('user_id', user.id).maybeSingle();
+    const enrollment = await enrolledStudent(session.classroom_id, user);
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
 
     const now = Date.now();

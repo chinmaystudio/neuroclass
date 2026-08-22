@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../database/supabase';
 import { withCors } from './cors';
 
-export async function requireAuth(request: NextRequest): Promise<{ userId: string } | { response: NextResponse }> {
+export async function requireAuth(request: NextRequest): Promise<{ userId: string; userEmail: string | null } | { response: NextResponse }> {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
   if (!token || token.length < 20 || token.length > 4096) {
     return { response: withCors(NextResponse.json({ error: 'Authentication is required.' }, { status: 401 })) };
@@ -11,7 +11,7 @@ export async function requireAuth(request: NextRequest): Promise<{ userId: strin
   if (error || !data.user) {
     return { response: withCors(NextResponse.json({ error: 'Authentication is invalid or expired.' }, { status: 401 })) };
   }
-  return { userId: data.user.id };
+  return { userId: data.user.id, userEmail: data.user.email?.trim().toLowerCase() || null };
 }
 
 export const boundedString = (value: unknown, maxLength: number, fallback = '') => {

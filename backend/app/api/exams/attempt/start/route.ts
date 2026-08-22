@@ -31,11 +31,20 @@ export async function POST(request: NextRequest): Promise<Response> {
     .maybeSingle();
   if (testError || !test) return withCors(NextResponse.json({ error: 'Test not found.' }, { status: 404 }));
 
-  const { data: enrollment, error: enrollmentError } = await (supabase.from('students') as any)
-    .select('id,classroom_id,name')
+  let { data: enrollment, error: enrollmentError } = await (supabase.from('students') as any)
+    .select('id,classroom_id,name,email')
     .eq('classroom_id', test.classroom_id)
     .eq('user_id', auth.userId)
     .maybeSingle();
+  if (!enrollment && auth.userEmail) {
+    const fallback = await (supabase.from('students') as any)
+      .select('id,classroom_id,name,email')
+      .eq('classroom_id', test.classroom_id)
+      .ilike('email', auth.userEmail)
+      .maybeSingle();
+    enrollment = fallback.data;
+    enrollmentError = fallback.error;
+  }
   if (enrollmentError || !enrollment) {
     return withCors(NextResponse.json({ error: 'You are not enrolled in this classroom.' }, { status: 403 }));
   }
