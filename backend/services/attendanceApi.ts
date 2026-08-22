@@ -143,13 +143,41 @@ export async function closeAttendanceSession(request: Request): Promise<Response
     const { data: session, error } = await supabase.from('attendance_sessions').update({ status: 'closed', closed_at: now, ended_at: now, ends_at: now, expires_at: now }).eq('id', sessionId).eq('teacher_id', user.id).select('id,classroom_id,status,closed_at,ended_at').single();
     if (error) return json({ error: 'Unable to close the attendance session.' }, 500);
 
-    const [{ count: rosterCount, error: rosterError }, { data: attendanceRows, error: attendanceError }, { count: observationCount, error: observationError }] = await Promise.all([
+    const [{ count: rosterCount, error: rosterError }, { data: rosterRows, error: rosterRowsError }, { data: attendanceRows, error: attendanceError }, { count: observationCount, error: observationError }] = await Promise.all([
       supabase.from('students').select('id', { count: 'exact', head: true }).eq('classroom_id', current.classroom_id),
+      supabase.from('students').select('id,name,roll_number,email').eq('classroom_id', current.classroom_id).order('name', { ascending: true }),
       supabase.from('attendance').select('id,student_id,student_name,status,verified_method,verified_at,confidence').eq('session_id', sessionId).order('verified_at', { ascending: true }),
       supabase.from('attendance_observations').select('id', { count: 'exact', head: true }).eq('session_id', sessionId),
     ]);
-    if (rosterError || attendanceError || observationError) console.error('[attendance.report] summary query failed', { rosterError, attendanceError, observationError });
-    const entries = attendanceRows || [];
+    if (rosterError || rosterRowsError || attendanceError || observationError) console.error('[attendance.report] summary query failed', { rosterError, rosterRowsError, attendanceError, observationError });
+    const attendanceByStudent = new Map((attendanceRows || []).map((entry) => [String(entry.student_id), entry]));
+    const rosterEntries = (rosterRows || []).map((student) => {
+      const attendance = attendanceByStudent.get(String(student.id));
+      return {
+        studentId: student.id,
+        studentName: attendance?.student_name || student.name,
+        rollNumber: student.roll_number || '',
+        email: student.email || '',
+        status: attendance?.status || 'Absent',
+        verifiedMethod: attendance?.verified_method || '',
+        verifiedAt: attendance?.verified_at || '',
+        confidence: attendance?.confidence ?? '',
+      };
+    });
+    const rosterIds = new Set(rosterEntries.map((entry) => String(entry.studentId)));
+    const unlistedEntries = (attendanceRows || [])
+      .filter((entry) => !rosterIds.has(String(entry.student_id)))
+      .map((entry) => ({
+        studentId: entry.student_id,
+        studentName: entry.student_name,
+        rollNumber: '',
+        email: '',
+        status: entry.status,
+        verifiedMethod: entry.verified_method || '',
+        verifiedAt: entry.verified_at || '',
+        confidence: entry.confidence ?? '',
+      }));
+    const entries = [...rosterEntries, ...unlistedEntries];
     const presentCount = entries.filter((entry) => entry.status === 'Present' || entry.status === 'Late').length;
     const report = {
       sessionId,

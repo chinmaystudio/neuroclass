@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, Users, CheckCircle2, AlertCircle, Loader2, MapPin, LocateFixed, Copy } from 'lucide-react';
+import { Camera, Users, CheckCircle2, AlertCircle, Loader2, MapPin, LocateFixed, Copy, Download } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CameraService } from '../../services/ml/CameraService';
 import { EmailService } from '../../services/ml/EmailService';
@@ -216,6 +216,37 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     anchor.href = url;
     anchor.download = `attendance-report-${finalReport.sessionId || 'session'}.json`;
     anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAttendanceCsv = () => {
+    if (!finalReport) return;
+    const escapeCsv = (value: unknown) => {
+      const text = value == null ? '' : String(value);
+      return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const headers = ['Session ID', 'Classroom ID', 'Student ID', 'Student Name', 'Roll Number', 'Email', 'Status', 'Verified Method', 'Verified At', 'Confidence (%)'];
+    const rows = (Array.isArray(finalReport.entries) ? finalReport.entries : []).map((entry: any) => [
+      finalReport.sessionId,
+      finalReport.classroomId,
+      entry.studentId,
+      entry.studentName,
+      entry.rollNumber,
+      entry.email,
+      entry.status,
+      entry.verifiedMethod,
+      entry.verifiedAt,
+      entry.confidence,
+    ]);
+    const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\r\n');
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `attendance-${finalReport.sessionId || 'session'}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   };
 
@@ -752,7 +783,10 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
               <div><p className="text-lg font-bold">{finalReport.absentCount}</p><p className="text-[8px] uppercase tracking-wide opacity-60">Absent</p></div>
               <div><p className="text-lg font-bold">{finalReport.attendanceRate}%</p><p className="text-[8px] uppercase tracking-wide opacity-60">Rate</p></div>
             </div>
-            <button type="button" onClick={downloadFinalReport} className="mt-3 w-full rounded-xl bg-emerald-600 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-white">Download Final Report</button>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={downloadAttendanceCsv} className="inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-white"><Download size={12} /> Download CSV</button>
+              <button type="button" onClick={downloadFinalReport} className="rounded-xl border border-emerald-500/30 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Download JSON</button>
+            </div>
           </div>
         )}
         <div className="flex justify-between items-center mb-6">
