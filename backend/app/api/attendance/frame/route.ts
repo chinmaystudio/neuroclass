@@ -32,17 +32,17 @@ export async function POST(request: Request): Promise<Response> {
     if (!sessionIsOpen(session)) throw new GatewayError('Attendance session is not active', 409);
     await assertTeacherOwnsClassroom(auth, classroomId);
 
-    form.set('liveness_required', 'true');
-    const renderResponse = await forwardMultipartToRender('/ai/v1/attendance/frame', form, ['classroom_id', 'session_id', 'capture_mode', 'liveness_required', 'file']);
+    const renderResponse = await forwardMultipartToRender('/ai/v1/attendance/frame', form, ['classroom_id', 'session_id', 'capture_mode', 'target_student_id', 'file']);
     const data = await renderResponse.json().catch(() => ({}));
     if (!renderResponse.ok) return withCors(NextResponse.json({ error: 'AI Service failed to process frame', detail: data }, { status: renderResponse.status }), request.headers.get('origin'));
     const rawResults = Array.isArray(data.results) ? data.results : [];
-    data.results = await persistObservations(auth, sessionId, rawResults.map((result: any) => {
-      const livenessVerified = result?.liveness_verified === true || result?.liveness_passed === true;
-      return livenessVerified
-        ? { ...result, liveness_status: 'passed', verification: result.verification || 'render_arcface_liveness' }
-        : { ...result, status: result.status === 'PRESENT' ? 'LIVENESS_REVIEW' : result.status, liveness_status: 'failed', verification: 'liveness_required' };
-    }));
+    // Liveness is not an acceptance requirement for this teacher capture path.
+    // The server still persists observations and manual attendance only for an enrolled
+    // student whose AI similarity meets the 45% threshold in materializeManualPresentAttendance.
+    data.results = await persistObservations(auth, sessionId, rawResults.map((result: any) => ({
+      ...result,
+      verification: result.verification || 'render_arcface_match',
+    })));
     if (String(form.get('capture_mode') || 'live') === 'manual') {
       data.results = await materializeManualPresentAttendance(auth, session, data.results);
     }

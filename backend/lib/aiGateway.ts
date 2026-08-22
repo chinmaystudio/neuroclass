@@ -15,6 +15,15 @@ export class GatewayError extends Error {
   }
 }
 
+const TEACHER_FACE_MATCH_THRESHOLD = 45;
+
+function similarityPercent(result: any): number {
+  const raw = result?.similarity ?? result?.similarity_score ?? result?.face_match_score ?? result?.match_score ?? result?.matchPercent ?? result?.score;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value <= 1 ? value * 100 : value));
+}
+
 function adminDb(): SupabaseClient {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -143,7 +152,16 @@ export async function persistObservations(auth: GatewayAuth, sessionId: string, 
 }
 
 export async function materializeManualPresentAttendance(auth: GatewayAuth, session: { id: string; classroom_id: string }, results: any[]) {
-  const present = results.filter((result) => result.status === 'PRESENT' && result.student_id);
+  // Render may label a valid manual capture REVIEW while the numeric similarity is
+  // above the teacher’s configured threshold. Manual capture is the explicit
+  // record action, so persist only an enrolled student meeting this server rule.
+  const present = results
+    .filter((result) => result.student_id && (result.status === 'PRESENT' || similarityPercent(result) >= TEACHER_FACE_MATCH_THRESHOLD))
+    .map((result) => ({
+      ...result,
+      status: 'PRESENT',
+      verification: 'MANUAL',
+    }));
   if (!present.length) return results;
   const studentIds = [...new Set(present.map((result) => result.student_id as string))];
   const { data: students, error: studentsError } = await auth.db
@@ -184,6 +202,9 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
     student_name: studentById.get(result.student_id)?.name || 'Student',
     status: 'Present',
     verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
+    marked_by: auth.user.id,
+    confidence: similarityPercent(result),
+    capture_metadata: { source: 'teacher-manual-capture', faceMatchScore: similarityPercent(result), threshold: TEACHER_FACE_MATCH_THRESHOLD },
   }));
 
   // Supabase/PostgreSQL ON CONFLICT cannot use a partial index (WHERE session_id IS NOT NULL).
@@ -220,6 +241,7 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
       .update({
         status: 'Present',
         verified_method: 'Teacher Face-ID Biometric (Manual Capture)',
+        marked_by: auth.user.id,
       })
       .eq('session_id', session.id)
       .in('student_id', Array.from(existingIds));
@@ -230,5 +252,7 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
     }
   }
   const persistedIds = new Set(validPresent.map((result) => result.student_id));
-  return results.map((result) => persistedIds.has(result.student_id) ? { ...result, attendance_persisted: true } : result);
+  return results.map((result) => persistedIds.has(result.student_id)
+    ? { ...result, status: 'PRESENT', verification: 'MANUAL', attendance_persisted: true }
+    : result);
 }
