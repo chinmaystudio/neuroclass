@@ -519,15 +519,17 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
     const faceMatchScore = identityMatch ? numericScore(identityMatch.similarity ?? identityMatch.face_match_score ?? identityMatch.confidence, String(identityMatch.confidence || '').toUpperCase() === 'HIGH' ? 95 : 0) : 0;
     const detectedFace = results.find((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4);
     const faceBox = (identityMatch?.bbox || detectedFace?.bbox || null) as number[] | null;
+    const identityVerified = Boolean(identityMatch) && faceMatchScore >= 60;
+    const observedFaceFrames = resultSets.filter((frameResults) => frameResults.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4)).length;
     const explicitLivenessScores = identityMatches.map((result: any) => result.liveness_score ?? result.livenessScore ?? (typeof result.liveness === 'number' ? result.liveness : null)).filter((value: unknown) => value !== null).map((value: unknown) => numericScore(value));
+    const temporalLivenessVerified = identityVerified && files.length >= 2 && frameDigests.size >= 2 && observedFaceFrames >= 2;
     const livenessScore = explicitLivenessScores.length > 0
       ? Math.max(...explicitLivenessScores)
-      : identityMatches.length >= 2 && frameDigests.size >= 2
+      : temporalLivenessVerified
         ? 100
         : 0;
     const livenessMethod = explicitLivenessScores.length > 0 ? 'ai_service' : 'temporal_multi_frame';
     const livenessVerified = livenessScore >= 50;
-    const identityVerified = Boolean(identityMatch) && faceMatchScore >= 60;
     const overallConfidence = Math.min(locationConfidence, faceMatchScore, livenessScore);
     const accepted = faceDetected && identityVerified && livenessVerified;
 
@@ -544,9 +546,9 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
         status: 'rejected',
         failure_reason: failureReason,
         proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
-        liveness_metadata: { faceDetected, identityVerified, livenessVerified, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, matchedFrames: identityMatches.length, faceMatchScore, livenessScore },
+        liveness_metadata: { faceDetected, identityVerified, livenessVerified, temporalLivenessVerified, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, observedFaceFrames, matchedFrames: identityMatches.length, faceMatchScore, livenessScore },
       }).select('id,status,failure_reason').single();
-      return json({ error: failureReason, faceDetected, faceBox, faceMatchScore, matchPercent: faceMatchScore, livenessScore, livenessMethod, framesSubmitted: files.length, matchedFrames: identityMatches.length, attempt }, 403);
+      return json({ error: failureReason, faceDetected, faceBox, faceMatchScore, matchPercent: faceMatchScore, livenessScore, temporalLivenessVerified, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, observedFaceFrames, matchedFrames: identityMatches.length, attempt }, 403);
     }
 
     const { data: attempt, error: attemptError } = await supabase.from('attendance_verification_attempts').insert({
@@ -558,7 +560,7 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
       challenge_digest: hash('student-face'),
       status: 'accepted',
       proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
-      liveness_metadata: { faceDetected, identityVerified, livenessVerified, faceMatchScore, livenessScore },
+      liveness_metadata: { faceDetected, identityVerified, livenessVerified, temporalLivenessVerified, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, observedFaceFrames, matchedFrames: identityMatches.length, faceMatchScore, livenessScore },
     }).select('id,status,created_at').single();
     if (attemptError || !attempt) return json({ error: 'Unable to record the verification attempt.' }, 500);
 
@@ -581,7 +583,7 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
 
     await updateVerification({ face_detected: faceDetected, liveness_score: livenessScore, face_match_score: faceMatchScore, final_confidence: overallConfidence, overall_confidence: overallConfidence, verification_status: 'VERIFIED', verified_at: new Date().toISOString() });
     await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: 'Multi-Level Geofence + Face ID', distanceMeters: locationResult.distanceMeters, faceMatchScore, livenessScore } });
-    return json({ ok: true, attendance, attempt, faceBox, stats: { distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, faceMatchScore, matchPercent: faceMatchScore, livenessScore, livenessMethod, framesSubmitted: files.length, matchedFrames: identityMatches.length, confidence: overallConfidence } });
+    return json({ ok: true, attendance, attempt, faceBox, stats: { distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, faceMatchScore, matchPercent: faceMatchScore, livenessScore, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, observedFaceFrames, matchedFrames: identityMatches.length, confidence: overallConfidence } });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to complete student Face ID verification.' }, error.status || 500);
   }
