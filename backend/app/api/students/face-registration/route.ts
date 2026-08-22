@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
 
     if (!response.ok) {
       console.error('Render AI Enrollment Error:', response.status, rawText);
-      const detailMsg = data.rejection_reasons ? data.rejection_reasons.join(', ') : (data.error || data.detail || `HTTP ${response.status} ${response.statusText} - ${rawText.substring(0, 100)}`);
+      const detailMsg = data.rejection_reasons && data.rejection_reasons.length > 0 ? data.rejection_reasons.join(', ') : (data.error ? `${data.error} - ${data.detail || ''}` : (data.detail || `HTTP ${response.status} ${response.statusText} - ${rawText.substring(0, 100)}`));
       return withCors(NextResponse.json({ 
         error: `AI Service rejected the enrollment: ${detailMsg}`, 
         detail: data 
