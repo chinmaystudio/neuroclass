@@ -13,6 +13,7 @@ import { ClassroomLearningBot } from './ClassroomLearningBot';
 import { StudentAttendanceModal } from './StudentAttendanceModal';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { getApiUrl } from '../../config/apiConfig';
 import { Bell } from 'lucide-react';
 
 export const StudentDashboard: React.FC = () => {
@@ -33,30 +34,37 @@ export const StudentDashboard: React.FC = () => {
     const subscribeToAttendanceAnnouncements = async () => {
       const { data: enrollments, error } = await supabase
         .from('students')
-        .select('classroom_id, classrooms(id,name)')
-        .eq('user_id', user.id);
+        .select('classroom_id')
+        .eq('user_id', user.id)
+        .limit(100);
       if (cancelled || error || !enrollments?.length) return;
 
-      const classroomMap = new Map<string, string>();
-      enrollments.forEach((enrollment: any) => {
-        if (enrollment.classroom_id) classroomMap.set(enrollment.classroom_id, enrollment.classrooms?.name || 'your classroom');
-      });
-      const classroomIds = [...classroomMap.keys()];
+      const classroomIds = [...new Set(enrollments.map((enrollment: any) => enrollment.classroom_id).filter(Boolean))];
       if (!classroomIds.length) return;
+      const { data: classrooms } = await supabase.from('classrooms').select('id,name').in('id', classroomIds).limit(100);
+      const classroomMap = new Map<string, string>((classrooms || []).map((classroom: any) => [classroom.id, classroom.name || 'your classroom']));
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        const activeSessions = await Promise.all(classroomIds.map(async (classroomId) => {
+          const response = await fetch(`${getApiUrl('/api/attendance/active')}?classroomId=${encodeURIComponent(classroomId)}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+          const payload = await response.json().catch(() => ({}));
+          return payload.session ? { ...payload.session, classroomId } : null;
+        }));
+        const alreadyActive = activeSessions.find(Boolean) as any;
+        if (!cancelled && alreadyActive) {
+          setAttendanceAlert({ sessionId: alreadyActive.id, classroomId: alreadyActive.classroomId, classroomName: classroomMap.get(alreadyActive.classroomId) || 'your classroom', sessionCode: alreadyActive.session_code });
+        }
+      }
 
       channel = supabase
         .channel(`student-attendance-announcements-${user.id}`)
         .on(
           'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'attendance_session_announcements',
-            filter: `classroom_id=in.(${classroomIds.join(',')})`,
-          },
+          { event: 'INSERT', schema: 'public', table: 'attendance_session_announcements' },
           (payload) => {
             const announcement: any = payload.new;
-            if (announcement.event_type !== 'attendance_started') return;
+            if (announcement.event_type !== 'attendance_started' || !classroomMap.has(announcement.classroom_id)) return;
             setAttendanceAlert({
               sessionId: announcement.attendance_session_id,
               classroomId: announcement.classroom_id,

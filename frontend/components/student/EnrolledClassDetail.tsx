@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
-  BookOpen, Users, ShieldCheck, FileText, CheckCircle2, Clock, ArrowLeft, Plus, Sparkles
+  BookOpen, Users, ShieldCheck, FileText, CheckCircle2, Clock, ArrowLeft, Plus, Sparkles, MapPin
 } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -28,9 +28,6 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
   const [appealSubmitting, setAppealSubmitting] = useState(false);
   const [appealMessage, setAppealMessage] = useState('');
   const [activeAttendanceSession, setActiveAttendanceSession] = useState<any>(null);
-  const [attendancePin, setAttendancePin] = useState('');
-  const [attendanceMessage, setAttendanceMessage] = useState('');
-  const [attendanceVerifying, setAttendanceVerifying] = useState(false);
   const [isFacePortalOpen, setIsFacePortalOpen] = useState(false);
 
   useEffect(() => {
@@ -82,34 +79,6 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
       console.error('Error fetching classroom detail:', e);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const verifyCurrentAttendance = async () => {
-    if (!activeAttendanceSession || !attendancePin.trim()) return;
-    setAttendanceVerifying(true);
-    setAttendanceMessage('');
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session?.access_token) throw new Error('Please sign in again before verifying attendance.');
-      const response = await fetch(getApiUrl('/api/attendance/verify'), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-          'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID(),
-        },
-        body: JSON.stringify({ sessionId: activeAttendanceSession.id, pin: attendancePin.trim() }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Attendance verification failed.');
-      setAttendancePin('');
-      setAttendanceMessage('Attendance verified for this live classroom session.');
-      await fetchClassroomData();
-    } catch (error: any) {
-      setAttendanceMessage(error.message || 'Attendance verification failed.');
-    } finally {
-      setAttendanceVerifying(false);
     }
   };
 
@@ -252,42 +221,20 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-900 dark:text-white">Live attendance session</p>
-                  <p className="text-xs text-slate-500">Your instructor opened a time-bound session. Enter the PIN shown in the classroom; this does not create a self-service attendance record.</p>
+                  <p className="text-xs text-slate-500">Your instructor opened a time-bound session. Use Location Access and Face ID on your own device; the server will verify your classroom zone before recording attendance.</p>
                 </div>
                 <Clock size={18} className="text-emerald-600 shrink-0" />
               </div>
               <div className="rounded-xl border border-emerald-300/60 bg-white/70 dark:border-emerald-500/20 dark:bg-black/10 p-4">
-                <p className="text-xs font-bold text-slate-900 dark:text-white">Multi-Level Face-ID verification</p>
-                <p className="mt-1 text-[11px] leading-5 text-slate-500">Join the classroom Wi-Fi, then use the secure face-ID portal on this device. Your face is not scanned by the teacher’s computer.</p>
-                <button
-                  type="button"
-                  onClick={() => setIsFacePortalOpen(true)}
-                  className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white"
-                >
-                  Open Face-ID Portal
-                </button>
+                <div className="flex items-start gap-3">
+                  <MapPin size={18} className="mt-0.5 shrink-0 text-emerald-600" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white">Location Access Required</p>
+                    <p className="mt-1 text-[11px] leading-5 text-slate-500">Allow location first. The server checks that you are inside the teacher’s attendance zone before opening Face ID. Your face is not scanned by the teacher’s computer.</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setIsFacePortalOpen(true)} className="mt-3 w-full rounded-xl bg-emerald-600 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white">Allow Location & Open Face-ID Portal</button>
               </div>
-              <details className="rounded-xl border border-slate-200 dark:border-white/10 p-3">
-                <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-widest text-slate-500">Use classroom PIN instead</summary>
-                <div className="mt-3 flex flex-col sm:flex-row gap-3">
-                <input
-                  value={attendancePin}
-                  onChange={(event) => setAttendancePin(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="6-digit classroom PIN"
-                  className="flex-1 rounded-xl border border-emerald-200 dark:border-white/10 bg-white dark:bg-black/20 p-3 text-sm outline-none focus:border-emerald-500"
-                />
-                <button
-                  onClick={verifyCurrentAttendance}
-                  disabled={attendanceVerifying || attendancePin.length !== 6}
-                  className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white disabled:opacity-40"
-                >
-                  {attendanceVerifying ? 'Verifying…' : 'Verify presence'}
-                </button>
-              </div>
-                {attendanceMessage && <p className="mt-3 text-xs font-semibold text-emerald-700 dark:text-emerald-300">{attendanceMessage}</p>}
-              </details>
             </div>
           )}
           <StudentAttendanceModal
