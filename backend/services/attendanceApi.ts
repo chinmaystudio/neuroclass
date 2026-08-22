@@ -335,7 +335,7 @@ export async function verifyAttendance(request: Request): Promise<Response> {
 
     const verifiedMethod = useMultiLevel ? 'Multi-Level Face Verification' : (validPin ? 'Student PIN + Teacher Session' : 'Session Challenge + Teacher Session');
     
-    const { data: attendance, error: attendanceError } = await supabase.from('attendance').insert({ classroom_id: session.classroom_id, session_id: session.id, student_id: enrollment.id, student_name: enrollment.name, status: 'Present', verified_method: verifiedMethod, marked_by: session.teacher_id, verification_attempt_id: attempt.id, confidence: finalConfidence, capture_metadata: { source: 'server-attendance-verification', geofence: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, liveness: { faceMatchScore, livenessScore } } }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
+    const { data: attendance, error: attendanceError } = await supabase.from('attendance').insert({ classroom_id: session.classroom_id, session_id: session.id, student_id: enrollment.id, student_id_legacy: enrollment.id, student_name: enrollment.name, status: 'Present', verified_method: verifiedMethod, marked_by: session.teacher_id, verification_attempt_id: attempt.id, confidence: finalConfidence, capture_metadata: { source: 'server-attendance-verification', geofence: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, liveness: { faceMatchScore, livenessScore } } }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
     
     if (attendanceError) {
       if (attendanceError.code === '23505') {
@@ -577,6 +577,7 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
       classroom_id: session.classroom_id,
       session_id: session.id,
       student_id: enrollment.id,
+      student_id_legacy: enrollment.id,
       student_name: enrollment.name,
       status: 'Present',
       verified_method: 'Multi-Level Geofence + Face ID',
@@ -586,8 +587,10 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
       capture_metadata: { source: 'server-student-face-verification', geofence: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, face: { faceMatchScore, verificationMode: 'face_match_only' } },
     }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
     if (attendanceError) {
-      if (attendanceError.code === '23505') return json({ error: 'Attendance is already recorded for this session.' }, 409);
-      return json({ error: 'Attendance record could not be created.' }, 500);
+      if (attendanceError.code === '23505') return json({ error: 'Attendance is already recorded for this session.', faceBox, faceMatchScore, matchPercent: faceMatchScore }, 409);
+      await supabase.from('attendance_verification_attempts').update({ status: 'rejected', failure_reason: 'Attendance record could not be created.' }).eq('id', attempt.id);
+      console.error('[attendance.student-face] attendance insert failed', { code: attendanceError.code, message: attendanceError.message, details: attendanceError.details, hint: attendanceError.hint, faceMatchScore });
+      return json({ error: 'Attendance record could not be created.', faceBox, faceMatchScore, matchPercent: faceMatchScore }, 500);
     }
 
     await updateVerification({ face_detected: faceDetected, face_match_score: faceMatchScore, final_confidence: overallConfidence, overall_confidence: overallConfidence, verification_status: 'VERIFIED', verified_at: new Date().toISOString() });
