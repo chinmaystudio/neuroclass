@@ -50,7 +50,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [verificationStats, setVerificationStats] = useState<{ distance: number | null; accuracy: number | null; score: number; liveness: number } | null>(null);
+  const [verificationStats, setVerificationStats] = useState<{ distance: number | null; accuracy: number | null; score: number } | null>(null);
   const [faceBox, setFaceBox] = useState<[number, number, number, number] | null>(null);
   const [faceMatchPercent, setFaceMatchPercent] = useState<number | null>(null);
   const [activeSession, setActiveSession] = useState<{ id: string; ends_at?: string; session_code?: string; radius_meters?: number } | null>(null);
@@ -157,7 +157,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
   };
 
-  const captureLivenessSequence = async (video: HTMLVideoElement): Promise<Blob[]> => {
+  const captureFaceSequence = async (video: HTMLVideoElement): Promise<Blob[]> => {
     const frames: Blob[] = [];
     for (let index = 0; index < 3; index += 1) {
       const frame = await captureFrameBlob(video);
@@ -285,8 +285,8 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       let response: Response;
       if (useMultiLevel) {
         if (!videoRef.current || !isCapturing || !locationCheck) throw new Error('Complete location verification before opening Face ID.');
-        const frames = await captureLivenessSequence(videoRef.current);
-        if (frames.length < 2) throw new Error('The mobile camera did not provide enough frames. Keep the Face ID view open for a moment, keep your face visible, and try again.');
+        const frames = await captureFaceSequence(videoRef.current);
+        if (frames.length < 1) throw new Error('The mobile camera did not provide a frame. Keep the Face ID view open, keep your face visible, and try again.');
         const form = new FormData();
         form.append('sessionId', activeSession.id);
         form.append('studentLatitude', String(locationCheck.latitude));
@@ -335,8 +335,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       setVerificationStats({
         distance: payload.stats?.distanceMeters ?? locationCheck?.distanceMeters ?? null,
         accuracy: payload.stats?.accuracyMeters ?? locationCheck?.accuracyMeters ?? null,
-        score: payload.stats?.faceMatchScore ?? payload.stats?.score ?? 100,
-        liveness: payload.stats?.livenessScore ?? 100,
+        score: payload.stats?.faceMatchScore ?? payload.stats?.matchPercent ?? 0,
       });
       setIsSuccess(true);
       window.setTimeout(() => {
@@ -387,7 +386,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
 
           <div className="rounded-2xl border border-purple-200 dark:border-purple-500/20 bg-purple-50/70 dark:bg-purple-500/5 px-4 py-3 text-xs text-purple-800 dark:text-purple-200">
             <p className="font-bold uppercase tracking-widest">Step {locationVerified ? '2' : '1'} of 3</p>
-            <p className="mt-1">{locationVerified ? 'Location verified. Hold your face in view while 3 frames are captured for liveness.' : 'Checking your location before Face ID.'}</p>
+            <p className="mt-1">{locationVerified ? 'Location verified. Hold your face in view while the camera captures your face match.' : 'Checking your location before Face ID.'}</p>
           </div>
 
           <div className="relative aspect-video rounded-3xl overflow-hidden bg-black border border-slate-200 dark:border-white/10 flex items-center justify-center">
@@ -413,7 +412,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
               <div className="absolute inset-0 bg-emerald-600/90 backdrop-blur-md flex flex-col items-center justify-center text-white space-y-2">
                 <CheckCircle2 size={48} />
                 <p className="text-lg font-bold">Attendance Verified!</p>
-                <p className="text-xs text-emerald-100">Present · Face ID and location confirmed</p>
+                <p className="text-xs text-emerald-100">Present · Face match and location confirmed</p>
               </div>
             )}
             {!isCapturing && !isSuccess && (
@@ -425,14 +424,14 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
             {isVerifying && (
               <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white gap-3">
                 <RefreshCw size={28} className="animate-spin" />
-                <p className="text-[10px] font-bold uppercase tracking-widest">Verifying Face ID…</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest">Verifying Face Match…</p>
               </div>
             )}
           </div>
 
           {faceMatchPercent !== null && !isSuccess && (
             <div className="rounded-2xl border border-emerald-300/60 bg-emerald-50/70 px-4 py-3 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-300">
-              Face match detected: {faceMatchPercent.toFixed(0)}%. Keep your face centered while the verification sequence completes.
+              Face match detected: {faceMatchPercent.toFixed(0)}%. Keep your face centered while the server verifies your identity.
             </div>
           )}
 

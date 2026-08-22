@@ -99,7 +99,7 @@ export async function createAttendanceSession(request: Request): Promise<Respons
       started_at: now,
       expires_at: expiresAt,
       verification_policy: usesGeofence
-        ? { pin: true, teacher_face: false, student_face: true, liveness: true, geofence: true, multi_level: true }
+        ? { pin: true, teacher_face: false, student_face: true, face_match: true, liveness: false, geofence: true, multi_level: true }
         : { pin: true, teacher_face: true, student_face: false, liveness: true, geofence: false, multi_level: false },
     }).select('id,classroom_id,title,status,starts_at,ends_at,challenge_expires_at,verification_policy,session_code').single();
     if (error || !session) return json({ error: 'Unable to open the attendance session.' }, 500);
@@ -282,8 +282,9 @@ export async function verifyAttendance(request: Request): Promise<Response> {
     const now = Date.now();
     const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= now;
     
-    // In multi-level mode, we rely on face verification if pin is absent
+    // The Multi-Level flow must use verifyStudentFaceAttendance, which performs the AI match server-side.
     const useMultiLevel = !pin && !challengeToken;
+    if (useMultiLevel) return json({ error: 'Multi-Level attendance must use the secure Face ID camera endpoint.' }, 400);
     const validPin = Boolean(pin && session.pin_hash && hash(pin) === session.pin_hash);
     const validToken = Boolean(challengeToken && session.challenge_token_hash && hash(challengeToken) === session.challenge_token_hash);
     const hasStudentLocation = isValidGeoPoint({ latitude: studentLatitude, longitude: studentLongitude }) && Number.isFinite(locationAccuracy) && locationAccuracy >= 0;
@@ -411,7 +412,7 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
     const studentLongitude = Number(form.get('studentLongitude'));
     const locationAccuracy = Number(form.get('locationAccuracy'));
     if (!sessionId || !idempotencyKey) return json({ error: 'sessionId, camera frame, and idempotency key are required.' }, 400);
-    if (!(file instanceof File) || files.length < 2) return json({ error: 'At least two camera frames are required for liveness verification.' }, 400);
+    if (!(file instanceof File)) return json({ error: 'A camera frame is required for Face ID verification.' }, 400);
 
     const { data: existing } = await supabase.from('attendance_verification_attempts').select('id,status,failure_reason').eq('session_id', sessionId).eq('student_user_id', user.id).eq('idempotency_key', idempotencyKey).maybeSingle();
     if (existing) {
@@ -508,34 +509,36 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
 
     const resultSets = aiPayloads.map((payload) => Array.isArray(payload.results) ? payload.results : []);
     const results = resultSets.flat();
-    const identityMatches = results.filter((result: any) => String(result.student_id || '') === String(enrollment.id) && String(result.status || '').toUpperCase() === 'PRESENT');
-    const identityMatch = identityMatches.sort((left: any, right: any) => Number(right.similarity || 0) - Number(left.similarity || 0))[0];
-    const faceDetected = resultSets.some((frameResults) => frameResults.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4)) || Boolean(identityMatch);
     const numericScore = (value: unknown, fallback = 0) => {
       const parsed = Number(value);
       if (Number.isFinite(parsed)) return parsed <= 1 ? parsed * 100 : parsed;
       return fallback;
     };
-    const faceMatchScore = identityMatch ? numericScore(identityMatch.similarity ?? identityMatch.face_match_score ?? identityMatch.confidence, String(identityMatch.confidence || '').toUpperCase() === 'HIGH' ? 95 : 0) : 0;
+    const scoreForResult = (result: any) => numericScore(
+      result.similarity ?? result.similarity_score ?? result.face_match_score ?? result.match_score ?? result.faceMatchScore ?? result.score ?? result.confidence,
+      String(result.confidence || '').toUpperCase() === 'HIGH' ? 95 : 0,
+    );
+    // Match the authenticated enrollee by ID and score, not by the AI display status.
+    // The upstream service may label a valid enrolled match REVIEW even when its similarity is usable.
+    const enrolledStudentId = String(enrollment.id).trim().toLowerCase();
+    const identityCandidates = results.filter((result: any) => String(result.student_id ?? result.studentId ?? result.matched_student_id ?? '').trim().toLowerCase() === enrolledStudentId);
+    const identityMatches = identityCandidates.filter((result: any) => scoreForResult(result) > 0);
+    const identityMatch = [...identityMatches].sort((left: any, right: any) => scoreForResult(right) - scoreForResult(left))[0];
+    const faceDetected = resultSets.some((frameResults) => frameResults.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4)) || Boolean(identityMatch);
+    const faceMatchScore = identityMatch ? scoreForResult(identityMatch) : 0;
     const detectedFace = results.find((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4);
     const faceBox = (identityMatch?.bbox || detectedFace?.bbox || null) as number[] | null;
     const identityVerified = Boolean(identityMatch) && faceMatchScore >= 60;
-    const observedFaceFrames = resultSets.filter((frameResults) => frameResults.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4)).length;
-    const explicitLivenessScores = identityMatches.map((result: any) => result.liveness_score ?? result.livenessScore ?? (typeof result.liveness === 'number' ? result.liveness : null)).filter((value: unknown) => value !== null).map((value: unknown) => numericScore(value));
-    const temporalLivenessVerified = identityVerified && files.length >= 2 && frameDigests.size >= 2 && observedFaceFrames >= 2;
-    const livenessScore = explicitLivenessScores.length > 0
-      ? Math.max(...explicitLivenessScores)
-      : temporalLivenessVerified
-        ? 100
-        : 0;
-    const livenessMethod = explicitLivenessScores.length > 0 ? 'ai_service' : 'temporal_multi_frame';
-    const livenessVerified = livenessScore >= 50;
-    const overallConfidence = Math.min(locationConfidence, faceMatchScore, livenessScore);
-    const accepted = faceDetected && identityVerified && livenessVerified;
+    const overallConfidence = Math.min(locationConfidence, faceMatchScore);
+    const accepted = faceDetected && identityVerified;
 
     if (!accepted) {
-      const failureReason = !faceDetected ? 'No face was detected.' : !livenessVerified ? 'Liveness verification failed.' : 'Face identity could not be matched to the logged-in student.';
-      await updateVerification({ face_detected: faceDetected, liveness_score: livenessScore, face_match_score: faceMatchScore, overall_confidence: overallConfidence, final_confidence: overallConfidence, verification_status: 'FACE_FAILED' });
+      const failureReason = !faceDetected
+        ? 'No face was detected.'
+        : !identityMatch
+          ? 'Your face could not be matched to the logged-in student.'
+          : `Face match was ${Math.round(faceMatchScore)}%; at least 60% is required.`;
+      await updateVerification({ face_detected: faceDetected, face_match_score: faceMatchScore, overall_confidence: overallConfidence, final_confidence: overallConfidence, verification_status: 'FACE_FAILED' });
       const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({
         session_id: session.id,
         classroom_id: session.classroom_id,
@@ -546,9 +549,8 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
         status: 'rejected',
         failure_reason: failureReason,
         proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
-        liveness_metadata: { faceDetected, identityVerified, livenessVerified, temporalLivenessVerified, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, observedFaceFrames, matchedFrames: identityMatches.length, faceMatchScore, livenessScore },
       }).select('id,status,failure_reason').single();
-      return json({ error: failureReason, faceDetected, faceBox, faceMatchScore, matchPercent: faceMatchScore, livenessScore, temporalLivenessVerified, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, observedFaceFrames, matchedFrames: identityMatches.length, attempt }, 403);
+      return json({ error: failureReason, faceDetected, faceBox, faceMatchScore, matchPercent: faceMatchScore, framesSubmitted: files.length, matchedFrames: identityMatches.length, attempt }, 403);
     }
 
     const { data: attempt, error: attemptError } = await supabase.from('attendance_verification_attempts').insert({
@@ -560,7 +562,6 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
       challenge_digest: hash('student-face'),
       status: 'accepted',
       proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
-      liveness_metadata: { faceDetected, identityVerified, livenessVerified, temporalLivenessVerified, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, observedFaceFrames, matchedFrames: identityMatches.length, faceMatchScore, livenessScore },
     }).select('id,status,created_at').single();
     if (attemptError || !attempt) return json({ error: 'Unable to record the verification attempt.' }, 500);
 
@@ -574,16 +575,16 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
       marked_by: session.teacher_id,
       verification_attempt_id: attempt.id,
       confidence: overallConfidence,
-      capture_metadata: { source: 'server-student-face-verification', geofence: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, face: { faceMatchScore, livenessScore } },
+      capture_metadata: { source: 'server-student-face-verification', geofence: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters }, face: { faceMatchScore, verificationMode: 'face_match_only' } },
     }).select('id,classroom_id,session_id,student_id,status,verified_method,verified_at').single();
     if (attendanceError) {
       if (attendanceError.code === '23505') return json({ error: 'Attendance is already recorded for this session.' }, 409);
       return json({ error: 'Attendance record could not be created.' }, 500);
     }
 
-    await updateVerification({ face_detected: faceDetected, liveness_score: livenessScore, face_match_score: faceMatchScore, final_confidence: overallConfidence, overall_confidence: overallConfidence, verification_status: 'VERIFIED', verified_at: new Date().toISOString() });
-    await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: 'Multi-Level Geofence + Face ID', distanceMeters: locationResult.distanceMeters, faceMatchScore, livenessScore } });
-    return json({ ok: true, attendance, attempt, faceBox, stats: { distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, faceMatchScore, matchPercent: faceMatchScore, livenessScore, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, observedFaceFrames, matchedFrames: identityMatches.length, confidence: overallConfidence } });
+    await updateVerification({ face_detected: faceDetected, face_match_score: faceMatchScore, final_confidence: overallConfidence, overall_confidence: overallConfidence, verification_status: 'VERIFIED', verified_at: new Date().toISOString() });
+    await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: 'Multi-Level Geofence + Face ID', distanceMeters: locationResult.distanceMeters, faceMatchScore } });
+    return json({ ok: true, attendance, attempt, faceBox, stats: { distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, faceMatchScore, matchPercent: faceMatchScore, framesSubmitted: files.length, matchedFrames: identityMatches.length, confidence: overallConfidence, verificationMode: 'face_match_only' } });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to complete student Face ID verification.' }, error.status || 500);
   }
