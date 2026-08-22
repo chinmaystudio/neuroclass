@@ -498,7 +498,9 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
       const outgoing = new FormData();
       outgoing.append('classroom_id', session.classroom_id);
       outgoing.append('session_id', session.id);
-      // The gateway supplies the temporal sequence; ask the upstream matcher to return its immediate identity decision for each frame.
+      // Restrict the private AI matcher to the authenticated student’s enrolled profile.
+      // This prevents a classroom-wide nearest neighbor from being mistaken for the logged-in student.
+      outgoing.append('target_student_id', enrollment.id);
       outgoing.append('capture_mode', 'manual');
       outgoing.append('file', candidateFile, candidateFile.name || 'student-face.jpg');
       const aiResponse = await fetch(`${aiBaseUrl}/ai/v1/attendance/frame`, { method: 'POST', headers: { Authorization: `Bearer ${aiSecret}` }, body: outgoing });
