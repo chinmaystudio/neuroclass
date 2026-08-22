@@ -82,6 +82,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
+      void videoRef.current.play().catch(() => undefined);
     }
   }, [stream]);
 
@@ -121,11 +122,28 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
     setIsCapturing(false);
   };
 
+  const waitForVideoReady = async (video: HTMLVideoElement): Promise<boolean> => {
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0) return true;
+    void video.play().catch(() => undefined);
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        video.removeEventListener('loadeddata', finish);
+        video.removeEventListener('canplay', finish);
+        window.clearTimeout(timeoutId);
+        resolve();
+      };
+      const timeoutId = window.setTimeout(finish, 8000);
+      video.addEventListener('loadeddata', finish, { once: true });
+      video.addEventListener('canplay', finish, { once: true });
+    });
+    return video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0 && video.videoHeight > 0;
+  };
+
   const captureFrameBlob = async (video: HTMLVideoElement): Promise<Blob | null> => {
-    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth < 1 || video.videoHeight < 1) {
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 500));
-    }
-    if (video.videoWidth < 1 || video.videoHeight < 1) return null;
+    if (!(await waitForVideoReady(video))) return null;
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -262,7 +280,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       if (useMultiLevel) {
         if (!videoRef.current || !isCapturing || !locationCheck) throw new Error('Complete location verification before opening Face ID.');
         const frames = await captureLivenessSequence(videoRef.current);
-        if (frames.length < 2) throw new Error('Camera frames are not ready. Keep your face visible and try again.');
+        if (frames.length < 2) throw new Error('The mobile camera did not provide enough frames. Keep the Face ID view open for a moment, keep your face visible, and try again.');
         const form = new FormData();
         form.append('sessionId', activeSession.id);
         form.append('studentLatitude', String(locationCheck.latitude));
