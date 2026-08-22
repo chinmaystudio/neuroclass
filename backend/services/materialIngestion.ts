@@ -1,6 +1,4 @@
 import { supabase } from '../database/supabase';
-import { PDFParse } from 'pdf-parse';
-import mammoth from 'mammoth';
 
 type PendingMaterial = {
   id: string;
@@ -45,6 +43,7 @@ async function extractText(material: PendingMaterial, bytes: Buffer): Promise<st
     return cleanText(bytes.toString('utf8'));
   }
   if (material.mime_type === 'application/pdf' || extension === 'pdf') {
+    const { PDFParse } = await import('pdf-parse');
     const parser = new PDFParse({ data: bytes });
     try {
       const parsed = await parser.getText();
@@ -54,6 +53,7 @@ async function extractText(material: PendingMaterial, bytes: Buffer): Promise<st
     }
   }
   if (material.mime_type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || extension === 'docx') {
+    const { default: mammoth } = await import('mammoth');
     const parsed = await mammoth.extractRawText({ buffer: bytes });
     return cleanText(parsed.value || '');
   }
