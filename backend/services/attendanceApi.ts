@@ -7,6 +7,7 @@ import { normalizeBackendRole } from '../lib/roles';
 
 const ATTENDANCE_STATUSES = ['Present', 'Late', 'Excused', 'Absent', 'Pending Review'] as const;
 type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
+const STUDENT_FACE_MATCH_THRESHOLD = 45;
 
 const json = (body: unknown, status = 200, req?: Request) => withCors(NextResponse.json(body, { status }), req?.headers.get('origin'));
 
@@ -327,7 +328,7 @@ export async function verifyAttendance(request: Request): Promise<Response> {
         )
       : { status: 'LOCATION_UNAVAILABLE' as LocationStatus, distanceMeters: null, accuracyMeters: Number.isFinite(locationAccuracy) ? Math.max(0, locationAccuracy) : null };
     const locationAllowed = !useMultiLevel || locationResult.status === 'LOCATION_VERIFIED';
-    const validFace = useMultiLevel && locationAllowed && faceDetected && faceMatchScore >= 60 && livenessScore >= 50;
+    const validFace = useMultiLevel && locationAllowed && faceDetected && faceMatchScore >= STUDENT_FACE_MATCH_THRESHOLD && livenessScore >= 50;
     const finalConfidence = useMultiLevel ? Math.min(faceMatchScore, livenessScore) : 100;
 
     if (expired || (!validPin && !validToken && !validFace)) {
@@ -563,7 +564,7 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
     const faceDetected = resultSets.some((frameResults) => frameResults.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4)) || Boolean(bestObservedResult);
     const detectedFace = results.find((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4);
     const faceBox = (identityMatch?.bbox || bestObservedResult?.bbox || detectedFace?.bbox || null) as number[] | null;
-    const identityVerified = Boolean(identityMatch) && identityMatchScore >= 60;
+    const identityVerified = Boolean(identityMatch) && identityMatchScore >= STUDENT_FACE_MATCH_THRESHOLD;
     console.info('[attendance.student-face] matcher summary', { frameCount: files.length, resultCounts: resultSets.map((frameResults) => frameResults.length), resultCount: results.length, identityCandidateCount: identityCandidates.length, positiveIdentityCount: identityMatches.length, identityMatchScore, bestObservedScore, faceDetected });
     const overallConfidence = Math.min(locationConfidence, identityVerified ? identityMatchScore : 0);
     const accepted = faceDetected && identityVerified;
@@ -573,7 +574,7 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
         ? 'No face was detected.'
         : !identityMatch
           ? `A face was detected at ${Math.round(faceMatchScore)}% similarity, but it could not be matched to the logged-in student.`
-          : `Face match was ${Math.round(identityMatchScore)}%; at least 60% is required.`;
+          : `Face match was ${Math.round(identityMatchScore)}%; at least ${STUDENT_FACE_MATCH_THRESHOLD}% is required.`;
       await updateVerification({ face_detected: faceDetected, face_match_score: faceMatchScore, overall_confidence: overallConfidence, final_confidence: overallConfidence, verification_status: 'FACE_FAILED' });
       const { data: attempt } = await supabase.from('attendance_verification_attempts').insert({
         session_id: session.id,
