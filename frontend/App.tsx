@@ -15,6 +15,7 @@ import { AnimatePresence } from 'motion/react';
 import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
 import { MobileAttendanceHandoff } from './components/auth/MobileAttendanceHandoff';
+import { MobileStudentAttendancePortal, MobileTeacherAttendancePortal } from './components/attendance/MobileAttendancePortals';
 
 const Home = ({ onLaunchAuth }: { onLaunchAuth: (mode: 'signin' | 'signup') => void }) => (
   <>
@@ -53,6 +54,14 @@ const AppContent = () => {
         <Routes>
           <Route path="/" element={<Home onLaunchAuth={openAuth} />} />
           <Route path="/attendance/mobile-handoff" element={<MobileAttendanceHandoff />} />
+          <Route
+            path="/attendance/teacher"
+            element={<SessionGuardian allowedRole="teacher"><MobileTeacherAttendancePortal /></SessionGuardian>}
+          />
+          <Route
+            path="/attendance/student"
+            element={<SessionGuardian allowedRole="student"><MobileStudentAttendancePortal /></SessionGuardian>}
+          />
           
           <Route 
             path="/teacher/*" 

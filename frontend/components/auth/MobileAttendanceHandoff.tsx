@@ -26,8 +26,7 @@ export const MobileAttendanceHandoff: React.FC = () => {
         if (!cancelled) setMessage('This secure attendance link has expired or was already used. Return to the NeuroClass app and open attendance again.');
         return;
       }
-      const target = new URL(`/${role}`, window.location.origin);
-      target.searchParams.set('attendance', '1');
+      const target = new URL(`/attendance/${role}`, window.location.origin);
       target.searchParams.set('classroomId', classroomId);
       target.searchParams.set('return_to', returnTo);
       window.location.replace(target.toString());
