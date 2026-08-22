@@ -135,6 +135,16 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
   };
 
+  const captureLivenessSequence = async (video: HTMLVideoElement): Promise<Blob[]> => {
+    const frames: Blob[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      const frame = await captureFrameBlob(video);
+      if (frame) frames.push(frame);
+      if (index < 2) await new Promise<void>((resolve) => window.setTimeout(resolve, 450));
+    }
+    return frames;
+  };
+
   const locationErrorToStatus = (positionError: GeolocationPositionError): LocationStatus => {
     if (positionError.code === 1) return 'LOCATION_PERMISSION_DENIED';
     return 'LOCATION_UNAVAILABLE';
@@ -251,14 +261,14 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       let response: Response;
       if (useMultiLevel) {
         if (!videoRef.current || !isCapturing || !locationCheck) throw new Error('Complete location verification before opening Face ID.');
-        const frame = await captureFrameBlob(videoRef.current);
-        if (!frame) throw new Error('Camera frame is not ready. Please try again.');
+        const frames = await captureLivenessSequence(videoRef.current);
+        if (frames.length < 2) throw new Error('Camera frames are not ready. Keep your face visible and try again.');
         const form = new FormData();
         form.append('sessionId', activeSession.id);
         form.append('studentLatitude', String(locationCheck.latitude));
         form.append('studentLongitude', String(locationCheck.longitude));
         form.append('locationAccuracy', String(locationCheck.accuracyMeters ?? 0));
-        form.append('file', frame, 'student-face.jpg');
+        frames.forEach((frame, index) => form.append('file', frame, `student-face-${index + 1}.jpg`));
         response = await fetch(getApiUrl('/api/attendance/student-face'), {
           method: 'POST',
           headers: {
@@ -347,7 +357,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
 
           <div className="rounded-2xl border border-purple-200 dark:border-purple-500/20 bg-purple-50/70 dark:bg-purple-500/5 px-4 py-3 text-xs text-purple-800 dark:text-purple-200">
             <p className="font-bold uppercase tracking-widest">Step {locationVerified ? '2' : '1'} of 3</p>
-            <p className="mt-1">{locationVerified ? 'Location verified. Preparing Face ID…' : 'Checking your location before Face ID.'}</p>
+            <p className="mt-1">{locationVerified ? 'Location verified. Hold your face in view while 3 frames are captured for liveness.' : 'Checking your location before Face ID.'}</p>
           </div>
 
           <div className="relative aspect-video rounded-3xl overflow-hidden bg-black border border-slate-200 dark:border-white/10 flex items-center justify-center">

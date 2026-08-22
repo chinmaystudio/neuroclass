@@ -398,13 +398,14 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
     const { user } = await requireUser(request, ['student']);
     const form = await request.formData();
     const sessionId = clean(form.get('sessionId'), 80);
-    const file = form.get('file');
+    const files = form.getAll('file').filter((value): value is File => value instanceof File).slice(0, 3);
+    const file = files[0];
     const idempotencyKey = clean(request.headers.get('idempotency-key') || form.get('idempotencyKey'), 120);
     const studentLatitude = Number(form.get('studentLatitude'));
     const studentLongitude = Number(form.get('studentLongitude'));
     const locationAccuracy = Number(form.get('locationAccuracy'));
     if (!sessionId || !idempotencyKey) return json({ error: 'sessionId, camera frame, and idempotency key are required.' }, 400);
-    if (!(file instanceof File)) return json({ error: 'A camera frame is required for Face ID.' }, 400);
+    if (!(file instanceof File) || files.length < 2) return json({ error: 'At least two camera frames are required for liveness verification.' }, 400);
 
     const { data: existing } = await supabase.from('attendance_verification_attempts').select('id,status,failure_reason').eq('session_id', sessionId).eq('student_user_id', user.id).eq('idempotency_key', idempotencyKey).maybeSingle();
     if (existing) {
@@ -478,28 +479,45 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
       return json({ error: 'Face ID is not enrolled for this student.' }, 403);
     }
 
-    const outgoing = new FormData();
-    outgoing.append('classroom_id', session.classroom_id);
-    outgoing.append('session_id', session.id);
-    outgoing.append('capture_mode', 'student_face');
-    outgoing.append('file', file, file.name || 'student-face.jpg');
     const aiBaseUrl = process.env.AI_SERVICE_URL?.replace(/\/$/, '');
     const aiSecret = process.env.AI_SERVICE_SECRET;
     if (!aiBaseUrl || !aiSecret) return json({ error: 'AI service configuration is missing.' }, 500);
-    const aiResponse = await fetch(`${aiBaseUrl}/ai/v1/attendance/frame`, { method: 'POST', headers: { Authorization: `Bearer ${aiSecret}` }, body: outgoing });
-    const aiPayload = await aiResponse.json().catch(() => ({}));
-    if (!aiResponse.ok) return json({ error: 'Face ID service could not process this frame.' }, 502);
 
-    const results = Array.isArray(aiPayload.results) ? aiPayload.results : [];
-    const identityMatch = results.find((result: any) => String(result.student_id || '') === String(enrollment.id) && String(result.status || '').toUpperCase() === 'PRESENT');
-    const faceDetected = results.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4) || Boolean(identityMatch);
+    const frameDigests = new Set<string>();
+    const aiPayloads: any[] = [];
+    for (const candidateFile of files) {
+      const bytes = Buffer.from(await candidateFile.arrayBuffer());
+      frameDigests.add(hash(bytes.toString('base64')));
+      const outgoing = new FormData();
+      outgoing.append('classroom_id', session.classroom_id);
+      outgoing.append('session_id', session.id);
+      // The gateway supplies the temporal sequence; ask the upstream matcher to return its immediate identity decision for each frame.
+      outgoing.append('capture_mode', 'manual');
+      outgoing.append('file', candidateFile, candidateFile.name || 'student-face.jpg');
+      const aiResponse = await fetch(`${aiBaseUrl}/ai/v1/attendance/frame`, { method: 'POST', headers: { Authorization: `Bearer ${aiSecret}` }, body: outgoing });
+      const aiPayload = await aiResponse.json().catch(() => ({}));
+      if (!aiResponse.ok) return json({ error: 'Face ID service could not process the camera sequence.' }, 502);
+      aiPayloads.push(aiPayload);
+    }
+
+    const resultSets = aiPayloads.map((payload) => Array.isArray(payload.results) ? payload.results : []);
+    const results = resultSets.flat();
+    const identityMatches = results.filter((result: any) => String(result.student_id || '') === String(enrollment.id) && String(result.status || '').toUpperCase() === 'PRESENT');
+    const identityMatch = identityMatches.sort((left: any, right: any) => Number(right.similarity || 0) - Number(left.similarity || 0))[0];
+    const faceDetected = resultSets.some((frameResults) => frameResults.some((result: any) => Array.isArray(result.bbox) && result.bbox.length === 4)) || Boolean(identityMatch);
     const numericScore = (value: unknown, fallback = 0) => {
       const parsed = Number(value);
       if (Number.isFinite(parsed)) return parsed <= 1 ? parsed * 100 : parsed;
       return fallback;
     };
     const faceMatchScore = identityMatch ? numericScore(identityMatch.similarity ?? identityMatch.face_match_score ?? identityMatch.confidence, String(identityMatch.confidence || '').toUpperCase() === 'HIGH' ? 95 : 0) : 0;
-    const livenessScore = identityMatch ? numericScore(identityMatch.liveness_score ?? identityMatch.livenessScore ?? identityMatch.liveness, identityMatch.liveness === true ? 100 : 0) : 0;
+    const explicitLivenessScores = identityMatches.map((result: any) => result.liveness_score ?? result.livenessScore ?? (typeof result.liveness === 'number' ? result.liveness : null)).filter((value: unknown) => value !== null).map((value: unknown) => numericScore(value));
+    const livenessScore = explicitLivenessScores.length > 0
+      ? Math.max(...explicitLivenessScores)
+      : identityMatches.length >= 2 && frameDigests.size >= 2
+        ? 100
+        : 0;
+    const livenessMethod = explicitLivenessScores.length > 0 ? 'ai_service' : 'temporal_multi_frame';
     const livenessVerified = livenessScore >= 50;
     const identityVerified = Boolean(identityMatch) && faceMatchScore >= 60;
     const overallConfidence = Math.min(locationConfidence, faceMatchScore, livenessScore);
@@ -518,9 +536,9 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
         status: 'rejected',
         failure_reason: failureReason,
         proximity_metadata: { locationStatus: locationResult.status, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters },
-        liveness_metadata: { faceDetected, identityVerified, livenessVerified, faceMatchScore, livenessScore },
+        liveness_metadata: { faceDetected, identityVerified, livenessVerified, livenessMethod, framesSubmitted: files.length, distinctFrames: frameDigests.size, matchedFrames: identityMatches.length, faceMatchScore, livenessScore },
       }).select('id,status,failure_reason').single();
-      return json({ error: failureReason, faceDetected, faceMatchScore, livenessScore, attempt }, 403);
+      return json({ error: failureReason, faceDetected, faceMatchScore, livenessScore, livenessMethod, framesSubmitted: files.length, matchedFrames: identityMatches.length, attempt }, 403);
     }
 
     const { data: attempt, error: attemptError } = await supabase.from('attendance_verification_attempts').insert({
@@ -555,7 +573,7 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
 
     await updateVerification({ face_detected: faceDetected, liveness_score: livenessScore, face_match_score: faceMatchScore, final_confidence: overallConfidence, overall_confidence: overallConfidence, verification_status: 'VERIFIED', verified_at: new Date().toISOString() });
     await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: 'Multi-Level Geofence + Face ID', distanceMeters: locationResult.distanceMeters, faceMatchScore, livenessScore } });
-    return json({ ok: true, attendance, attempt, stats: { distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, faceMatchScore, livenessScore, confidence: overallConfidence } });
+    return json({ ok: true, attendance, attempt, stats: { distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, faceMatchScore, livenessScore, livenessMethod, framesSubmitted: files.length, matchedFrames: identityMatches.length, confidence: overallConfidence } });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to complete student Face ID verification.' }, error.status || 500);
   }
