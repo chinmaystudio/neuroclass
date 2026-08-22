@@ -15,8 +15,10 @@ import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { getApiUrl } from '../../config/apiConfig';
 import { Bell } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 export const StudentDashboard: React.FC = () => {
+  const location = useLocation();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isSidebarHovered, setSidebarHovered] = useState(false);
   const [isJoinWizardOpen, setJoinWizardOpen] = useState(false);
@@ -25,6 +27,31 @@ export const StudentDashboard: React.FC = () => {
   const [isAttendancePortalOpen, setIsAttendancePortalOpen] = useState(false);
   const [attendancePortal, setAttendancePortal] = useState<{ sessionId: string; classroomId: string; classroomName: string; sessionCode?: string; radiusMeters?: number } | null>(null);
   const { user } = useAuth();
+
+  const handoffParams = new URLSearchParams(location.search);
+  const handoffClassroomId = handoffParams.get('attendance') === '1' ? handoffParams.get('classroomId') : null;
+  const returnTo = handoffParams.get('return_to');
+  const hasReturnToApp = returnTo?.startsWith('neuroclass://attendance-return') === true;
+
+  useEffect(() => {
+    if (!user?.id || !handoffClassroomId) return;
+    let cancelled = false;
+    void (async () => {
+      const [{ data: authData }, { data: classroom }] = await Promise.all([
+        supabase.auth.getSession(),
+        supabase.from('classrooms').select('name').eq('id', handoffClassroomId).maybeSingle(),
+      ]);
+      const token = authData.session?.access_token;
+      if (!token || cancelled) return;
+      const response = await fetch(`${getApiUrl('/api/attendance/active')}?classroomId=${encodeURIComponent(handoffClassroomId)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const payload = await response.json().catch(() => ({}));
+      if (cancelled || !payload.session) return;
+      const portal = { sessionId: payload.session.id, classroomId: handoffClassroomId, classroomName: classroom?.name || 'your classroom', sessionCode: payload.session.session_code, radiusMeters: payload.session.radius_meters };
+      setAttendancePortal(portal);
+      setIsAttendancePortalOpen(true);
+    })();
+    return () => { cancelled = true; };
+  }, [handoffClassroomId, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -155,6 +182,7 @@ export const StudentDashboard: React.FC = () => {
       >
         {renderContent()}
       </main>
+      {hasReturnToApp && <a href={returnTo!} className="fixed right-5 top-5 z-[110] rounded-xl bg-slate-900 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white shadow-xl dark:bg-white dark:text-slate-900">Return to app</a>}
 
       {attendanceAlert && (
         <div className="fixed inset-0 z-[95] flex items-start justify-center bg-black/40 p-4 pt-20 backdrop-blur-sm">

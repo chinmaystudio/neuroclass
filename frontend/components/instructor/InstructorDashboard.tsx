@@ -8,11 +8,15 @@ import { InstructorSettings } from './InstructorSettings';
 import { AttendanceSystem } from '../ai/AttendanceSystem';
 import { ProctoringSystem } from '../ai/ProctoringSystem';
 import { AnalyticsDashboard } from '../evaluation/AnalyticsDashboard';
+import { useLocation } from 'react-router-dom';
 
 export const InstructorDashboard: React.FC = () => {
-  const [activeSection, setActiveSection] = useState('classrooms');
+  const location = useLocation();
+  const requestedClassroomId = new URLSearchParams(location.search).get('classroomId');
+  const attendanceHandoff = new URLSearchParams(location.search).get('attendance') === '1' && Boolean(requestedClassroomId);
+  const [activeSection, setActiveSection] = useState(() => attendanceHandoff ? 'classroom-detail' : 'classrooms');
   const [isSidebarHovered, setSidebarHovered] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(() => attendanceHandoff ? requestedClassroomId : null);
 
   const handleSelectClass = (id: string) => {
     setSelectedClassId(id);

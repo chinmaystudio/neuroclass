@@ -7,6 +7,7 @@ import { ProctoringSystem } from '../ai/ProctoringSystem';
 import { ClassroomMaterialsPanel } from './ClassroomMaterialsPanel';
 import { ClassroomLearningAnalytics } from './ClassroomLearningAnalytics';
 import { getApiUrl } from '../../config/apiConfig';
+import { useLocation } from 'react-router-dom';
 
 interface ClassroomDetailProps {
   classroomId: string;
@@ -14,9 +15,13 @@ interface ClassroomDetailProps {
 }
 
 export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, onBack }) => {
+  const location = useLocation();
+  const handoff = new URLSearchParams(location.search);
+  const returnTo = handoff.get('return_to');
+  const hasReturnToApp = returnTo?.startsWith('neuroclass://attendance-return') === true;
   const [classroom, setClassroom] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'students' | 'tests' | 'materials' | 'attendance' | 'proctoring' | 'x402' | 'settings'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'tests' | 'materials' | 'attendance' | 'proctoring' | 'x402' | 'settings'>(() => handoff.get('attendance') === '1' ? 'attendance' : 'students');
   const [testPortalSrc, setTestPortalSrc] = useState<string | null>(null);
   const [testPortalLoading, setTestPortalLoading] = useState(false);
   const [testPortalError, setTestPortalError] = useState<string | null>(null);
@@ -170,6 +175,7 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
                 <div className="rounded-3xl border border-blue-500/20 bg-blue-500/5 p-6">
                   <h3 className="text-xl font-bold mb-2">Classroom Attendance</h3>
                   <p className="text-sm text-slate-500 mb-6">Open a teacher-authorized session, register student samples, and scan this classroom through the Render AI gateway.</p>
+                  {hasReturnToApp && <a href={returnTo!} className="mb-5 inline-flex rounded-xl bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white dark:bg-white dark:text-slate-900">Return to NeuroClass app</a>}
                   <AttendanceSystem classId={classroom.id} className={classroom.name} />
                 </div>
               </div>

@@ -14,6 +14,7 @@ import { AIModuleDashboard } from './components/ai/AIModuleDashboard';
 import { AnimatePresence } from 'motion/react';
 import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
+import { MobileAttendanceHandoff } from './components/auth/MobileAttendanceHandoff';
 
 const Home = ({ onLaunchAuth }: { onLaunchAuth: (mode: 'signin' | 'signup') => void }) => (
   <>
@@ -51,6 +52,7 @@ const AppContent = () => {
       <main className="relative z-10">
         <Routes>
           <Route path="/" element={<Home onLaunchAuth={openAuth} />} />
+          <Route path="/attendance/mobile-handoff" element={<MobileAttendanceHandoff />} />
           
           <Route 
             path="/teacher/*" 
