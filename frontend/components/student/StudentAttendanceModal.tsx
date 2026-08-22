@@ -12,6 +12,9 @@ interface StudentAttendanceModalProps {
   classroomName: string;
   onClose: () => void;
   onSuccess: () => void;
+  sessionId?: string;
+  sessionCode?: string;
+  radiusMeters?: number;
 }
 
 type LocationStatus =
@@ -36,6 +39,9 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   classroomName,
   onClose,
   onSuccess,
+  sessionId: initialSessionId,
+  sessionCode: initialSessionCode,
+  radiusMeters: initialRadiusMeters,
 }) => {
   const { user } = useAuth();
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -55,7 +61,12 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      void loadActiveSession();
+      if (initialSessionId) {
+        setActiveSession({ id: initialSessionId, session_code: initialSessionCode, radius_meters: initialRadiusMeters });
+        setError(null);
+      } else {
+        void loadActiveSession();
+      }
     } else {
       stopCamera();
       setActiveSession(null);
@@ -66,7 +77,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       setIsSuccess(false);
       setUseMultiLevel(true);
     }
-  }, [isOpen]);
+  }, [isOpen, initialSessionId, initialSessionCode, initialRadiusMeters]);
 
   useEffect(() => {
     if (videoRef.current && stream) {

@@ -21,9 +21,9 @@ export const StudentDashboard: React.FC = () => {
   const [isSidebarHovered, setSidebarHovered] = useState(false);
   const [isJoinWizardOpen, setJoinWizardOpen] = useState(false);
     const [activeTestId, setActiveTestId] = useState<string | null>(null);
-  const [attendanceAlert, setAttendanceAlert] = useState<{ sessionId: string; classroomId: string; classroomName: string; sessionCode?: string } | null>(null);
+  const [attendanceAlert, setAttendanceAlert] = useState<{ sessionId: string; classroomId: string; classroomName: string; sessionCode?: string; radiusMeters?: number } | null>(null);
   const [isAttendancePortalOpen, setIsAttendancePortalOpen] = useState(false);
-  const [attendancePortal, setAttendancePortal] = useState<{ sessionId: string; classroomId: string; classroomName: string; sessionCode?: string } | null>(null);
+  const [attendancePortal, setAttendancePortal] = useState<{ sessionId: string; classroomId: string; classroomName: string; sessionCode?: string; radiusMeters?: number } | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export const StudentDashboard: React.FC = () => {
         }));
         const alreadyActive = activeSessions.find(Boolean) as any;
         if (!cancelled && alreadyActive) {
-          setAttendanceAlert({ sessionId: alreadyActive.id, classroomId: alreadyActive.classroomId, classroomName: classroomMap.get(alreadyActive.classroomId) || 'your classroom', sessionCode: alreadyActive.session_code });
+          setAttendanceAlert({ sessionId: alreadyActive.id, classroomId: alreadyActive.classroomId, classroomName: classroomMap.get(alreadyActive.classroomId) || 'your classroom', sessionCode: alreadyActive.session_code, radiusMeters: alreadyActive.radius_meters });
         }
       }
 
@@ -67,7 +67,7 @@ export const StudentDashboard: React.FC = () => {
           return payload.session ? { ...payload.session, classroomId } : null;
         }));
         const active = activeSessions.find(Boolean) as any;
-        if (!cancelled && active) setAttendanceAlert({ sessionId: active.id, classroomId: active.classroomId, classroomName: classroomMap.get(active.classroomId) || 'your classroom', sessionCode: active.session_code });
+        if (!cancelled && active) setAttendanceAlert({ sessionId: active.id, classroomId: active.classroomId, classroomName: classroomMap.get(active.classroomId) || 'your classroom', sessionCode: active.session_code, radiusMeters: active.radius_meters });
       };
       pollTimer = window.setInterval(() => void pollForActiveAttendance(), 15000);
 
@@ -84,6 +84,7 @@ export const StudentDashboard: React.FC = () => {
               classroomId: announcement.classroom_id,
               classroomName: classroomMap.get(announcement.classroom_id) || 'your classroom',
               sessionCode: announcement.session_code,
+              radiusMeters: announcement.radius_meters,
             });
           },
         )
@@ -180,6 +181,9 @@ export const StudentDashboard: React.FC = () => {
           isOpen={isAttendancePortalOpen}
           classroomId={attendancePortal.classroomId}
           classroomName={attendancePortal.classroomName}
+          sessionId={attendancePortal.sessionId}
+          sessionCode={attendancePortal.sessionCode}
+          radiusMeters={attendancePortal.radiusMeters}
           onClose={() => { setIsAttendancePortalOpen(false); setAttendancePortal(null); }}
           onSuccess={() => { setIsAttendancePortalOpen(false); setAttendancePortal(null); }}
         />

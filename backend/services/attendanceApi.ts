@@ -97,6 +97,7 @@ export async function createAttendanceSession(request: Request): Promise<Respons
         classroom_id: classroom.id,
         event_type: 'attendance_started',
         session_code: sessionCode,
+        radius_meters: usesGeofence ? radiusMeters : null,
         expires_at: expiresAt,
       });
       if (announcementError) console.error('[attendance.announcement]', announcementError.message);

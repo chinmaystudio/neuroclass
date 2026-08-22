@@ -65,12 +65,14 @@ CREATE TABLE IF NOT EXISTS public.attendance_session_announcements (
   classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
   event_type text NOT NULL DEFAULT 'attendance_started',
   session_code text,
+  radius_meters integer,
   expires_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now()
 );
 
 ALTER TABLE public.attendance_session_announcements
-  ADD COLUMN IF NOT EXISTS session_code text;
+  ADD COLUMN IF NOT EXISTS session_code text,
+  ADD COLUMN IF NOT EXISTS radius_meters integer;
 
 CREATE INDEX IF NOT EXISTS attendance_session_announcements_classroom_idx
   ON public.attendance_session_announcements (classroom_id, created_at DESC);
