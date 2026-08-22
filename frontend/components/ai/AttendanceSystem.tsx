@@ -395,12 +395,12 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
         <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 flex items-center justify-between gap-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-blue-500">Teacher authorization</p>
-            <p className="text-xs text-slate-500">{activeSession ? `Session open until ${new Date(activeSession.ends_at).toLocaleTimeString()}` : 'Open a session before any attendance can be recorded.'}</p>
+            <p className="text-xs text-slate-500">{activeSession ? `Session open until ${new Date(activeSession.ends_at).toLocaleTimeString()}` : 'Initiate attendance before any attendance can be recorded.'}</p>
           </div>
           {activeSession ? (
             <button onClick={closeAttendanceSession} disabled={sessionBusy} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-600 text-[10px] font-bold uppercase tracking-widest disabled:opacity-40">{sessionBusy ? 'Closing…' : 'Close session'}</button>
           ) : (
-            <button onClick={openAttendanceSession} disabled={sessionBusy} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest disabled:opacity-40">{sessionBusy ? 'Opening…' : 'Open session'}</button>
+            <button onClick={openAttendanceSession} disabled={sessionBusy} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest disabled:opacity-40">{sessionBusy ? 'Initiating…' : 'Initiate Attendance'}</button>
           )}
         </div>
         <div className="relative z-30 pointer-events-auto flex gap-4 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit">
@@ -409,14 +409,14 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
             onClick={() => setMode('single')}
             className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'single' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
           >
-            One-by-One
+            Multi-Level Attendance
           </button>
           <button 
             type="button"
             onClick={() => setMode('group')}
             className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'group' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
           >
-            Group Mode
+            Manual Mode
           </button>
           <button 
             type="button"
@@ -426,6 +426,18 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
             Register Face
           </button>
         </div>
+
+        {activeSession && (
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center justify-between gap-3">
+              <span>Local Attendance Network</span>
+              <span>NeuroClass-Attendance</span>
+            </div>
+            <div className="mt-1 text-[9px] font-semibold tracking-wide opacity-70">
+              Session code: {activeSession.session_code || activeSession.sessionCode || 'Active'} · Multi-level verification enabled
+            </div>
+          </div>
+        )}
 
         <div className="relative aspect-video bg-black rounded-[24px] overflow-hidden group">
           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
@@ -490,7 +502,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
                 ? (isCameraActive ? 'Registration ready: capture five samples. No attendance session is required.' : 'Next step: activate the camera.')
                 : mode === 'group' && isLiveScanning
                   ? 'LIVE SCAN ACTIVE: green boxes are confirmed present students.'
-                  : (activeSession ? (isCameraActive ? 'Ready: click Start Live Group Scan to continuously analyze the classroom.' : 'Next step: activate the camera.') : 'Ready to start: click Start Live Group Scan to open a session and scan.')}
+                  : (activeSession ? (isCameraActive ? 'Ready: click Start Live Face Preview to continuously analyze the classroom.' : 'Next step: activate the camera.') : 'Ready to start: click Initiate Attendance to open a multi-level session.')}
             </div>
             {cameraError && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-rose-600">{cameraError}</div>}
 
