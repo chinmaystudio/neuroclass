@@ -51,6 +51,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   const [useMultiLevel, setUseMultiLevel] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const locationTapLockRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -126,6 +127,14 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
   const locationErrorToStatus = (positionError: GeolocationPositionError): LocationStatus => {
     if (positionError.code === positionError.PERMISSION_DENIED) return 'LOCATION_PERMISSION_DENIED';
     return 'LOCATION_UNAVAILABLE';
+  };
+
+  const handleLocationAction = () => {
+    if (locationTapLockRef.current || isCheckingLocation || isVerifying || isSuccess) return;
+    locationTapLockRef.current = true;
+    void requestLocation().finally(() => {
+      window.setTimeout(() => { locationTapLockRef.current = false; }, 450);
+    });
   };
 
   const requestLocation = async () => {
@@ -362,7 +371,15 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
                 </div>
                 {locationMessage && <p className="mt-3 text-xs leading-5 text-rose-500">{locationMessage}</p>}
               </div>
-              <button type="button" onClick={() => void requestLocation()} disabled={isCheckingLocation || isVerifying || isSuccess} className="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 disabled:opacity-50">
+              <button
+                type="button"
+                onPointerUp={handleLocationAction}
+                onClick={handleLocationAction}
+                disabled={isCheckingLocation || isVerifying || isSuccess}
+                aria-label={locationVerified ? 'Recheck location' : 'Allow location'}
+                className="relative z-50 pointer-events-auto min-h-[48px] w-full touch-manipulation select-none rounded-2xl bg-purple-600 py-3.5 text-white font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 transition-colors hover:bg-purple-500 active:bg-purple-700 disabled:opacity-50"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
                 {isCheckingLocation ? <><RefreshCw size={15} className="animate-spin" /> Checking Location…</> : locationVerified ? <><RefreshCw size={15} /> Recheck Location</> : <><LocateFixed size={15} /> Allow Location</>}
               </button>
               <p className="text-[10px] leading-4 text-slate-400">Your exact teacher coordinates are never shown. The server compares your location with the protected classroom zone.</p>
