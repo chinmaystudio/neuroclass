@@ -61,6 +61,10 @@ export async function POST(request: NextRequest) {
   const { data: enrolled } = await supabase.from('students').select('id').eq('classroom_id', classroomId).or(`user_id.eq.${auth.userId},email.eq.${email}`).limit(1);
   if (!owned?.length && !enrolled?.length) return json(request, { error: 'You are not authorized for this classroom.' }, 403);
   const now = Math.floor(Date.now() / 1000);
-  const handoffToken = signHandoff({ userId: auth.userId, email, name: profile?.displayName || authData.user.user_metadata?.full_name || email, role, classroomId, kind: 'neuroclass-handoff', iss: 'neuroclass', aud: 'test_creation', iat: now, exp: now + 60, jti: crypto.randomUUID() }, secretText);
-  return json(request, { handoffToken, expiresInSeconds: 60 });
+  // Render free instances may take close to a minute to wake up. Keep the
+  // token short-lived, but long enough for the classroom iframe to complete
+  // the handoff before the portal verifies it.
+  const expiresInSeconds = 300;
+  const handoffToken = signHandoff({ userId: auth.userId, email, name: profile?.displayName || authData.user.user_metadata?.full_name || email, role, classroomId, kind: 'neuroclass-handoff', iss: 'neuroclass', aud: 'test_creation', iat: now, exp: now + expiresInSeconds, jti: crypto.randomUUID() }, secretText);
+  return json(request, { handoffToken, expiresInSeconds });
 }
