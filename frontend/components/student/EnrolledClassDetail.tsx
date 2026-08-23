@@ -104,9 +104,9 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="min-w-0 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
       {/* Top Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <button
           onClick={onBack}
           className="p-3 rounded-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 transition-colors"
@@ -115,18 +115,18 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
         </button>
         <div>
           <span className="text-xs font-bold uppercase tracking-widest text-purple-500">Enrolled Classroom</span>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-white">{classroom.name}</h1>
+          <h1 className="truncate text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{classroom.name}</h1>
         </div>
       </div>
 
       {/* Classroom Hero Card */}
-      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-black rounded-[36px] p-8 text-white border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-black rounded-[28px] md:rounded-[36px] p-5 sm:p-7 md:p-8 text-white border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-5 md:gap-6 relative overflow-hidden">
         <div className="space-y-2 z-10">
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 rounded-full bg-white/10 text-xs font-mono font-bold uppercase tracking-widest border border-white/20">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2.5 py-1 rounded-full bg-white/10 text-[10px] sm:text-xs font-mono font-bold uppercase tracking-widest border border-white/20">
               Code: {classroom.code}
             </span>
-            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest flex items-center gap-1">
               <Users size={14} /> {classroom.students || 1} Enrolled
             </span>
           </div>
@@ -134,16 +134,16 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
           <p className="text-xs text-slate-300">Secure proctored assessments & biometric face verification enabled.</p>
         </div>
 
-        <div className="px-5 py-3.5 rounded-2xl bg-white/10 border border-white/15 text-white/80 text-xs font-bold uppercase tracking-widest flex items-center gap-2 shrink-0 z-10">
+        <div className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/15 text-white/80 text-[10px] sm:text-xs font-bold uppercase tracking-widest flex items-center gap-2 shrink-0 z-10 md:w-auto">
           <ShieldCheck size={16} /> Attendance is instructor-verified
         </div>
       </div>
 
       {/* Tab Selectors */}
-      <div className="flex border-b border-slate-200 dark:border-white/10 gap-8">
+      <div className="flex overflow-x-auto border-b border-slate-200 dark:border-white/10 gap-5 md:gap-8 scrollbar-hide">
         <button
           onClick={() => setActiveTab('tests')}
-          className={`pb-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
+          className={`shrink-0 pb-3 md:pb-4 text-[11px] md:text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'tests' ? 'border-purple-500 text-purple-500' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
           }`}
         >
@@ -152,7 +152,7 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
 
         <button
           onClick={() => setActiveTab('attendance')}
-          className={`pb-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
+          className={`shrink-0 pb-3 md:pb-4 text-[11px] md:text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'attendance' ? 'border-purple-500 text-purple-500' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
           }`}
         >
@@ -161,7 +161,7 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
 
         <button
           onClick={() => setActiveTab('announcements')}
-          className={`pb-4 text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
+          className={`shrink-0 pb-3 md:pb-4 text-[11px] md:text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'announcements' ? 'border-purple-500 text-purple-500' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
           }`}
         >
@@ -186,7 +186,7 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
               {tests.map((t) => (
                 <div
                   key={t.id}
-                  className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 space-y-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                  className="min-w-0 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 space-y-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
                 >
                   <div className="space-y-2">
                     <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
@@ -258,7 +258,7 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
               {attendanceLogs.map((log) => (
                 <div
                   key={log.id}
-                  className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-5 flex items-center justify-between"
+                  className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
@@ -269,7 +269,7 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
                       <p className="text-xs text-slate-400">Verified via: {log.verified_method || 'Face-ID Biometric'}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-slate-400 font-mono">
+                  <span className="break-words text-xs text-slate-400 font-mono sm:text-right">
                     {new Date(log.verified_at || log.created_at).toLocaleString()}
                   </span>
                 </div>

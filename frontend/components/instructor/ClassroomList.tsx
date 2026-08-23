@@ -108,8 +108,8 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
   };
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-end mb-8">
+    <div className="min-w-0 p-4 sm:p-6 md:p-8">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-6 md:mb-8">
         <div>
           <h2 className="text-3xl font-black tracking-tight mb-2">My Classrooms</h2>
           <p className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Instances</p>
@@ -118,7 +118,7 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setCreateModalOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 rounded-full bg-blue-600 text-white font-bold uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/30 hover:bg-blue-500 transition-colors"
+          className="flex w-full sm:w-auto items-center justify-center gap-2 px-5 sm:px-6 py-3.5 sm:py-3 rounded-full bg-blue-600 text-white font-bold uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/30 hover:bg-blue-500 transition-colors active:scale-95"
         >
           <Plus size={16} />
           Create Class
@@ -145,7 +145,7 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
               onClick={() => onSelect(cls.id)}
-              className="group cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[24px] p-6 hover:shadow-2xl hover:border-blue-500/30 transition-all"
+              className="group min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[24px] p-5 sm:p-6 hover:shadow-2xl hover:border-blue-500/30 transition-all"
             >
               <div className="flex justify-between items-start mb-6">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
@@ -165,7 +165,7 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
                 </div>
               </div>
               <h3 className="text-xl font-bold mb-2 group-hover:text-blue-500 transition-colors">{cls.name}</h3>
-              <div className="flex items-center gap-6 mt-6 pt-6 border-t border-slate-100 dark:border-white/10">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-6 pt-6 border-t border-slate-100 dark:border-white/10">
                 <div className="flex items-center gap-2">
                   <Users size={16} className="text-slate-400" />
                   <span className="text-sm font-semibold">{cls.students || 0}</span>
@@ -188,15 +188,15 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md bg-white dark:bg-[#0a0a0a] rounded-[32px] border border-slate-200 dark:border-white/10 p-10 shadow-2xl"
+              className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto bg-white dark:bg-[#0a0a0a] rounded-[28px] border border-slate-200 dark:border-white/10 p-6 sm:p-10 shadow-2xl"
             >
-              <div className="flex justify-between items-center mb-10">
+              <div className="flex justify-between items-center mb-7 sm:mb-10">
                 <h3 className="text-2xl font-light tracking-tight text-slate-900 dark:text-white">New Classroom</h3>
                 <button onClick={() => setCreateModalOpen(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                   <X size={20} />
                 </button>
               </div>
-              <div className="space-y-8">
+              <div className="space-y-6 sm:space-y-8">
                 <div className="space-y-4">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Classroom Name</label>
                   <input 
@@ -205,7 +205,7 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
                     value={newClassName}
                     onChange={(e) => setNewClassName(e.target.value)}
                     placeholder="e.g. Advanced AI Theory" 
-                    className="w-full px-6 py-5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 sm:px-6 py-4 sm:py-5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                   {error && <p className="text-xs text-rose-500 mt-2">{error}</p>}
                 </div>

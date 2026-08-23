@@ -36,13 +36,14 @@ export const StudentSidebar: React.FC<SidebarProps> = ({ activeSection, setActiv
   };
 
   return (
+    <>
     <motion.aside 
       initial={{ x: -100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
-        "fixed left-0 top-0 bottom-0 z-40 bg-white/60 dark:bg-black/60 backdrop-blur-2xl border-r border-black/5 dark:border-white/10 transition-all duration-500 flex flex-col py-6",
+        "hidden md:flex fixed left-0 top-0 bottom-0 z-40 bg-white/60 dark:bg-black/60 backdrop-blur-2xl border-r border-black/5 dark:border-white/10 transition-all duration-500 flex-col py-6",
         isHovered ? "w-64" : "w-20"
       )}
     >
@@ -111,5 +112,25 @@ export const StudentSidebar: React.FC<SidebarProps> = ({ activeSection, setActiv
         </button>
       </div>
     </motion.aside>
+
+    <nav aria-label="Student navigation" className="fixed bottom-3 left-3 right-3 z-50 flex items-center gap-1 overflow-x-auto rounded-2xl border border-black/10 bg-white/90 px-2 py-2 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-[#111]/90 md:hidden scrollbar-hide">
+      {navItems.map((item) => (
+        <button
+          key={`mobile-${item.id}`}
+          type="button"
+          aria-label={item.label}
+          title={item.label}
+          onClick={() => setActiveSection(item.id)}
+          className={cn(
+            "flex min-w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-[9px] font-bold uppercase tracking-wide transition-colors active:scale-95",
+            activeSection === item.id ? "bg-purple-600 text-white shadow-lg shadow-purple-500/30" : "text-slate-500 dark:text-slate-300"
+          )}
+        >
+          {React.cloneElement(item.icon, { size: 18 })}
+          <span>{item.label.split(' ')[0]}</span>
+        </button>
+      ))}
+    </nav>
+    </>
   );
 };

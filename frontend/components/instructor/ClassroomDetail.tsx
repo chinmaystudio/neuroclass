@@ -80,8 +80,8 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-[#0a0a0a]">
       {/* Header */}
-      <div className="px-8 py-6 border-b border-black/5 dark:border-white/10 bg-white/50 dark:bg-white/5 backdrop-blur-xl flex justify-between items-center z-10 sticky top-0">
-        <div className="flex items-center gap-6">
+      <div className="px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 border-b border-black/5 dark:border-white/10 bg-white/50 dark:bg-white/5 backdrop-blur-xl flex justify-between items-center z-10 sticky top-0">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-6">
           <button 
             onClick={onBack}
             className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-white/20 transition-colors"
@@ -89,7 +89,7 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h2 className="text-2xl font-black tracking-tight">{classroom.name}</h2>
+            <h2 className="truncate text-xl sm:text-2xl font-black tracking-tight">{classroom.name}</h2>
             <div className="flex items-center gap-4 mt-1">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Code: <code className="text-blue-500">{classroom.code}</code></span>
             </div>
@@ -98,12 +98,12 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
       </div>
 
       {/* Navigation Tabs */}
-      <div className="px-8 pt-4 border-b border-black/5 dark:border-white/10 flex gap-8 sticky top-[89px] bg-slate-50/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md z-10">
+      <div className="overflow-x-auto px-4 pt-3 sm:px-6 md:px-8 md:pt-4 border-b border-black/5 dark:border-white/10 flex gap-5 md:gap-8 sticky top-[73px] md:top-[89px] bg-slate-50/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md z-10 scrollbar-hide">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 pb-4 text-sm font-bold uppercase tracking-widest transition-colors relative ${
+            className={`flex shrink-0 items-center gap-2 pb-3 md:pb-4 text-[11px] md:text-sm font-bold uppercase tracking-widest transition-colors relative ${
               activeTab === tab.id ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -120,7 +120,7 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-8 relative">
+      <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 relative">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -130,8 +130,8 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
             className="min-h-full"
           >
             {activeTab === 'students' && (
-              <div className="bg-white dark:bg-white/5 rounded-3xl p-8 border border-black/5 dark:border-white/10 shadow-xl">
-                <div className="flex items-center justify-between mb-6">
+              <div className="min-w-0 bg-white dark:bg-white/5 rounded-3xl p-5 sm:p-6 md:p-8 border border-black/5 dark:border-white/10 shadow-xl">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
                   <div>
                     <h3 className="text-xl font-bold">Enrolled Students</h3>
                     <p className="text-sm text-slate-500">Teacher-owned roster for {classroom.name}.</p>
@@ -140,7 +140,7 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
                 </div>
                 <div className="space-y-3">
                   {students.length === 0 ? <p className="text-sm text-slate-500">No students have joined with the classroom code yet.</p> : students.map((student) => (
-                    <div key={student.id} className="flex items-center justify-between rounded-2xl border border-black/5 dark:border-white/10 p-4">
+                    <div key={student.id} className="flex flex-col gap-3 rounded-2xl border border-black/5 dark:border-white/10 p-4 sm:flex-row sm:items-center sm:justify-between">
                       <div><p className="font-bold">{student.name}</p><p className="text-xs text-slate-500">{student.email || 'No email'} {student.roll_number ? `· Roll ${student.roll_number}` : ''}</p></div>
                       <span className={`text-[10px] font-bold uppercase tracking-widest ${student.face_registration_status === 'REGISTERED' ? 'text-emerald-500' : 'text-amber-500'}`}>{student.face_registration_status === 'REGISTERED' ? 'Biometric ready' : 'Needs registration'}</span>
                     </div>
@@ -150,18 +150,18 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
             )}
             
             {activeTab === 'tests' && (
-              <div className="bg-white dark:bg-white/5 rounded-3xl border border-black/5 dark:border-white/10 shadow-xl overflow-hidden min-h-[720px] flex flex-col">
-                <div className="flex items-center justify-between gap-4 p-5 border-b border-black/5 dark:border-white/10">
+              <div className="bg-white dark:bg-white/5 rounded-3xl border border-black/5 dark:border-white/10 shadow-xl overflow-hidden min-h-[560px] md:min-h-[720px] flex flex-col">
+                <div className="flex flex-col items-start justify-between gap-3 p-4 sm:p-5 md:flex-row md:items-center border-b border-black/5 dark:border-white/10">
                   <div>
                     <h3 className="text-xl font-bold">Test Designer</h3>
                     <p className="text-sm text-slate-500">Create, publish, and monitor tests for {classroom.name}. Only enrolled students can access them.</p>
                   </div>
                   <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600">Classroom secured</span>
                 </div>
-                <div className="flex-1 min-h-[640px] bg-slate-100 dark:bg-black/20">
-                  {testPortalLoading && <div className="flex h-full min-h-[640px] items-center justify-center text-sm font-semibold text-slate-500">Authorizing classroom test portal…</div>}
-                  {testPortalError && <div className="flex h-full min-h-[640px] items-center justify-center p-8 text-center text-sm font-semibold text-red-500">{testPortalError}</div>}
-                  {testPortalSrc && <iframe title={`${classroom.name} test designer`} src={testPortalSrc} className="h-full min-h-[640px] w-full border-0" allow="camera; fullscreen; autoplay" allowFullScreen />}
+                <div className="flex-1 min-h-[520px] md:min-h-[640px] bg-slate-100 dark:bg-black/20">
+                  {testPortalLoading && <div className="flex h-full min-h-[520px] md:min-h-[640px] items-center justify-center p-6 text-center text-sm font-semibold text-slate-500">Authorizing classroom test portal…</div>}
+                  {testPortalError && <div className="flex h-full min-h-[520px] md:min-h-[640px] items-center justify-center p-6 text-center text-sm font-semibold text-red-500">{testPortalError}</div>}
+                  {testPortalSrc && <iframe title={`${classroom.name} test designer`} src={testPortalSrc} className="h-full min-h-[520px] md:min-h-[640px] w-full border-0" allow="camera; fullscreen; autoplay" allowFullScreen />}
                 </div>
               </div>
             )}

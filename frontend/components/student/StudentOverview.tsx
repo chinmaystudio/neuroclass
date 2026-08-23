@@ -137,29 +137,29 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="min-w-0 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
       {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-[36px] bg-gradient-to-r from-purple-900 via-indigo-900 to-black p-8 md:p-10 text-white shadow-2xl border border-white/10">
+      <div className="relative overflow-hidden rounded-[28px] md:rounded-[36px] bg-gradient-to-r from-purple-900 via-indigo-900 to-black p-5 sm:p-7 md:p-10 text-white shadow-2xl border border-white/10">
         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2" />
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
                 <Sparkles size={13} /> Student Portal
               </span>
               {stats.biometricVerified ? (
-                <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
                   <ShieldCheck size={13} /> Biometric Verified
                 </span>
               ) : (
-                <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold uppercase tracking-widest">
+                <span className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest">
                   Biometric Pending
                 </span>
               )}
             </div>
             
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight break-words">
               Welcome back, {user?.email?.split('@')[0] || 'Student'}! 👋
             </h1>
             <p className="text-slate-300 text-sm max-w-xl">
@@ -167,16 +167,16 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <button
               onClick={onJoinClick}
-              className="px-6 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/30 flex items-center gap-2 transition-all"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3.5 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-purple-500/30 transition-all active:scale-95 sm:w-auto"
             >
               <Plus size={16} /> Join Class
             </button>
             <button
               onClick={() => onNavigate('tests')}
-              className="px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold uppercase tracking-widest text-xs border border-white/20 flex items-center gap-2 transition-all"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 text-xs font-bold uppercase tracking-widest text-white transition-all active:scale-95 sm:w-auto"
             >
               <Zap size={16} /> Active Tests
             </button>
@@ -185,11 +185,11 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
       </div>
 
       {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
         <motion.div
           whileHover={{ y: -4 }}
           onClick={() => onNavigate('classes')}
-          className="cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
+          className="min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
@@ -204,7 +204,7 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
         <motion.div
           whileHover={{ y: -4 }}
           onClick={() => onNavigate('tests')}
-          className="cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
+          className="min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
@@ -219,7 +219,7 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
         <motion.div
           whileHover={{ y: -4 }}
           onClick={() => onNavigate('history')}
-          className="cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
+          className="min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
@@ -234,7 +234,7 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
         <motion.div
           whileHover={{ y: -4 }}
           onClick={() => onNavigate('performance')}
-          className="cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
+          className="min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
         >
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
@@ -248,7 +248,7 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
       </div>
 
       {/* Main Grid: Active Tests Widget & Recent Activity Timeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3 md:gap-8">
         {/* Left 2 Cols: Quick Pending Assessments */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
@@ -275,7 +275,7 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
               {recentTests.map((t) => (
                 <div
                   key={t.id}
-                  className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all"
+                  className="min-w-0 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all"
                 >
                   <div className="space-y-1">
                     <span className="px-3 py-0.5 rounded-full bg-purple-500/10 text-purple-500 text-[10px] font-bold uppercase tracking-widest">
@@ -286,7 +286,7 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
                   </div>
                   <button
                     onClick={() => onStartTest(t.id)}
-                    className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 shrink-0 transition-colors"
+                    className="w-full rounded-xl bg-purple-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-purple-500/20 transition-colors active:scale-95 sm:w-auto"
                   >
                     Start Exam
                   </button>

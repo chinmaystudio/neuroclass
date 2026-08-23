@@ -97,7 +97,7 @@ export const InstructorDashboard: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white flex font-sans overflow-hidden">
+    <div className="fixed inset-0 z-[60] min-w-0 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white flex font-sans overflow-hidden">
       {/* Background Glows */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30 z-0">
          <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/2" />
@@ -112,8 +112,7 @@ export const InstructorDashboard: React.FC = () => {
       />
       
       <main 
-        className="flex-1 relative z-10 transition-all duration-500 overflow-hidden bg-white/50 dark:bg-black/20 backdrop-blur-3xl border-l border-black/5 dark:border-white/10"
-        style={{ marginLeft: isSidebarHovered ? '16rem' : '5rem' }}
+        className={`!ml-0 flex-1 min-w-0 relative z-10 pb-24 md:pb-0 transition-all duration-500 overflow-hidden bg-white/50 dark:bg-black/20 backdrop-blur-3xl border-l border-black/5 dark:border-white/10 ${isSidebarHovered ? 'md:!ml-64' : 'md:!ml-20'}`}
       >
         {renderContent()}
       </main>
