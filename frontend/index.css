@@ -1,3 +1,63 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --surface-shadow-button: 0 0.5rem 1.25rem rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
+  --surface-shadow-button-hover: 0 0.75rem 1.5rem rgba(15, 23, 42, 0.16), 0 2px 5px rgba(15, 23, 42, 0.1);
+  --surface-shadow-card: 0 1rem 2.5rem rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.05);
+  --surface-shadow-card-hover: 0 1.25rem 3rem rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.07);
+}
+
+.dark {
+  --surface-shadow-button: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.28), 0 0 1px rgba(255, 255, 255, 0.08);
+  --surface-shadow-button-hover: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.38), 0 0 1px rgba(255, 255, 255, 0.12);
+  --surface-shadow-card: 0 1rem 2.5rem rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.12);
+  --surface-shadow-card-hover: 0 1.25rem 3rem rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href] {
+    box-shadow: var(--surface-shadow-button);
+    transition: box-shadow 180ms ease-out, transform 160ms ease-out, background-color 180ms ease-out, color 180ms ease-out;
+  }
+
+  button:not(:disabled):hover,
+  [role="button"]:not([aria-disabled="true"]):hover,
+  a[href]:hover {
+    box-shadow: var(--surface-shadow-button-hover);
+  }
+
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  a[href]:active {
+    transform: scale(0.98);
+  }
+
+  div[class~="rounded-xl"],
+  div[class~="rounded-2xl"],
+  div[class~="rounded-3xl"],
+  article[class~="rounded-xl"],
+  article[class~="rounded-2xl"],
+  article[class~="rounded-3xl"],
+  section[class~="rounded-xl"],
+  section[class~="rounded-2xl"],
+  section[class~="rounded-3xl"] {
+    box-shadow: var(--surface-shadow-card);
+    transition: box-shadow 220ms ease-out, transform 220ms ease-out;
+  }
+
+  div[class~="rounded-xl"]:hover,
+  div[class~="rounded-2xl"]:hover,
+  div[class~="rounded-3xl"]:hover,
+  article[class~="rounded-xl"]:hover,
+  article[class~="rounded-2xl"]:hover,
+  article[class~="rounded-3xl"]:hover,
+  section[class~="rounded-xl"]:hover,
+  section[class~="rounded-2xl"]:hover,
+  section[class~="rounded-3xl"]:hover {
+    box-shadow: var(--surface-shadow-card-hover);
+  }
+}
