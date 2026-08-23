@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/common/Navbar';
@@ -16,6 +16,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
 import { MobileAttendanceHandoff } from './components/auth/MobileAttendanceHandoff';
 import { MobileStudentAttendancePortal, MobileTeacherAttendancePortal } from './components/attendance/MobileAttendancePortals';
+import BrandIntro from './components/common/BrandIntro';
 
 const Home = ({ onLaunchAuth }: { onLaunchAuth: (mode: 'signin' | 'signup') => void }) => (
   <>
@@ -33,6 +34,7 @@ const AppContent = () => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [showAIModule, setShowAIModule] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const openAuth = (mode: 'signin' | 'signup') => {
     setAuthMode(mode);
@@ -47,6 +49,7 @@ const AppContent = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-white selection:bg-blue-500 selection:text-white relative transition-colors duration-300 font-sans">
       <ParticleBackground />
+      {location.pathname === '/' && <BrandIntro />}
 
       <Navbar onLogin={openAuth} />
 
