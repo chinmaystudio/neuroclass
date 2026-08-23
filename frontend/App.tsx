@@ -16,7 +16,6 @@ import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
 import { MobileAttendanceHandoff } from './components/auth/MobileAttendanceHandoff';
 import { MobileStudentAttendancePortal, MobileTeacherAttendancePortal } from './components/attendance/MobileAttendancePortals';
-import MobileVideoIntro from './components/common/MobileVideoIntro';
 
 const Home = ({ onLaunchAuth }: { onLaunchAuth: (mode: 'signin' | 'signup') => void }) => (
   <>
@@ -49,7 +48,6 @@ const AppContent = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-white selection:bg-blue-500 selection:text-white relative transition-colors duration-300 font-sans">
       <ParticleBackground />
-      {location.pathname === '/' && <MobileVideoIntro />}
 
       <Navbar onLogin={openAuth} />
 
