@@ -17,6 +17,12 @@
 }
 
 @layer base {
+  .brand-link,
+  .brand-link:hover,
+  .brand-link:active {
+    box-shadow: none !important;
+  }
+
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   a[href] {

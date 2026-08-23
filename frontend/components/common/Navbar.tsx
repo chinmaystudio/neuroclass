@@ -34,7 +34,7 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-black/5 dark:border-white/10 bg-white/50 dark:bg-black/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link to="/">
+          <Link to="/" className="brand-link">
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -43,12 +43,12 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
               <img 
                 src="/logo-light.png" 
                 alt="NeuroClass Logo" 
-                className="h-10 w-auto object-contain block dark:hidden drop-shadow-[0_0_10px_rgba(59,130,246,0.2)] transition-transform group-hover:scale-105" 
+                className="h-10 w-auto object-contain block dark:hidden transition-transform group-hover:scale-105"
               />
               <img 
                 src="/logo-dark.png" 
                 alt="NeuroClass Logo" 
-                className="h-10 w-auto object-contain hidden dark:block drop-shadow-[0_0_12px_rgba(59,130,246,0.4)] transition-transform group-hover:scale-105" 
+                className="h-10 w-auto object-contain hidden dark:block transition-transform group-hover:scale-105"
               />
               <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
                 NEURO<span className="text-blue-600 dark:text-blue-400 font-light">CLASS</span>
