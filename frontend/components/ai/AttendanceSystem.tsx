@@ -156,7 +156,7 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Could not open an attendance session.');
       if (mode !== 'single') await startAttendanceSession(classId, payload.session.id);
-      const nextSession = { ...payload.session, pin: payload.pin, sessionCode: payload.sessionCode, radiusMeters: payload.radiusMeters, challengeToken: payload.challengeToken };
+      const nextSession = { ...payload.session, pin: payload.pin, sessionCode: payload.sessionCode, radiusMeters: payload.radiusMeters, challengeToken: payload.challengeToken, attendanceMode: mode === 'single' ? 'multi_level' : 'manual' };
       identifiedIdsRef.current.clear();
       setIdentified([]);
       setFinalReport(null);
@@ -189,7 +189,10 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again before closing attendance.');
-      await finalizeAttendanceSession(activeSession.id);
+
+      // Closing the Supabase session is authoritative. Multi-Level sessions do not
+      // create a Render manual-scan session, so never let that auxiliary call block
+      // the database state transition.
       const response = await fetch(getApiUrl('/api/attendance/session'), {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
@@ -197,10 +200,26 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Could not close an attendance session.');
+
+      let finalizationWarning = false;
+      const usesRenderSession = activeSession.attendanceMode ? activeSession.attendanceMode === 'manual' : mode === 'group';
+      if (usesRenderSession) {
+        try {
+          await Promise.race([
+            finalizeAttendanceSession(activeSession.id),
+            new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('Manual attendance finalization timed out.')), 8000)),
+          ]);
+        } catch (finalizationError) {
+          finalizationWarning = true;
+          console.warn('Manual attendance finalization did not complete after the session closed:', finalizationError);
+        }
+      }
+
       setActiveSession(null);
       setRegistrationSamples([]);
       setFinalReport(payload.report || null);
-      setSessionNotice(payload.report ? `Session closed. ${payload.report.presentCount} present out of ${payload.report.rosterCount}. Final report is ready.` : 'Session closed.');
+      const reportNotice = payload.report ? `Session closed. ${payload.report.presentCount} present out of ${payload.report.rosterCount}. Final report is ready.` : 'Session closed.';
+      setSessionNotice(finalizationWarning ? `${reportNotice} Manual scan finalization was unavailable, but the attendance session is closed.` : reportNotice);
     } catch (error: any) {
       setCameraError(error.message || 'Could not close an attendance session.');
     } finally {
