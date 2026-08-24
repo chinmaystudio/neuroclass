@@ -31,6 +31,7 @@ type LocationCheck = {
   accuracyMeters?: number | null;
   distanceMeters?: number | null;
   radiusMeters?: number;
+  capturedAt?: number;
 };
 
 export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
@@ -211,8 +212,8 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       } catch (firstError: any) {
         if (firstError?.code === 1) throw firstError;
         // Some Android devices expose location but fail the first GPS-only fix.
-        // Retry with a network/cached fix so the server can evaluate accuracy honestly.
-        position = await readBrowserPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+        // Retry with a fresh network-assisted fix, never an old cached coordinate.
+        position = await readBrowserPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
       }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again before verifying your location.');
@@ -237,6 +238,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
         accuracyMeters: payload.accuracyMeters ?? position.coords.accuracy,
         distanceMeters: payload.distanceMeters ?? null,
         radiusMeters: payload.radiusMeters ?? activeSession.radius_meters,
+        capturedAt: Number.isFinite(position.timestamp) && position.timestamp > 0 ? position.timestamp : Date.now(),
       };
       setLocationCheck(nextLocation);
       if (!response.ok || nextLocation.status !== 'LOCATION_VERIFIED') {
@@ -264,7 +266,8 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
       return;
     }
 
-    if (useMultiLevel && locationCheck?.status !== 'LOCATION_VERIFIED') {
+    const locationIsStale = !locationCheck?.capturedAt || Date.now() - locationCheck.capturedAt > 30_000;
+    if (useMultiLevel && (locationCheck?.status !== 'LOCATION_VERIFIED' || locationIsStale)) {
       await requestLocation();
       return;
     }
