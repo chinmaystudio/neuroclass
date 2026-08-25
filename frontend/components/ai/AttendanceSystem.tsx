@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Camera, Users, CheckCircle2, AlertCircle, Loader2, MapPin, LocateFixed, Copy, Download } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CameraService } from '../../services/ml/CameraService';
-import { EmailService } from '../../services/ml/EmailService';
 import { supabase } from '../../database/supabase';
 import { logEvent } from '../../database/analytics';
 import { getApiUrl } from '../../config/apiConfig';
@@ -385,7 +384,6 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
       };
       newlyIdentified.push(entry);
       logEvent('Attendance', 'Student Identified', entry.name);
-      if (student?.email) void EmailService.sendAttendanceEmail(student.email, student.name, className).catch((error) => console.warn('Attendance email failed:', error));
     }
     if (newlyIdentified.length) setIdentified((previous) => [...newlyIdentified.reverse(), ...previous]);
   };
@@ -474,7 +472,6 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
               const student = students.find(s => s.id === match.student_id);
               if (student) {
                 logEvent('Attendance', 'Student Identified', student.name);
-                await EmailService.sendAttendanceEmail(student.email, student.name, className);
               }
             }
           }
