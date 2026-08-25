@@ -4,6 +4,7 @@ import { supabase, isSupabaseServiceRoleConfigured } from '../database/supabase'
 import { withCors } from '../lib/cors';
 import { evaluateGeofence, isValidGeoPoint, type LocationStatus } from '../lib/geofence';
 import { normalizeBackendRole } from '../lib/roles';
+import { sendAttendanceConfirmationEmail } from '../lib/attendanceEmail';
 
 const ATTENDANCE_STATUSES = ['Present', 'Late', 'Excused', 'Absent', 'Pending Review'] as const;
 type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
@@ -46,11 +47,11 @@ async function audit(payload: Record<string, unknown>) {
 }
 
 async function enrolledStudent(classroomId: string, user: { id: string; email?: string | null }) {
-  const { data: byUser } = await supabase.from('students').select('id,name').eq('classroom_id', classroomId).eq('user_id', user.id).maybeSingle();
+  const { data: byUser } = await supabase.from('students').select('id,name,email').eq('classroom_id', classroomId).eq('user_id', user.id).maybeSingle();
   if (byUser) return byUser;
   const normalizedEmail = user.email?.trim().toLowerCase();
   if (normalizedEmail) {
-    const { data: byEmail } = await supabase.from('students').select('id,name').eq('classroom_id', classroomId).ilike('email', normalizedEmail).maybeSingle();
+    const { data: byEmail } = await supabase.from('students').select('id,name,email').eq('classroom_id', classroomId).ilike('email', normalizedEmail).maybeSingle();
     if (byEmail) return byEmail;
   }
   return null;
@@ -394,6 +395,11 @@ export async function verifyAttendance(request: Request): Promise<Response> {
     }
 
     await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: attendance.verified_method } });
+    void sendAttendanceConfirmationEmail({
+      recipientEmail: enrollment.email,
+      studentName: enrollment.name,
+      verifiedMethod: attendance.verified_method,
+    });
     return json({ ok: true, attendance, attempt, stats: { score: faceMatchScore, liveness: livenessScore, confidence: finalConfidence, distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters } });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to verify attendance.' }, error.status || 500);
@@ -423,6 +429,11 @@ export async function markTeacherAttendance(request: Request): Promise<Response>
       return json({ error: 'Unable to record attendance.' }, 500);
     }
     await audit({ classroom_id: classroomId, session_id: sessionId, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'teacher', event_type: 'attendance_teacher_marked', payload: { mode, confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(confidence, 100)) : null } });
+    void sendAttendanceConfirmationEmail({
+      recipientEmail: enrolled.email,
+      studentName: enrolled.name,
+      verifiedMethod: attendance.verified_method,
+    });
     return json({ attendance });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to record attendance.' }, error.status || 500);
@@ -451,7 +462,7 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
 
     const { data: session, error: sessionError } = await supabase.from('attendance_sessions').select('id,classroom_id,teacher_id,status,ends_at,teacher_latitude,teacher_longitude,radius_meters').eq('id', sessionId).maybeSingle();
     if (sessionError || !session) return json({ error: 'Attendance session not found.' }, 404);
-    const { data: enrollment } = await supabase.from('students').select('id,name,face_registration_status').eq('classroom_id', session.classroom_id).eq('user_id', user.id).maybeSingle();
+    const { data: enrollment } = await supabase.from('students').select('id,name,email,face_registration_status').eq('classroom_id', session.classroom_id).eq('user_id', user.id).maybeSingle();
     if (!enrollment) return json({ error: 'You are not enrolled in this classroom.' }, 403);
 
     const expired = session.status !== 'open' || !session.ends_at || new Date(session.ends_at).getTime() <= Date.now();
@@ -624,6 +635,11 @@ export async function verifyStudentFaceAttendance(request: Request): Promise<Res
 
     await updateVerification({ face_detected: faceDetected, face_match_score: faceMatchScore, final_confidence: overallConfidence, overall_confidence: overallConfidence, verification_status: 'VERIFIED', verified_at: new Date().toISOString() });
     await audit({ classroom_id: session.classroom_id, session_id: session.id, attendance_id: attendance.id, actor_user_id: user.id, actor_role: 'student', event_type: 'attendance_verified', payload: { attemptId: attempt.id, verifiedMethod: 'Multi-Level Geofence + Face ID', distanceMeters: locationResult.distanceMeters, faceMatchScore } });
+    void sendAttendanceConfirmationEmail({
+      recipientEmail: enrollment.email,
+      studentName: enrollment.name,
+      verifiedMethod: attendance.verified_method,
+    });
     return json({ ok: true, attendance, attempt, faceBox, stats: { distanceMeters: locationResult.distanceMeters, accuracyMeters: locationResult.accuracyMeters, radiusMeters, faceMatchScore, matchPercent: faceMatchScore, framesSubmitted: files.length, matchedFrames: identityMatches.length, confidence: overallConfidence, verificationMode: 'face_match_only' } });
   } catch (error: any) {
     return json({ error: error.message || 'Unable to complete student Face ID verification.' }, error.status || 500);
