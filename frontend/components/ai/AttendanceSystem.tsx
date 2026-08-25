@@ -6,6 +6,7 @@ import { EmailService } from '../../services/ml/EmailService';
 import { supabase } from '../../database/supabase';
 import { logEvent } from '../../database/analytics';
 import { getApiUrl } from '../../config/apiConfig';
+import { getStableBrowserPosition } from '../../services/location/stablePosition';
 import { finalizeAttendanceSession, sendAttendanceFrame, startAttendanceSession } from '../../services/api/attendance';
 
 interface AttendanceSystemProps {
@@ -116,10 +117,8 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     setLocationState('requesting');
     setCameraError(null);
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-      });
-      const nextLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy };
+      const position = await getStableBrowserPosition(3);
+      const nextLocation = { latitude: position.latitude, longitude: position.longitude, accuracy: position.accuracy };
       setTeacherLocation(nextLocation);
       setLocationState('granted');
       return nextLocation;
