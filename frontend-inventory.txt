@@ -52,7 +52,7 @@ frontend/services/algoClient.ts
 frontend/services/evaluationStore.ts
 frontend/services/excelGenerator.ts
 frontend/services/ml/CameraService.ts
-frontend/services/ml/EmailService.ts
+frontend/services/location/stablePosition.ts
 frontend/services/ml/LocalMLService.ts
 frontend/services/testService.ts
 frontend/types.ts
