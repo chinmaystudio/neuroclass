@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { supabase } from '../database/supabase';
 import { withCors } from './cors';
+import { sendAttendanceConfirmationEmail } from './attendanceEmail';
 
 export type GatewayAuth = {
   user: User;
@@ -166,7 +167,7 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
   const studentIds = [...new Set(present.map((result) => result.student_id as string))];
   const { data: students, error: studentsError } = await auth.db
     .from('students')
-    .select('id,name')
+    .select('id,name,email')
     .eq('classroom_id', session.classroom_id)
     .in('id', studentIds);
   if (studentsError) throw new GatewayError('Unable to load enrolled students for attendance', 500);
@@ -230,6 +231,14 @@ export async function materializeManualPresentAttendance(auth: GatewayAuth, sess
       console.error('[attendance.manual] insert failed', insertError);
       throw new GatewayError(`Unable to persist reviewed attendance: ${insertError.message || JSON.stringify(insertError)}`, 500);
     }
+    void Promise.all(toInsert.map((row) => {
+      const student = studentById.get(row.student_id);
+      return sendAttendanceConfirmationEmail({
+        recipientEmail: student?.email || '',
+        studentName: student?.name || row.student_name || 'Student',
+        verifiedMethod: row.verified_method,
+      });
+    }));
   }
 
   if (toUpdate.length > 0) {
