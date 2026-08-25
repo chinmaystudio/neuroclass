@@ -24,7 +24,7 @@ The public role selector is no longer authoritative. The active role is resolved
 
 ### Teacher attendance
 
-Attendance now starts with a teacher-issued session containing a nonce, classroom owner, open/closed state, and expiry. The teacher must open a session before scanning. Single and group face scans write `session_id`, `marked_by`, verification method, confidence, mode, and capture metadata. Duplicate `(session_id, student_id)` rows are rejected by a partial unique index, and the UI only confirms or emails attendance after a successful insert. Teacher attendance is mounted inside the selected classroom rather than a hardcoded demo class.
+Attendance now starts with a teacher-issued session containing a nonce, classroom owner, open/closed state, and expiry. The teacher must open a session before scanning. Single and group face scans write `session_id`, `marked_by`, verification method, confidence, mode, and capture metadata. Duplicate `(session_id, student_id)` rows are rejected by a partial unique index. After a new attendance insert succeeds, the backend attempts a confirmation email to the student’s registered address when Google Workspace SMTP is configured; mail failure does not change the attendance result. Teacher attendance is mounted inside the selected classroom rather than a hardcoded demo class.
 
 The student portal no longer provides an attendance check-in action. Students can inspect their status and raise an attendance appeal for teacher review. This prevents a student from simulating presence from home through a student-controlled insert path. The camera workflow is teacher-operated; a production deployment should still add a dedicated liveness/anti-spoof model before using attendance for high-stakes decisions.
 
