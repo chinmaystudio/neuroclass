@@ -5,6 +5,7 @@ import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { CameraService } from '../../services/ml/CameraService';
 import { getApiUrl } from '../../config/apiConfig';
+import { getStableBrowserPosition } from '../../services/location/stablePosition';
 
 interface StudentAttendanceModalProps {
   isOpen: boolean;
@@ -180,10 +181,6 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
     return 'Your location could not be determined. Try again with device location enabled.';
   };
 
-  const readBrowserPosition = (options: PositionOptions) => new Promise<GeolocationPosition>((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, options);
-  });
-
   const handleLocationAction = () => {
     if (locationTapLockRef.current || isCheckingLocation || isVerifying || isSuccess) return;
     locationTapLockRef.current = true;
@@ -206,15 +203,7 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
     setIsCheckingLocation(true);
     setError(null);
     try {
-      let position: GeolocationPosition;
-      try {
-        position = await readBrowserPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-      } catch (firstError: any) {
-        if (firstError?.code === 1) throw firstError;
-        // Some Android devices expose location but fail the first GPS-only fix.
-        // Retry with a fresh network-assisted fix, never an old cached coordinate.
-        position = await readBrowserPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 0 });
-      }
+      const position = await getStableBrowserPosition(3);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in again before verifying your location.');
       const response = await fetch(getApiUrl('/api/attendance/location'), {
@@ -225,17 +214,17 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
         },
         body: JSON.stringify({
           sessionId: activeSession.id,
-          studentLatitude: position.coords.latitude,
-          studentLongitude: position.coords.longitude,
-          locationAccuracy: position.coords.accuracy,
+          studentLatitude: position.latitude,
+          studentLongitude: position.longitude,
+          locationAccuracy: position.accuracy,
         }),
       });
       const payload = await response.json().catch(() => ({}));
       const nextLocation: LocationCheck = {
         status: payload.locationStatus || (response.ok ? 'LOCATION_VERIFIED' : 'LOCATION_UNAVAILABLE'),
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracyMeters: payload.accuracyMeters ?? position.coords.accuracy,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracyMeters: payload.accuracyMeters ?? position.accuracy,
         distanceMeters: payload.distanceMeters ?? null,
         radiusMeters: payload.radiusMeters ?? activeSession.radius_meters,
         capturedAt: Number.isFinite(position.timestamp) && position.timestamp > 0 ? position.timestamp : Date.now(),
