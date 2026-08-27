@@ -7,6 +7,7 @@ import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { getApiUrl } from '../../config/apiConfig';
 import { StudentAttendanceModal } from './StudentAttendanceModal';
+import { StudentClassroomMaterials } from './StudentClassroomMaterials';
 
 interface EnrolledClassDetailProps {
   classroom: any;
@@ -20,7 +21,7 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
   onStartTest,
 }) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'tests' | 'attendance' | 'announcements'>('tests');
+  const [activeTab, setActiveTab] = useState<'tests' | 'materials' | 'attendance' | 'announcements'>('tests');
   const [loading, setLoading] = useState(true);
   const [tests, setTests] = useState<any[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
@@ -151,6 +152,15 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('materials')}
+          className={`shrink-0 pb-3 md:pb-4 text-[11px] md:text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === 'materials' ? 'border-purple-500 text-purple-500' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          <BookOpen size={16} /> Study Materials
+        </button>
+
+        <button
           onClick={() => setActiveTab('attendance')}
           className={`shrink-0 pb-3 md:pb-4 text-[11px] md:text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
             activeTab === 'attendance' ? 'border-purple-500 text-purple-500' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -214,6 +224,8 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
             </div>
           )}
         </div>
+      ) : activeTab === 'materials' ? (
+        <StudentClassroomMaterials classroomId={classroom.id} />
       ) : activeTab === 'attendance' ? (
         <div className="space-y-4">
           {activeAttendanceSession && (
