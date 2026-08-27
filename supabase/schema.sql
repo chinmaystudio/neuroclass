@@ -232,10 +232,43 @@ CREATE TABLE IF NOT EXISTS public.classroom_materials (
   retry_count INTEGER NOT NULL DEFAULT 0,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   processed_at TIMESTAMP WITH TIME ZONE,
+  source_type TEXT NOT NULL DEFAULT 'local_upload' CHECK (source_type IN ('local_upload', 'google_drive')),
+  drive_file_id TEXT,
+  drive_modified_at TIMESTAMP WITH TIME ZONE,
+  drive_web_view_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 CREATE INDEX IF NOT EXISTS classroom_materials_classroom_idx
   ON public.classroom_materials (classroom_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS classroom_materials_drive_file_unique_idx
+  ON public.classroom_materials (classroom_id, drive_file_id)
+  WHERE drive_file_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS public.google_drive_connections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  teacher_user_id TEXT NOT NULL UNIQUE,
+  google_email TEXT,
+  encrypted_refresh_token TEXT NOT NULL,
+  granted_scopes JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status TEXT NOT NULL DEFAULT 'connected' CHECK (status IN ('connected', 'revoked', 'error')),
+  last_error TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.classroom_drive_folders (
+  classroom_id UUID PRIMARY KEY REFERENCES public.classrooms(id) ON DELETE CASCADE,
+  connection_id UUID NOT NULL REFERENCES public.google_drive_connections(id) ON DELETE CASCADE,
+  drive_folder_id TEXT NOT NULL UNIQUE,
+  folder_name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS classroom_drive_folders_connection_idx
+  ON public.classroom_drive_folders (connection_id);
+
+ALTER TABLE public.google_drive_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.classroom_drive_folders ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS public.classroom_material_chunks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
