@@ -10,7 +10,7 @@ This release hardens the active teacher and student portals, moves attendance au
 |---|---|---|---|
 | Attendance session | Open/close a classroom session; select one-by-one or group camera scan; register faces | Read attendance history; submit an appeal | `attendance_sessions` ownership, teacher identity, open-window check, session/student uniqueness, RLS |
 | Attendance marking | Teacher-authorized face match only | No direct check-in or attendance insert | Student attendance modal/check-in controls removed; student appeal is the only write path |
-| Classroom materials | Upload/manage classroom source files through teacher workflow | Read only enrolled classroom context through the learning assistant | Classroom membership query plus classroom-scoped retrieval |
+| Classroom materials | Upload local files or connect Google Drive, auto-create one Drive folder per classroom, and import selected files | Browse and securely download only materials from enrolled classrooms | Teacher ownership, signed OAuth state, private storage, enrollment query, short-lived download URL |
 | AI test generation | Paid test designer inside instructor flows | Not available | x402 route, facilitator settlement, idempotent payment ledger |
 | Project advisor | Not applicable | Paid guided project ideation | Authenticated student request, x402 settlement, durable project record |
 | Classroom AI | Teacher supplies classroom context/materials | Ask questions against the selected enrolled classroom | Bearer authentication, enrollment check, source-only prompt, persisted thread |
@@ -48,6 +48,10 @@ The teacher x402 dashboard also exposes a wallet-specific persisted payment log 
 
 `ProjectAdvisor` asks the student to select a category and answer four structured questions: target user/problem, available skills/resources, constraints, and measurable impact. An optional preferred stack is supported. The paid result is a structured blueprint containing a title, pitch, problem, solution, novelty, target users, MVP scope, stretch scope, architecture, milestones, risks, competition readiness, and next actions. The result and settlement hash are stored in `project_ideas`.
 
+### Google Drive classroom materials
+
+Teachers can connect Google Drive from a teacher-owned classroom. The backend stores the encrypted refresh token server-side, creates a dedicated classroom folder, and supports direct uploads into that folder. Selected Drive files are copied into the existing private `classroom_materials` pipeline, where the extraction worker makes them available to the classroom tutor. Students use a separate Materials tab; the backend checks enrollment in the exact classroom before listing or issuing a short-lived private-storage download URL. Students are never granted raw Drive links or Drive permissions.
+
 ### Classroom adaptive learning assistant
 
 `ClassroomLearningBot` lets a student choose an enrolled classroom and continue a private thread. The backend verifies the Supabase bearer token, confirms membership in the selected classroom, reads only ready `classroom_materials` rows for that classroom, limits material/history context, asks Gemini to answer only from the supplied context, persists the user and assistant messages, and returns citations and source names. The assistant explicitly reports when the available material is insufficient instead of inventing an answer.
@@ -65,6 +69,13 @@ The canonical schema and idempotent migration add attendance sessions, attendanc
 | `POST` | `/api/ai/project-idea` | Generate and return a paid project blueprint | x402 + authenticated student |
 | `POST` | `/api/ai/classroom-answer` | Answer from one enrolled classroom’s materials | Authenticated student |
 | `GET` | `/api/x402/ledger?payer=...` | Return persisted wallet payment history | Authenticated session |
+| `GET/POST` | `/api/google-drive/connect?classroomId=...` | Start teacher Google Drive OAuth | Authenticated teacher owner |
+| `GET` | `/api/google-drive/callback` | Complete Google Drive OAuth and provision classroom folder | Signed OAuth state |
+| `GET` | `/api/google-drive/status?classroomId=...` | Return teacher connection and folder status | Authenticated teacher owner |
+| `GET` | `/api/google-drive/files?classroomId=...` | List supported files in the classroom Drive folder | Authenticated teacher owner |
+| `POST` | `/api/google-drive/upload` | Upload selected material to Drive and private classroom storage | Authenticated teacher owner |
+| `POST` | `/api/google-drive/import` | Import one selected Drive file | Authenticated teacher owner |
+| `GET` | `/api/materials/download?classroomId=...&materialId=...` | Return a short-lived private material URL | Authenticated teacher or enrolled student |
 
 ## Validation completed
 
@@ -79,7 +90,7 @@ The Vite build reports a non-blocking bundle-size warning for the existing large
 
 ## Required deployment configuration
 
-Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `X402_FACILITATOR_URL`, `NEUROCLASS_TREASURY_ADDRESS`, `VITE_NEUROCLASS_TREASURY_ADDRESS`, `VITE_X402_NETWORK`, `VITE_ALGOD_SERVER_URL`, and `ALLOWED_ORIGINS`. Set the three `X402_*_PRICE_USDC_MICRO` variables explicitly in production instead of relying on defaults. Apply `supabase/migrations/20260813090000_production_learning_attendance_x402.sql` to an existing database, or use the canonical schema for a new database.
+Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, `GOOGLE_DRIVE_REDIRECT_URI`, `GOOGLE_DRIVE_FRONTEND_ORIGIN`, `GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY`, `GOOGLE_DRIVE_STATE_SECRET`, `CLASSROOM_MATERIALS_BUCKET`, `X402_FACILITATOR_URL`, `NEUROCLASS_TREASURY_ADDRESS`, `VITE_NEUROCLASS_TREASURY_ADDRESS`, `VITE_X402_NETWORK`, `VITE_ALGOD_SERVER_URL`, and `ALLOWED_ORIGINS`. Set the three `X402_*_PRICE_USDC_MICRO` variables explicitly in production instead of relying on defaults. Apply `supabase/migrations/20260813090000_production_learning_attendance_x402.sql` and `supabase/migrations/20260827000100_google_drive_classroom_materials.sql` to an existing database, or use the canonical schema for a new database.
 
 ## Prioritized next features
 
