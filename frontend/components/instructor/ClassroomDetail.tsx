@@ -21,7 +21,7 @@ export const ClassroomDetail: React.FC<ClassroomDetailProps> = ({ classroomId, o
   const hasReturnToApp = returnTo?.startsWith('neuroclass://attendance-return') === true;
   const [classroom, setClassroom] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'students' | 'tests' | 'materials' | 'attendance' | 'proctoring' | 'x402' | 'settings'>(() => handoff.get('attendance') === '1' ? 'attendance' : 'students');
+  const [activeTab, setActiveTab] = useState<'students' | 'tests' | 'materials' | 'attendance' | 'proctoring' | 'x402' | 'settings'>(() => handoff.get('attendance') === '1' ? 'attendance' : handoff.get('drive') ? 'materials' : 'students');
   const [testPortalSrc, setTestPortalSrc] = useState<string | null>(null);
   const [testPortalLoading, setTestPortalLoading] = useState(false);
   const [testPortalError, setTestPortalError] = useState<string | null>(null);
