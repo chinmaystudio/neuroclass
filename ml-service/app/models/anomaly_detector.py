@@ -5,7 +5,7 @@ from .baseline import _numeric_values
 
 class RobustBaselineDetector:
     """Per-attempt unsupervised detector using robust median/MAD distance from normal calibration data."""
-    version = "robust-baseline-v1.0.0"
+    version = "robust-baseline-v1.1.0"
 
     def score(self, baseline: BaselineState, features: FeatureVector) -> tuple[float, float]:
         if not baseline.finalized or not baseline.feature_stats:

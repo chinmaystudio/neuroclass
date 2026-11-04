@@ -21,8 +21,8 @@ export const TestResults: React.FC<{ testId: string; onBack: () => void; initial
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" onClick={onBack} icon={<ArrowLeft size={14} />}>Tests</Button>
-        <h3 className="text-xl font-black">{data?.test.title ?? 'Results'}</h3>
-        {data && <Badge tone={AVAILABILITY_BADGE[data.test.availability]?.tone}>{AVAILABILITY_BADGE[data.test.availability]?.label}</Badge>}
+        <h3 className="text-xl font-black">{data?.test?.title ?? 'Results'}</h3>
+        {data?.test && <Badge tone={AVAILABILITY_BADGE[data.test.availability]?.tone}>{AVAILABILITY_BADGE[data.test.availability]?.label}</Badge>}
         <div className="ml-auto flex gap-2">
           <Button variant={view === 'monitor' ? 'primary' : 'secondary'} onClick={() => setView('monitor')} icon={<Radio size={14} />}>Live monitor</Button>
           <Button variant={view === 'results' ? 'primary' : 'secondary'} onClick={() => { setView('results'); results.reload(); }} icon={<BarChart3 size={14} />}>Results</Button>
@@ -30,7 +30,7 @@ export const TestResults: React.FC<{ testId: string; onBack: () => void; initial
       </div>
       <ErrorNote message={error || results.error} onRetry={results.error ? results.reload : undefined} />
 
-      {view === 'monitor' ? <LiveMonitor testId={testId} onReview={setReviewing} /> : results.loading && !data ? <Spinner /> : data && (
+      {view === 'monitor' ? <LiveMonitor testId={testId} onReview={setReviewing} /> : results.loading && !data ? <Spinner /> : data?.metrics && (
         <>
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Metric label="Enrolled" value={data.metrics.enrolled} />

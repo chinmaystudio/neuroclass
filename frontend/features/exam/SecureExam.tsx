@@ -362,11 +362,11 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
     <Shell>
       {/* Header */}
       <header className="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-black">{state.test.title}</p>
+        <div className="min-w-[8rem] flex-1">
+          <p className="line-clamp-2 text-sm font-black sm:truncate">{state.test.title}</p>
           <p className="text-[11px] text-slate-400">{answered}/{questions.length} answered{flagged ? ` · ${flagged} flagged` : ''}</p>
         </div>
-        <span className={cn('flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest', queue.state === 'saved' ? 'text-emerald-400' : queue.state === 'offline' ? 'text-amber-400' : 'text-slate-400')} aria-live="polite">
+        <span className={cn('order-last flex w-full items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest sm:order-none sm:w-auto', queue.state === 'saved' ? 'text-emerald-400' : queue.state === 'offline' ? 'text-amber-400' : 'text-slate-400')} aria-live="polite">
           {online ? <Wifi size={13} /> : <WifiOff size={13} />}
           {queue.state === 'saving' ? 'Saving…' : queue.state === 'offline' || !online ? `Offline · ${queue.pendingCount} queued` : queue.state === 'error' ? 'Save failed — retrying' : 'All changes saved'}
         </span>
@@ -385,9 +385,9 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
 
       <div className={cn('grid min-h-0 flex-1 gap-0', state.test.examMode === 'coding' ? 'lg:grid-cols-[220px_1fr]' : 'lg:grid-cols-[240px_1fr]')}>
         {/* Navigator + camera */}
-        <aside className="space-y-4 border-b border-white/10 p-4 lg:border-b-0 lg:border-r">
-          {needsCamera && cameraPreview()}
-          <nav aria-label="Questions" className="grid grid-cols-8 gap-1.5 lg:grid-cols-5">
+        <aside className="flex items-start gap-3 border-b border-white/10 p-3 sm:p-4 lg:block lg:space-y-4 lg:border-b-0 lg:border-r">
+          {needsCamera && <div className="shrink-0 [&>div]:w-28 sm:[&>div]:w-40 lg:[&>div]:w-48">{cameraPreview()}</div>}
+          <nav aria-label="Questions" className="grid flex-1 grid-cols-6 gap-1.5 sm:grid-cols-8 lg:grid-cols-5">
             {questions.map((q, i) => {
               const r: any = answers[q.id]?.response;
               const has = r && (r.optionIds?.length || (r.text ?? '').trim() || (r.value ?? '') !== '' || (r.source ?? '').trim());

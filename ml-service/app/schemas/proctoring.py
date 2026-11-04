@@ -48,6 +48,9 @@ class ProctoringPolicy(BaseModel):
     event_cooldown_seconds: int = Field(default=20, ge=3, le=300)
     face_absence_seconds: int = Field(default=5, ge=2, le=120)
     head_turn_degrees: float = Field(default=40, ge=15, le=120)
+    # Looking down (e.g. at a phone or notes) shows up as pitch, not yaw.
+    head_pitch_degrees: float = Field(default=25, ge=10, le=90)
+    gaze_threshold: float = Field(default=0.7, ge=0.3, le=1)
     minimum_confidence: float = Field(default=0.6, ge=0, le=1)
     risk_weights: dict[str, float] = Field(default_factory=lambda: {"face_missing": 35.0, "multiple_faces": 45.0, "unknown_face": 45.0, "head_away": 20.0, "gaze_deviation": 15.0, "camera_obstructed": 25.0, "behavior_anomaly": 30.0})
 

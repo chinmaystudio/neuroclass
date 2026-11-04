@@ -67,20 +67,16 @@ export const CodingWorkspace: React.FC<CodingWorkspaceProps> = ({ mode, language
   const available = useMemo(() => languages.map((id) => allLanguages.find((l) => l.id === id) ?? { id, label: id, monaco: id, fileName: '', compiled: false, starter: '' } as Language), [languages, allLanguages]);
   const language = value?.language ?? languages[0];
   const meta = available.find((l) => l.id === language);
-  const source = value?.source ?? starterCode[language] ?? meta?.starter ?? '';
-
-  // Seed starter code once the language list arrives.
-  useEffect(() => {
-    if (!value && meta?.starter !== undefined && !readOnly) onChange({ language, source: starterCode[language] ?? meta.starter });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meta?.starter]);
+  // The starter template is only displayed; nothing is saved (and the question
+  // does not count as answered) until the student actually edits the code.
+  const starterFor = (id: LanguageId) => starterCode[id] ?? allLanguages.find((l) => l.id === id)?.starter ?? '';
+  const source = value ? value.source : starterFor(language);
 
   const switchLanguage = (next: LanguageId) => {
     if (next === language) return;
-    const nextMeta = available.find((l) => l.id === next);
-    const dirty = source.trim() && source !== (starterCode[language] ?? meta?.starter ?? '');
+    const dirty = source.trim() && source !== starterFor(language);
     if (dirty && !window.confirm('Switching language replaces your current code with the starter template. Continue?')) return;
-    onChange({ language: next, source: starterCode[next] ?? nextMeta?.starter ?? '' });
+    onChange({ language: next, source: starterFor(next) });
     setResult(null);
   };
 

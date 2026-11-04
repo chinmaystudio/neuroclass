@@ -14,3 +14,9 @@ coverage/
 !.env.example
 !backend/.env.example
 !frontend/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

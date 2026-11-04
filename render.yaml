@@ -1,0 +1,25 @@
+# Render Blueprint for the NeuroClass ML proctoring service.
+# The frontend is deployed on Cloudflare Pages and the API on Vercel; only the
+# ML service runs on Render. The browser never calls this service directly:
+# the Vercel API calls it with X-Proctoring-Service-Key.
+services:
+  - type: web
+    name: neuroclass-ml-proctoring
+    runtime: docker
+    rootDir: ml-service
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ML_SERVICE_API_KEY
+        sync: false            # set a long random value; reuse it as ML_PROCTORING_API_KEY on Vercel
+      - key: ML_MODEL_VERSION
+        value: robust-baseline-v1.1.0
+      - key: ML_MAX_REQUEST_BYTES
+        value: "65536"
+      - key: ML_RATE_LIMIT_PER_MINUTE
+        value: "180"
+
+# Code execution is deliberately NOT deployed here. Judge0 and Piston need
+# privileged containers (isolate/nsjail cgroups), which Render web services do
+# not provide. See docs/DEPLOYMENT.md -> "Code execution sandbox".
