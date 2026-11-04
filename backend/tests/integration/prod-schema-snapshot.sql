@@ -279,3 +279,11 @@ CREATE POLICY "Classroom participants read material chunks" ON public.classroom_
 CREATE POLICY "Classroom owners read learning feedback" ON public.learning_feedback FOR SELECT TO authenticated USING ((EXISTS (SELECT 1 FROM classrooms c WHERE ((c.id = learning_feedback.classroom_id) AND (c.user_id = (auth.uid())::text)))));
 
 INSERT INTO storage.buckets (id, name, public) VALUES ('classroom-materials', 'classroom-materials', false);
+
+CREATE OR REPLACE FUNCTION public.update_attendance_verifications_updated_at() RETURNS trigger LANGUAGE plpgsql AS $function$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$function$;
+CREATE TRIGGER set_attendance_verifications_updated_at BEFORE UPDATE ON public.attendance_verifications FOR EACH ROW EXECUTE FUNCTION update_attendance_verifications_updated_at();
