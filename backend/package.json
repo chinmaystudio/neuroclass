@@ -6,7 +6,10 @@
     "dev": "next dev",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:all": "vitest run"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",
@@ -22,13 +25,17 @@
     "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "stripe": "^22.5.0"
+    "stripe": "^22.5.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
+    "pg": "^8.23.1",
     "tsx": "^4.21.0",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "vitest": "^3.2.7"
   }
 }
