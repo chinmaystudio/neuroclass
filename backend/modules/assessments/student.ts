@@ -265,20 +265,22 @@ export async function submitAttempt(attemptId: string, user: AuthedUser) {
   const { attempt, test } = await loadOwnAttempt(attemptId, user);
   if (FINISHED.includes(attempt.status)) return { alreadySubmitted: true, ...(await resultView(attempt, test)) };
   if (attempt.status !== 'in_progress') throw conflict('This attempt cannot be submitted.');
-  await finalizeAttempt(attempt, test, 'student');
+  // Only the request that wins the conditional lock grades the attempt; a
+  // concurrent duplicate (double click, retry) is reported as already submitted.
+  const won = await finalizeAttempt(attempt, test, 'student');
   const { attempt: fresh } = await loadOwnAttempt(attemptId, user);
-  return { alreadySubmitted: false, ...(await resultView(fresh, test)) };
+  return { alreadySubmitted: !won, ...(await resultView(fresh, test)) };
 }
 
 /**
  * Locks the attempt (exactly once, guarded by a conditional update), grades
  * objective and coding answers on the server, and computes the score.
  */
-export async function finalizeAttempt(attempt: AttemptRow, test: TestRow, source: 'student' | 'timeout' | 'teacher') {
+export async function finalizeAttempt(attempt: AttemptRow, test: TestRow, source: 'student' | 'timeout' | 'teacher'): Promise<boolean> {
   const status = source === 'timeout' ? 'auto_submitted' : 'submitted';
   const { data: locked, error } = await db().from('attempts').update({ status, submitted_at: new Date().toISOString(), finished_at: new Date().toISOString(), submission_source: source }).eq('id', attempt.id).eq('status', 'in_progress').select('id');
   if (error) dbFail('lock attempt', error);
-  if (!locked?.length) return; // someone else already finalised it
+  if (!locked?.length) return false; // someone else already finalised it
 
   const config = readConfig(test.config);
   const questions = await loadQuestions(test.id);
@@ -300,6 +302,7 @@ export async function finalizeAttempt(attempt: AttemptRow, test: TestRow, source
   }
   await recomputeAttempt(attempt.id, test, null, true);
   await audit({ actor: attempt.student_id, classroomId: test.classroom_id, entityType: 'attempt', entityId: attempt.id, action: `submit.${source}` });
+  return true;
 }
 
 async function resultView(attempt: AttemptRow, test: TestRow) {
