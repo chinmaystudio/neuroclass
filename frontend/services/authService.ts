@@ -37,9 +37,12 @@ export const authService = {
       email: email.trim().toLowerCase(),
       password,
       options: {
+        // The profile row is created server-side from this metadata by the
+        // nc_on_auth_user_created trigger, so sign-up works without a session.
         data: {
           full_name: name.trim(),
           role: role,
+          phone: phone.trim(),
         },
       },
     });
@@ -60,8 +63,10 @@ export const authService = {
       { onConflict: 'uid' }
     );
 
-    if (profileError) {
-      console.warn('Supabase account created, but the application profile could not be saved:', profileError.message);
+    if (profileError && data.session) {
+      // Without a session (email confirmation pending) this upsert is expected to
+      // be refused; the database trigger has already created the profile.
+      console.warn('Supabase account created, but the application profile could not be updated:', profileError.message);
     }
 
     return data.user;

@@ -1,4 +1,4 @@
-name: NeuroClass CI/CD Pipeline
+name: NeuroClass CI
 
 on:
   push:
@@ -7,47 +7,71 @@ on:
     branches: [main, master]
 
 jobs:
-  build-and-test:
+  frontend:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [22.x]
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22.x
           cache: npm
           cache-dependency-path: package-lock.json
-
-      - name: Install Frontend Dependencies
-        run: npm ci
-
-      - name: Frontend Type Check
+      - run: npm ci
+      - name: Type check
         run: npm run lint
-
-      - name: Frontend Production Build
+      - name: Production build
         run: npm run build
 
-      - name: Install Backend Dependencies
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
         working-directory: backend
         run: npm ci
-
-      - name: Backend Type Check
+      - name: Type check
         working-directory: backend
         run: npm run typecheck
-
-      - name: Backend Production Build
+      - name: Unit tests
+        working-directory: backend
+        run: npm test
+      - name: Prepare test database (schema + all migrations)
+        working-directory: backend
+        run: TEST_DATABASE_ADMIN_URL=postgresql://postgres:postgres@localhost:5432/postgres ./tests/integration/prepare-db.sh
+      - name: Integration tests (authorization, lifecycle, IDOR negatives)
+        working-directory: backend
+        run: TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/neuroclass_test npm run test:integration
+      - name: Production build
         working-directory: backend
         run: npm run build
 
-      - name: Container Build Test
-        uses: docker/build-push-action@v5
+  ml-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          context: .
-          push: false
-          tags: neuroclass:test
+          python-version: "3.12"
+      - run: pip install -r requirements.txt httpx
+      - name: Tests
+        run: ML_SERVICE_API_KEY=ci-test-key python -m pytest -q
+      - name: Behaviour evaluation (synthetic sequences)
+        run: PYTHONPATH=. ML_SERVICE_API_KEY=ci-test-key python scripts/evaluate.py
