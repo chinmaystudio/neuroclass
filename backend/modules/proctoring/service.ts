@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { conflict, db, dbFail, rateLimit, readForm, unavailable, type AuthedUser, ApiError } from '../core/http';
+import { conflict, db, dbFail, durableRateLimit, rateLimit, readForm, unavailable, type AuthedUser, ApiError } from '../core/http';
 import { integrityScore, isExpired, readConfig, readSecurity, riskLevelFrom, type Severity } from '../assessments/domain';
 import { finalizeAttempt, getAttemptState, loadOwnAttempt, type AttemptRow } from '../assessments/student';
 import type { TestRow } from '../assessments/repo';
@@ -118,16 +118,50 @@ export async function heartbeat(attemptId: string, user: AuthedUser, raw: unknow
 }
 
 /* ------------------------------ Identity ------------------------------ */
+const livenessSchema = z.object({
+  passed: z.boolean(),
+  reason: z.enum(['timeout', 'multiple_faces', 'no_face', 'unavailable', 'cancelled']).optional(),
+  durationMs: z.number().min(0).max(600_000),
+  maxYawNegative: z.number().min(-180).max(180),
+  maxYawPositive: z.number().min(-180).max(180),
+  blinks: z.number().int().min(0).max(1000),
+  frames: z.number().int().min(0).max(100_000),
+}).strict();
+type Liveness = z.infer<typeof livenessSchema>;
+
+function parseLiveness(raw: FormDataEntryValue | null): Liveness | null {
+  if (typeof raw !== 'string' || raw.length > 2000) return null;
+  try {
+    const parsed = livenessSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 const MAX_IDENTITY_FAILURES = 3;
 
 export async function verifyIdentity(attemptId: string, user: AuthedUser, request: Request) {
   rateLimit(`identity:${attemptId}`, 10, 60_000);
+  await durableRateLimit('face-identity', user.id, 40, 3600);
   const { attempt, test } = await activeAttempt(attemptId, user, true);
   if (!attempt.student_record_id) throw conflict('Your enrolment record is incomplete. Ask your teacher to re-add you.');
   const security = readSecurity(test.security);
   const { data: enrollment } = await db().from('students').select('id,face_registration_status').eq('id', attempt.student_record_id).maybeSingle();
   const form = await readForm(request, 3_000_000);
   const file = form.get('file');
+  const liveness = parseLiveness(form.get('liveness'));
+  if (security.livenessCheck) {
+    // The browser runs the head-turn + blink check; the server insists on a
+    // passing report (or an explicit "unavailable" on devices that cannot run it).
+    if (!liveness) throw conflict('Complete the liveness check (turn your head to both sides and blink) before verifying.');
+    if (!liveness.passed && liveness.reason !== 'unavailable') throw conflict('The liveness check did not pass. Please try again.');
+    await db().from('attempts').update({ proctoring_state: { ...(attempt.proctoring_state ?? {}), liveness: { ...liveness, at: new Date().toISOString() } } }).eq('id', attemptId);
+    attempt.proctoring_state = { ...(attempt.proctoring_state ?? {}), liveness };
+    await insertEvents(attempt, test, [liveness.passed
+      ? { event_type: 'liveness_passed', category: 'identity', severity: 'info', source: 'browser', confidence: 1, details: { blinks: liveness.blinks, durationMs: liveness.durationMs } }
+      : { event_type: 'liveness_unavailable', category: 'identity', severity: 'low', source: 'browser', confidence: 1, details: {} }]);
+  }
 
   if (String(enrollment?.face_registration_status || '').toUpperCase() !== 'REGISTERED') {
     await insertEvents(attempt, test, [{ event_type: 'identity_not_enrolled', category: 'identity', severity: 'medium', source: 'server', confidence: 1, details: {} }]);
@@ -171,6 +205,7 @@ export async function frameCheck(attemptId: string, user: AuthedUser, request: R
   const { attempt, test } = await activeAttempt(attemptId, user);
   const security = readSecurity(test.security);
   rateLimit(`frame:${attemptId}`, Math.max(2, Math.ceil(120 / security.identityRecheckSeconds) + 2), 120_000);
+  await durableRateLimit('face-frame', attemptId, Math.ceil(3600 / security.identityRecheckSeconds) + 20, 3600);
   if (!security.liveProctoring && !security.requireIdentityVerification) return { checked: false, reason: 'not_required' };
   if (!attempt.student_record_id || !isFaceServiceConfigured()) return { checked: false, reason: 'service_unavailable' };
   const form = await readForm(request, 3_000_000);

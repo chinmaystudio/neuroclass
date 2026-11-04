@@ -1,21 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
 import { 
-  BarChart3, Award, ShieldCheck, CheckCircle2, TrendingUp, Sparkles, BookOpen
+  BarChart3, Award, TrendingUp, Sparkles, BookOpen, Hourglass
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../features/lms/api';
+import type { StudentTest } from '../../features/lms/types';
 
+/** Only released results count; nothing is estimated or invented. */
 export const StudentPerformance: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
   const [summary, setSummary] = useState({
     totalExams: 0,
     averagePercent: 0,
     highestPercent: 0,
-    proctoringScore: 100,
+    awaiting: 0,
   });
 
   useEffect(() => {
@@ -26,45 +28,30 @@ export const StudentPerformance: React.FC = () => {
 
   const fetchPerformanceData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { data: results, error } = await (supabase.from('attempts') as any)
-        .select('*, tests(title, total_marks, classrooms(name))')
-        .eq('student_id', user!.id)
-        .in('status', ['submitted', 'flagged'])
-        .order('submitted_at', { ascending: true })
-        .limit(200);
-      if (error) throw error;
-
-      const records = results || [];
-      let sumPct = 0;
-      let maxPct = 0;
-
-      const formatted = records.map((r, index) => {
-        const total = r.tests?.total_marks || 100;
-        const pct = Math.min(100, Math.round(((r.score || 0) / total) * 100));
-        sumPct += pct;
-        if (pct > maxPct) maxPct = pct;
-
-        return {
-          name: r.tests?.title || `Exam #${index + 1}`,
-          score: r.score || 0,
-          total,
-          percentage: pct,
-          classroom: r.tests?.classrooms?.name || 'Class',
-        };
-      });
-
-      const avg = records.length > 0 ? Math.round(sumPct / records.length) : 0;
-
+      const { tests } = await api.get<{ tests: StudentTest[] }>('me/tests');
+      const finished = tests.filter((t) => t.lastAttemptId);
+      const released = finished
+        .filter((t) => t.result && t.result.percentage !== null)
+        .sort((a, b) => new Date(a.submittedAt ?? 0).getTime() - new Date(b.submittedAt ?? 0).getTime());
+      const formatted = released.map((t) => ({
+        name: t.title,
+        score: t.result!.score ?? 0,
+        total: t.result!.maxScore ?? t.totalMarks,
+        percentage: Math.max(0, Math.min(100, Math.round(t.result!.percentage ?? 0))),
+        classroom: t.classroomName || 'Class',
+      }));
+      const sum = formatted.reduce((acc, r) => acc + r.percentage, 0);
       setChartData(formatted);
       setSummary({
-        totalExams: records.length,
-        averagePercent: avg,
-        highestPercent: maxPct,
-        proctoringScore: 100,
+        totalExams: finished.length,
+        averagePercent: formatted.length ? Math.round(sum / formatted.length) : 0,
+        highestPercent: formatted.reduce((m, r) => Math.max(m, r.percentage), 0),
+        awaiting: finished.length - formatted.length,
       });
-    } catch (e) {
-      console.error('Error loading performance data:', e);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load your results.');
     } finally {
       setLoading(false);
     }
@@ -79,15 +66,16 @@ export const StudentPerformance: React.FC = () => {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
           <BarChart3 className="text-purple-500" size={32} />
           Performance & Analytics
         </h1>
         <p className="text-slate-500 text-sm mt-1">
-          Detailed metrics on your exam scores, grade progression, and AI proctoring compliance.
+          Your released exam results across all classrooms.
         </p>
+        {error && <p className="mt-3 text-sm text-red-500">{error} <button type="button" className="underline" onClick={fetchPerformanceData}>Retry</button></p>}
       </div>
 
       {/* Summary Stat Cards */}
@@ -107,7 +95,7 @@ export const StudentPerformance: React.FC = () => {
             <TrendingUp className="text-indigo-500" size={20} />
           </div>
           <p className="text-3xl font-black text-slate-900 dark:text-white">{summary.averagePercent}%</p>
-          <p className="text-xs text-slate-500 mt-1">Cumulative Mean Score</p>
+          <p className="text-xs text-slate-500 mt-1">Mean of released results</p>
         </div>
 
         <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
@@ -121,11 +109,11 @@ export const StudentPerformance: React.FC = () => {
 
         <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Proctor Compliance</span>
-            <ShieldCheck className="text-emerald-500" size={20} />
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Awaiting Results</span>
+            <Hourglass className="text-amber-500" size={20} />
           </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{summary.proctoringScore}%</p>
-          <p className="text-xs text-emerald-500 font-semibold mt-1">Zero Integrity Flagged Violations</p>
+          <p className="text-3xl font-black text-slate-900 dark:text-white">{summary.awaiting}</p>
+          <p className="text-xs text-slate-500 mt-1">Submitted, not yet released</p>
         </div>
       </div>
 
@@ -143,7 +131,7 @@ export const StudentPerformance: React.FC = () => {
         {chartData.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center border border-dashed border-black/10 dark:border-white/10 rounded-2xl text-slate-400 text-sm">
             <BarChart3 size={40} className="mb-2 opacity-50" />
-            No exam results recorded yet. Complete an active test to view performance analytics.
+            No released results yet. Results appear here once your teacher publishes them.
           </div>
         ) : (
           <div className="h-72 w-full">

@@ -34,7 +34,13 @@ async function request<T>(method: string, path: string, body?: unknown, init: { 
     response = await fetch(getApiUrl(init.absolute ? path : `/api/v1/${path}`), { method, headers, body: payload, signal: init.signal, keepalive: init.keepalive });
   } catch (error) {
     if ((error as Error).name === 'AbortError') throw error;
-    throw new ApiRequestError('You appear to be offline. Your work is kept on this device and will be sent when you reconnect.', 0, 'network');
+    // fetch() also fails like this when the server is unreachable or rejects the
+    // request at the network/CORS level, so only blame the connection when the
+    // browser reports being offline.
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    throw new ApiRequestError(offline
+      ? 'You appear to be offline. Your work is kept on this device and will be sent when you reconnect.'
+      : 'Can’t reach the NeuroClass server right now. Please try again in a moment; if this keeps happening, tell your teacher or administrator.', 0, 'network');
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -52,9 +58,10 @@ export const api = {
   del: <T,>(path: string) => request<T>('DELETE', path),
   /** For older non-versioned routes such as /api/ai/generate-test. */
   postLegacy: <T,>(path: string, body: unknown) => request<T>('POST', path, body, { absolute: true }),
-  upload: <T,>(path: string, file: Blob, fileName = 'upload') => {
+  upload: <T,>(path: string, file: Blob, fileName = 'upload', fields?: Record<string, string>) => {
     const form = new FormData();
     form.append('file', file, fileName);
+    Object.entries(fields ?? {}).forEach(([key, value]) => form.append(key, value));
     return request<T>('POST', path, undefined, { form });
   },
 };

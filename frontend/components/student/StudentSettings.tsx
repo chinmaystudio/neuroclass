@@ -43,10 +43,8 @@ export const StudentSettings: React.FC<StudentSettingsProps> = ({ onRegisterFace
     if (!user || !window.confirm('Are you sure you want to clear your Face-ID biometric data across all enrolled classrooms?')) return;
     setClearing(true);
     try {
-      const { error } = await supabase
-        .from('students')
-        .update({ face_registration_status: 'PENDING' })
-        .eq('user_id', user.id);
+      // Deletes stored face embeddings and profiles for every classroom.
+      const { error } = await (supabase as any).rpc('nc_clear_my_face_data');
       if (error) throw error;
       setHasBiometric(false);
     } catch (e) {

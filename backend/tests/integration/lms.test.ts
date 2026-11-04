@@ -23,6 +23,9 @@ const S_A2 = { id: '5c000000-0000-4000-8000-00000000005c', email: 'student.a2@sc
 
 let pg: PgSupabase;
 
+/** What the browser liveness check (head turn + blink) reports. */
+const LIVE = JSON.stringify({ passed: true, durationMs: 4200, maxYawNegative: -26, maxYawPositive: 24, blinks: 1, frames: 46 });
+
 async function call(method: string, path: string, token: string | null, body?: unknown, form?: FormData) {
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -138,8 +141,20 @@ suite('consolidated LMS (integration)', () => {
       expect((await call('POST', `attempts/${attemptId}/begin`, S_A.token)).status).toBe(409); // identity first
     });
 
+    it('face verification requires a passing liveness report first', async () => {
+      const frame = (liveness?: string) => { const f = new FormData(); f.append('file', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])], 'f.jpg', { type: 'image/jpeg' })); if (liveness) f.append('liveness', liveness); return f; };
+      (globalThis as any).__faceMode = 'match';
+      const missing = await call('POST', `attempts/${attemptId}/identity`, S_A.token, undefined, frame());
+      expect(missing.status).toBe(409);
+      expect(missing.body.error).toMatch(/liveness/i);
+      const failed = await call('POST', `attempts/${attemptId}/identity`, S_A.token, undefined, frame(JSON.stringify({ passed: false, reason: 'timeout', durationMs: 25000, maxYawNegative: -3, maxYawPositive: 4, blinks: 0, frames: 200 })));
+      expect(failed.status).toBe(409);
+      const forged = await call('POST', `attempts/${attemptId}/identity`, S_A.token, undefined, frame(JSON.stringify({ passed: true, extra: 'x' })));
+      expect(forged.status).toBe(409);
+    });
+
     it('face verification rejects a mismatch, then accepts the enrolled student', async () => {
-      const jpeg = () => { const f = new FormData(); f.append('file', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])], 'f.jpg', { type: 'image/jpeg' })); return f; };
+      const jpeg = () => { const f = new FormData(); f.append('file', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])], 'f.jpg', { type: 'image/jpeg' })); f.append('liveness', LIVE); return f; };
       (globalThis as any).__faceMode = 'other';
       const bad = await call('POST', `attempts/${attemptId}/identity`, S_A.token, undefined, jpeg());
       expect(bad.body).toMatchObject({ verified: false, reason: 'mismatch', identityStatus: 'pending' });
@@ -152,7 +167,7 @@ suite('consolidated LMS (integration)', () => {
     });
 
     it('rejects a non-image upload pretending to be a camera frame', async () => {
-      const f = new FormData(); f.append('file', new File([new Uint8Array([0x4d, 0x5a, 0, 0])], 'x.jpg', { type: 'image/jpeg' }));
+      const f = new FormData(); f.append('file', new File([new Uint8Array([0x4d, 0x5a, 0, 0])], 'x.jpg', { type: 'image/jpeg' })); f.append('liveness', LIVE);
       expect((await call('POST', `attempts/${attemptId}/identity`, S_A.token, undefined, f)).status).toBe(415);
     });
 
@@ -445,9 +460,13 @@ suite('consolidated LMS (integration)', () => {
       await call('POST', `attempts/${a.attempt.id}/consent`, S_A.token);
       const saved = process.env.AI_SERVICE_URL; delete process.env.AI_SERVICE_URL;
       const f = new FormData(); f.append('file', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'f.jpg', { type: 'image/jpeg' }));
+      // A device that cannot run the liveness model reports "unavailable": allowed, but recorded for the teacher.
+      f.append('liveness', JSON.stringify({ passed: false, reason: 'unavailable', durationMs: 0, maxYawNegative: 0, maxYawPositive: 0, blinks: 0, frames: 0 }));
       const res = await call('POST', `attempts/${a.attempt.id}/identity`, S_A.token, undefined, f);
       process.env.AI_SERVICE_URL = saved;
       expect(res.body).toMatchObject({ verified: false, reason: 'service_unavailable', identityStatus: 'manual_review', canProceed: true });
+      const ev = await pg.pool.query("select event_type from proctoring_events where attempt_id = $1 order by occurred_at", [a.attempt.id]);
+      expect(ev.rows.map((r: any) => r.event_type)).toContain('liveness_unavailable');
       expect((await call('POST', `attempts/${a.attempt.id}/begin`, S_A.token)).body.attempt.status).toBe('in_progress');
     });
     it('rejects malformed ids and oversized bodies safely', async () => {
@@ -459,6 +478,60 @@ suite('consolidated LMS (integration)', () => {
     it('records audit logs for teacher and student actions', async () => {
       const { rows } = await pg.pool.query("select action from assessment_audit_logs where entity_id = $1 order by created_at", [testId]);
       expect(rows.map((r) => r.action)).toEqual(expect.arrayContaining(['create', 'questions.replace', 'publish', 'results.release']));
+    });
+  });
+
+  describe('Scenario G — tests imported from the retired portal (production-shaped seed)', () => {
+    const LT = { id: 'a0000000-0000-4000-8000-000000000001', email: 'legacy.teacher@example.test', token: 'token-legacy-teacher-01234' };
+    const LS = { id: 'a0000000-0000-4000-8000-000000000002', email: 'legacy.student@example.test', token: 'token-legacy-student-01234' };
+    const LO = { id: 'a0000000-0000-4000-8000-000000000004', email: 'other.student@example.test', token: 'token-legacy-other-0123456' };
+    const PHYS = 'c0000000-0000-4000-8000-000000000001';
+    const CHEM = 'c0000000-0000-4000-8000-000000000002';
+    beforeAll(() => { for (const u of [LT, LS, LO]) pg.users.set(u.token, { id: u.id, email: u.email }); });
+
+    it('teacher sees imported tests in the right classrooms with totals from the questions', async () => {
+      const phys = await call('GET', `classrooms/${PHYS}/tests`, LT.token);
+      expect(phys.status).toBe(200);
+      const byTitle = new Map(phys.body.tests.map((t: any) => [t.title, t]));
+      const proctored: any = byTitle.get('Portal proctored test');
+      expect(proctored).toMatchObject({ status: 'published', totalMarks: 4, passingMarks: 1.6, questionCount: 3, durationMinutes: 60, availability: 'ended' });
+      expect(proctored.security).toMatchObject({ requireIdentityVerification: true, requireCamera: true, requireFullscreen: true, liveProctoring: true, blockClipboard: true });
+      expect(proctored.config).toMatchObject({ attemptLimit: 1, shuffleQuestions: true, negativeMarking: true, showCorrectAnswers: true });
+      expect(byTitle.get('Portal draft quiz')).toMatchObject({ status: 'draft', totalMarks: 1, scheduledEnd: null });
+      const chem = await call('GET', `classrooms/${CHEM}/tests`, LT.token);
+      // A portal test without a classroom lands as a draft in the teacher's newest classroom.
+      expect(chem.body.tests.map((t: any) => `${t.title}:${t.status}:${t.resultsReleased}`)).toEqual(['Portal live test:draft:false']);
+    });
+
+    it('answer keys survive the import for the teacher', async () => {
+      const list = await call('GET', `classrooms/${PHYS}/tests`, LT.token);
+      const id = list.body.tests.find((t: any) => t.title === 'Portal proctored test').id;
+      const full = await call('GET', `tests/${id}`, LT.token);
+      expect(full.status).toBe(200);
+      expect(full.body.questions.map((q: any) => q.options.find((o: any) => o.isCorrect)?.text)).toEqual(['Newton', '3e8 m/s', '9.8 m/s2']);
+      expect(full.body.questions[1].negativeMarks).toBe(0.25);
+    });
+
+    it('students see the published import without answers; drafts and other classrooms stay hidden', async () => {
+      const mine = await call('GET', 'me/tests', LS.token);
+      expect(mine.status).toBe(200);
+      expect(mine.body.tests.map((t: any) => t.title)).toEqual(['Portal proctored test']);
+      expect(JSON.stringify(mine.body)).not.toMatch(/isCorrect|answer_key|correctOptionIds/);
+      const other = await call('GET', 'me/tests', LO.token);
+      expect(other.body.tests).toEqual([]);
+      expect((await call('GET', `classrooms/${PHYS}/tests`, LO.token)).status).toBe(404);
+    });
+
+    it('the teacher can reopen the imported draft in a new window and students can then take it', async () => {
+      const list = await call('GET', `classrooms/${PHYS}/tests`, LT.token);
+      const draft = list.body.tests.find((t: any) => t.title === 'Portal draft quiz');
+      const start = new Date(Date.now() - 60_000).toISOString();
+      const end = new Date(Date.now() + 3_600_000).toISOString();
+      const pub = await call('POST', `tests/${draft.id}/publish`, LT.token, { scheduledStart: start, scheduledEnd: end });
+      expect(pub.status).toBe(200);
+      const begin = await call('POST', `tests/${draft.id}/attempts`, LS.token);
+      expect(begin.status).toBe(200);
+      expect(['calibrating', 'in_progress']).toContain(begin.body.attempt.status);
     });
   });
 });

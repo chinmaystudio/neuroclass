@@ -22,7 +22,7 @@ export const EnrolledClasses: React.FC<EnrolledClassesProps> = ({ onJoinClick, o
       try {
         const { data, error } = await supabase
           .from('students')
-          .select('*, classrooms(*)')
+          .select('id,classroom_id,user_id,name,roll_number,email,joined_at,face_registration_status, classrooms(id,name,code,subject,status,students,created_at)')
           .eq('user_id', user.id)
           .order('joined_at', { ascending: false });
 

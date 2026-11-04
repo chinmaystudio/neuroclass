@@ -40,7 +40,7 @@ export type TestConfig = {
   releaseResultsImmediately: boolean; showCorrectAnswers: boolean; submissionGraceSeconds: number;
 };
 export type SecurityConfig = {
-  requireCamera: boolean; requireIdentityVerification: boolean; requireFullscreen: boolean; tabSwitchDetection: boolean; blockClipboard: boolean;
+  requireCamera: boolean; requireIdentityVerification: boolean; livenessCheck: boolean; requireFullscreen: boolean; tabSwitchDetection: boolean; blockClipboard: boolean;
   liveProctoring: boolean; identityRecheckSeconds: number; proctoringFailurePolicy: 'block' | 'warn' | 'manual_review';
   cameraDisconnectPolicy: 'flag' | 'pause'; fullscreenExitPolicy: 'flag' | 'pause'; warningEscalationThreshold: number;
   thresholds: { lookAwaySeconds: number; headYawDegrees: number; headPitchDegrees: number; faceAbsentSeconds: number; multiFaceSeconds: number; cooldownSeconds: number };
@@ -61,7 +61,7 @@ export type StudentTest = {
   scheduledStart: string | null; scheduledEnd: string | null; examMode: 'standard' | 'coding'; availability: Availability; proctored: boolean;
   requirements: { camera: boolean; identity: boolean; fullscreen: boolean }; attemptLimit: number; attemptsUsed: number; openAttemptId: string | null; canStart: boolean;
   myStatus: 'not_started' | 'in_progress' | 'submitted' | 'evaluated' | 'results_published' | 'missed';
-  result: { attemptId: string; score: number | null; maxScore: number | null; percentage: number | null } | null; lastAttemptId: string | null;
+  result: { attemptId: string; score: number | null; maxScore: number | null; percentage: number | null } | null; lastAttemptId: string | null; submittedAt?: string | null;
   classroomId?: string; classroomName?: string;
 };
 
@@ -73,7 +73,7 @@ export type StudentQuestion = {
 export type AttemptState = {
   attempt: { id: string; status: string; attemptNumber: number; startedAt: string; expiresAt: string | null; identityStatus: 'not_required' | 'pending' | 'verified' | 'failed' | 'manual_review'; consentAt: string | null; warningCount: number };
   serverTime: string;
-  test: { id: string; title: string; instructions: string | null; description: string | null; durationMinutes: number; totalMarks: number; examMode: 'standard' | 'coding'; allowBackNavigation: boolean; security: Pick<SecurityConfig, 'requireCamera' | 'requireIdentityVerification' | 'requireFullscreen' | 'tabSwitchDetection' | 'blockClipboard' | 'liveProctoring' | 'identityRecheckSeconds' | 'proctoringFailurePolicy' | 'cameraDisconnectPolicy' | 'fullscreenExitPolicy' | 'thresholds'> };
+  test: { id: string; title: string; instructions: string | null; description: string | null; durationMinutes: number; totalMarks: number; examMode: 'standard' | 'coding'; allowBackNavigation: boolean; security: Pick<SecurityConfig, 'requireCamera' | 'requireIdentityVerification' | 'livenessCheck' | 'requireFullscreen' | 'tabSwitchDetection' | 'blockClipboard' | 'liveProctoring' | 'identityRecheckSeconds' | 'proctoringFailurePolicy' | 'cameraDisconnectPolicy' | 'fullscreenExitPolicy' | 'thresholds'> };
   questions: StudentQuestion[];
   answers: Record<string, { response: unknown; markedForReview: boolean; revision: number; savedAt: string }>;
 };
@@ -110,7 +110,7 @@ export type Submission = {
 
 export const DEFAULT_CONFIG: TestConfig = { attemptLimit: 1, shuffleQuestions: false, shuffleOptions: false, negativeMarking: false, allowBackNavigation: true, releaseResultsImmediately: false, showCorrectAnswers: false, submissionGraceSeconds: 20 };
 export const DEFAULT_SECURITY: SecurityConfig = {
-  requireCamera: false, requireIdentityVerification: false, requireFullscreen: true, tabSwitchDetection: true, blockClipboard: true, liveProctoring: false,
+  requireCamera: false, requireIdentityVerification: false, livenessCheck: true, requireFullscreen: true, tabSwitchDetection: true, blockClipboard: true, liveProctoring: false,
   identityRecheckSeconds: 180, proctoringFailurePolicy: 'warn', cameraDisconnectPolicy: 'flag', fullscreenExitPolicy: 'flag', warningEscalationThreshold: 5,
   thresholds: { lookAwaySeconds: 4, headYawDegrees: 35, headPitchDegrees: 25, faceAbsentSeconds: 5, multiFaceSeconds: 2, cooldownSeconds: 20 }, evidenceRetentionDays: 30,
 };

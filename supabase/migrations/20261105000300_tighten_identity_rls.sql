@@ -13,10 +13,11 @@ DECLARE
   meta jsonb := coalesce(NEW.raw_user_meta_data, '{}'::jsonb);
   requested_role text := lower(coalesce(meta ->> 'role', ''));
 BEGIN
-  INSERT INTO public.users (uid, email, role, mobile_number)
+  INSERT INTO public.users (uid, email, displayname, role, mobile_number)
   VALUES (
     NEW.id::text,
     coalesce(NEW.email, ''),
+    nullif(left(coalesce(meta ->> 'full_name', meta ->> 'name', ''), 200), ''),
     CASE WHEN requested_role IN ('teacher', 'student') THEN requested_role ELSE 'student' END,
     nullif(left(coalesce(meta ->> 'phone', ''), 32), '')
   )

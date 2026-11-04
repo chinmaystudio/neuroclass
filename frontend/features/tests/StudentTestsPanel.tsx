@@ -83,7 +83,7 @@ export const StudentTestsPanel: React.FC<{ classroomId?: string; onCountChange?:
   );
 };
 
-const ResultModal: React.FC<{ attemptId: string; onClose: () => void }> = ({ attemptId, onClose }) => {
+export const ResultModal: React.FC<{ attemptId: string; onClose: () => void }> = ({ attemptId, onClose }) => {
   const result = useAsync(() => api.get<any>(`attempts/${attemptId}/result`), [attemptId]);
   const [appeal, setAppeal] = useState('');
   const [appealState, setAppealState] = useState<{ sending: boolean; message?: string; error?: string }>({ sending: false });

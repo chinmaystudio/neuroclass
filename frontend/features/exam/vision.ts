@@ -24,6 +24,8 @@ export function loadFaceLandmarker() {
         runningMode: 'VIDEO',
         numFaces: 4,
         outputFacialTransformationMatrixes: true,
+        // Eye-blink scores power the liveness check before Face ID.
+        outputFaceBlendshapes: true,
         minFaceDetectionConfidence: 0.5,
         minFacePresenceConfidence: 0.5,
       });
@@ -46,6 +48,8 @@ export type VisionSample = {
   gazeVertical: number | null;
   frameQuality: number;
   movement: number;
+  /** Mean eye-closure score of the primary face, 0 (open) to 1 (closed). */
+  eyesClosed: number | null;
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -114,6 +118,10 @@ export function analyzeFrame(landmarker: FaceLandmarker, video: HTMLVideoElement
   const matrix = result.facialTransformationMatrixes?.[0]?.data;
   const pose = matrix ? headPose(Array.from(matrix)) : null;
   const g = primary ? gaze(primary) : { h: null, v: null };
+  const shapes = result.faceBlendshapes?.[0]?.categories ?? [];
+  const score = (name: string) => shapes.find((c) => c.categoryName === name)?.score;
+  const left = score('eyeBlinkLeft');
+  const right = score('eyeBlinkRight');
   return {
     faceCount: faces.length,
     boxes: faces.map(boxOf),
@@ -124,5 +132,6 @@ export function analyzeFrame(landmarker: FaceLandmarker, video: HTMLVideoElement
     gazeVertical: g.v === null ? null : Math.round(g.v * 100) / 100,
     frameQuality: stats.quality,
     movement: stats.movement,
+    eyesClosed: left === undefined || right === undefined ? null : Math.round(((left + right) / 2) * 100) / 100,
   };
 }

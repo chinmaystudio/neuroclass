@@ -156,6 +156,29 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
   }
 }
 
+let durableUnavailableLogged = false;
+/**
+ * Rate limit that holds across serverless instances (Postgres-backed via
+ * nc_rate_limit_hit). Falls back to the per-instance limiter if the database
+ * function is unreachable, so a DB hiccup never blocks legitimate users.
+ */
+export async function durableRateLimit(bucket: string, subject: string, limit: number, windowSeconds: number) {
+  try {
+    const { data, error } = await (db() as any).rpc('nc_rate_limit_hit', {
+      p_bucket: bucket, p_subject: subject, p_window_seconds: windowSeconds, p_max: limit,
+    });
+    if (error) throw error;
+    if (data === false) throw tooMany();
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (!durableUnavailableLogged) {
+      durableUnavailableLogged = true;
+      console.warn('[rate-limit] durable limiter unavailable, using per-instance limits', (error as Error)?.message);
+    }
+    rateLimit(`${bucket}:${subject}`, limit, windowSeconds * 1000);
+  }
+}
+
 export const isUuid = (value: unknown): value is string =>
   typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 

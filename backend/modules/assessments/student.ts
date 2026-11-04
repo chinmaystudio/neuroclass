@@ -53,6 +53,7 @@ export async function listStudentTests(classroomId: string, user: AuthedUser) {
       myStatus: open ? 'in_progress' : latest ? (t.results_released && latest.status === 'evaluated' ? 'results_published' : latest.status === 'evaluated' ? 'evaluated' : 'submitted') : availability === 'ended' ? 'missed' : 'not_started',
       result: latest && t.results_released ? { attemptId: latest.id, score: latest.score === null ? null : Number(latest.score), maxScore: latest.max_score === null ? null : Number(latest.max_score), percentage: latest.percentage === null ? null : Number(latest.percentage) } : null,
       lastAttemptId: latest?.id ?? null,
+      submittedAt: latest?.submitted_at ?? null,
     };
   });
 }
@@ -180,7 +181,7 @@ export async function getAttemptState(attemptId: string, user: AuthedUser) {
     test: {
       id: test.id, title: test.title, instructions: test.instructions, description: test.description, durationMinutes: durationOf(test), totalMarks: Number(test.total_marks ?? 0),
       examMode: test.exam_mode ?? 'standard', allowBackNavigation: config.allowBackNavigation,
-      security: { requireCamera: security.requireCamera || security.liveProctoring || security.requireIdentityVerification, requireIdentityVerification: security.requireIdentityVerification, requireFullscreen: security.requireFullscreen, tabSwitchDetection: security.tabSwitchDetection, blockClipboard: security.blockClipboard, liveProctoring: security.liveProctoring, identityRecheckSeconds: security.identityRecheckSeconds, proctoringFailurePolicy: security.proctoringFailurePolicy, cameraDisconnectPolicy: security.cameraDisconnectPolicy, fullscreenExitPolicy: security.fullscreenExitPolicy, thresholds: security.thresholds },
+      security: { requireCamera: security.requireCamera || security.liveProctoring || security.requireIdentityVerification, requireIdentityVerification: security.requireIdentityVerification, livenessCheck: security.livenessCheck, requireFullscreen: security.requireFullscreen, tabSwitchDetection: security.tabSwitchDetection, blockClipboard: security.blockClipboard, liveProctoring: security.liveProctoring, identityRecheckSeconds: security.identityRecheckSeconds, proctoringFailurePolicy: security.proctoringFailurePolicy, cameraDisconnectPolicy: security.cameraDisconnectPolicy, fullscreenExitPolicy: security.fullscreenExitPolicy, thresholds: security.thresholds },
     },
   };
   // Questions are only revealed once the timer is running.

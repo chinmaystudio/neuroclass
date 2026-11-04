@@ -193,6 +193,7 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
             <Toggle checked={sec.blockClipboard} onChange={(v) => setSec({ blockClipboard: v })} label="Block copy, paste and drag-and-drop" description="A deterrent in answer fields and the code editor, not a guarantee." />
             <Toggle checked={sec.requireCamera} onChange={(v) => setSec({ requireCamera: v })} label="Require camera" />
             <Toggle checked={sec.requireIdentityVerification} onChange={(v) => setSec({ requireIdentityVerification: v, requireCamera: v || sec.requireCamera })} label="Verify identity with Face ID before starting" description="Uses each student’s registered Face ID." />
+            {sec.requireIdentityVerification && <Toggle checked={sec.livenessCheck} onChange={(v) => setSec({ livenessCheck: v })} label="Liveness check before Face ID" description="Students turn their head to both sides and blink, so a photo can’t be used. Runs on the student’s device." />}
             <Toggle checked={sec.liveProctoring} onChange={(v) => setSec({ liveProctoring: v, requireCamera: v || sec.requireCamera })} label="Live AI proctoring" description="On-device face, head-pose and gaze checks plus periodic identity re-checks." />
           </div>
           {(sec.liveProctoring || sec.requireIdentityVerification) && (

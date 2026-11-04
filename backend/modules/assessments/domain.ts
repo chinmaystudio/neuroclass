@@ -164,6 +164,8 @@ export type TestConfig = z.infer<typeof testConfigSchema>;
 export const securityConfigSchema = z.object({
   requireCamera: z.boolean().default(false),
   requireIdentityVerification: z.boolean().default(false),
+  /** Head-turn + blink check in the browser before each Face ID capture. */
+  livenessCheck: z.boolean().default(true),
   requireFullscreen: z.boolean().default(true),
   tabSwitchDetection: z.boolean().default(true),
   blockClipboard: z.boolean().default(true),

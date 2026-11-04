@@ -44,6 +44,20 @@ export class PgSupabase {
     return new Builder(this, table);
   }
 
+  /** PostgREST-style RPC: named arguments to a public function. */
+  async rpc(fn: string, args: Record<string, unknown> = {}) {
+    if (!/^[a-z_][a-z0-9_]*$/.test(fn)) return { data: null, error: { message: 'invalid function' } };
+    const keys = Object.keys(args);
+    if (keys.some((k) => !/^[a-z_][a-z0-9_]*$/.test(k))) return { data: null, error: { message: 'invalid argument' } };
+    const sql = `select public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as result`;
+    try {
+      const { rows } = await this.pool.query(sql, keys.map((k) => args[k]));
+      return { data: rows[0]?.result ?? null, error: null };
+    } catch (e: any) {
+      return { data: null, error: { message: e.message, code: e.code } };
+    }
+  }
+
   auth = {
     getUser: async (token: string) => {
       const user = this.users.get(token);

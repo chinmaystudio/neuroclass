@@ -49,26 +49,8 @@ export const authService = {
 
     if (error) throw formatAuthError(error);
     if (!data.user) throw new Error('Sign-up did not return a user. Please try again.');
-
-    const { error: profileError } = await supabase.from('users').upsert(
-      {
-        uid: data.user.id,
-        email: data.user.email,
-        displayName: name.trim(),
-        photoURL: '',
-        mobile_number: phone.trim(),
-        role: role,
-        createdAt: new Date().toISOString(),
-      },
-      { onConflict: 'uid' }
-    );
-
-    if (profileError && data.session) {
-      // Without a session (email confirmation pending) this upsert is expected to
-      // be refused; the database trigger has already created the profile.
-      console.warn('Supabase account created, but the application profile could not be updated:', profileError.message);
-    }
-
+    // public.users is created by the database (nc_on_auth_user_created) from the
+    // metadata above; the role cannot be changed from the browser afterwards.
     return data.user;
   },
 
@@ -84,23 +66,6 @@ export const authService = {
     if (!data.user) throw new Error('Sign-in did not return a user. Please try again.');
 
     return data.user;
-  },
-
-  async setUserRole(uid: string, role: AppRole): Promise<void> {
-    if (!uid) return;
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('users').upsert(
-          {
-            uid,
-            role,
-          },
-          { onConflict: 'uid' }
-        );
-      } catch (err) {
-        console.warn('Unable to persist role update to Supabase:', err);
-      }
-    }
   },
 
   async getUserRole(uid: string): Promise<AppRole> {

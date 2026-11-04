@@ -4,6 +4,7 @@ import { api, ApiRequestError } from '../lms/api';
 import type { AttemptState } from '../lms/types';
 import { Button, ErrorNote } from '../lms/ui';
 import { useExamProctoring } from './useExamProctoring';
+import { LIVENESS_MESSAGES, runLivenessCheck, type LivenessProgress, type LivenessResult } from './liveness';
 import { useAnswerQueue } from './useAnswerQueue';
 import { QuestionView } from './QuestionView';
 import { cn } from '../../lib/utils';
@@ -38,6 +39,7 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [reverify, setReverify] = useState(false);
+  const [liveness, setLiveness] = useState<LivenessProgress | null>(null);
   const [result, setResult] = useState<any>(null);
   const submittingRef = useRef(false);
 
@@ -165,11 +167,24 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
 
   const verifyIdentity = async () => {
     if (!attemptId) return;
-    setIdentity({ status: 'checking' });
+    let report: LivenessResult | null = null;
+    if (security?.livenessCheck !== false) {
+      const video = proctor.videoRef.current;
+      if (!video) { setIdentity({ status: 'failed', message: 'The camera is not ready yet. Wait a second and try again.' }); return; }
+      setIdentity({ status: 'checking', message: 'Liveness check: follow the prompts on the camera preview.' });
+      setLiveness({ step: 'turn', turnedA: false, turnedB: false, blinked: false, faces: 0 });
+      report = await runLivenessCheck(video, setLiveness);
+      setLiveness(null);
+      if (!report.passed && report.reason !== 'unavailable') {
+        setIdentity({ status: 'failed', message: LIVENESS_MESSAGES[report.reason ?? 'timeout'] });
+        return;
+      }
+    }
+    setIdentity({ status: 'checking', message: 'Checking your face against your registered Face ID…' });
     const frame = await proctor.captureFrame();
     if (!frame) { setIdentity({ status: 'failed', message: 'The camera is not ready yet. Wait a second and try again.' }); return; }
     try {
-      const res = await api.upload<{ verified: boolean; message?: string; canProceed?: boolean; identityStatus: string }>(`attempts/${attemptId}/identity`, frame, 'identity.jpg');
+      const res = await api.upload<{ verified: boolean; message?: string; canProceed?: boolean; identityStatus: string }>(`attempts/${attemptId}/identity`, frame, 'identity.jpg', report ? { liveness: JSON.stringify(report) } : undefined);
       setIdentity(res.verified ? { status: 'ok', message: 'Identity verified.' } : { status: 'failed', message: res.message, canProceed: res.canProceed });
       if (res.verified || res.canProceed) setReverify(false);
     } catch (err) {
@@ -321,6 +336,7 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
         <div className="grid gap-6 md:grid-cols-[1fr_1fr]">
           <div className="space-y-3">
             {needsCamera ? cameraPreview(true) : <div className="rounded-2xl border border-white/10 p-6 text-sm text-slate-400">This exam does not use your camera.</div>}
+            {liveness && <LivenessPrompt progress={liveness} />}
             {needsCamera && proctor.cameraStatus === 'blocked' && <ErrorNote message="Camera access was blocked. Allow the camera in your browser’s site settings, then press Retry." onRetry={() => void proctor.startCamera()} />}
           </div>
           <ol className="space-y-3 text-sm">
@@ -430,6 +446,7 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
           <h2 className="text-xl font-black">Verify your identity again</h2>
           <p className="text-sm text-slate-300">Your face did not match your registered Face ID. Look at the camera and verify to continue. Your teacher can review this.</p>
           <div className="mx-auto w-fit">{cameraPreview()}</div>
+          {liveness && <LivenessPrompt progress={liveness} />}
           {identity.message && <p className="text-xs text-amber-300">{identity.message}</p>}
           <Button variant="student" loading={identity.status === 'checking'} onClick={() => void verifyIdentity()}>Verify now</Button>
         </Overlay>
@@ -457,6 +474,28 @@ const Overlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const Info: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
   <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">{icon}{label}</p><p className="mt-1 text-sm font-bold">{value}</p></div>
 );
+const LivenessPrompt: React.FC<{ progress: LivenessProgress }> = ({ progress }) => {
+  const text = progress.faces > 1 ? 'Only you should be in view.'
+    : progress.faces === 0 ? 'Move so your whole face is in the frame.'
+    : progress.step === 'turn' ? (progress.turnedA || progress.turnedB ? 'Good — now turn your head slowly to the other side.' : 'Turn your head slowly to one side.')
+    : progress.step === 'blink' ? 'Now blink once.'
+    : 'Look straight at the camera.';
+  const pill = (done: boolean, label: string) => (
+    <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-bold', done ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-slate-300')}>{done ? '✓ ' : ''}{label}</span>
+  );
+  return (
+    <div role="status" aria-live="polite" className="space-y-2 rounded-2xl border border-purple-400/30 bg-purple-500/10 p-4 text-left">
+      <p className="text-sm font-bold text-white">{text}</p>
+      <div className="flex flex-wrap gap-2">
+        {pill(progress.turnedA, 'One side')}
+        {pill(progress.turnedB, 'Other side')}
+        {pill(progress.blinked, 'Blink')}
+        {pill(progress.step === 'done', 'Face camera')}
+      </div>
+    </div>
+  );
+};
+
 const Step: React.FC<{ done: boolean; label: string; detail: string; action?: React.ReactNode; tone?: 'error' }> = ({ done, label, detail, action, tone }) => (
   <li className="flex items-start gap-3 rounded-2xl border border-white/10 p-4">
     {done ? <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-400" size={18} /> : tone === 'error' ? <XCircle className="mt-0.5 shrink-0 text-rose-400" size={18} /> : <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full border-2 border-slate-500" />}

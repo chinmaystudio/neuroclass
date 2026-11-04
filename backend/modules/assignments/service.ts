@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { badRequest, conflict, db, dbFail, forbidden, notFound, rateLimit, readForm, type AuthedUser } from '../core/http';
+import { badRequest, conflict, db, dbFail, durableRateLimit, forbidden, notFound, rateLimit, readForm, type AuthedUser } from '../core/http';
 import { audit, requireTeacher, resolveClassroomAccess } from '../core/access';
 import { putObject, removeObjects, signedDownload, SUPPORTED_EXTENSIONS, validateUpload } from '../core/storage';
 import { LANGUAGE_IDS } from '../coding/languages';
@@ -201,6 +201,7 @@ export async function getAssignment(id: string, user: AuthedUser) {
 export async function uploadAttachment(id: string, user: AuthedUser, request: Request) {
   const { assignment } = await teacherAssignment(id, user);
   rateLimit(`upload:${user.id}`, 30, 60_000);
+  await durableRateLimit('upload', user.id, 300, 3600);
   const form = await readForm(request, 26 * 1_048_576);
   const file = form.get('file') as File;
   const meta = await validateUpload(file, SUPPORTED_EXTENSIONS, 25 * 1_048_576);
@@ -299,6 +300,7 @@ export async function saveDraft(id: string, user: AuthedUser, raw: unknown) {
 
 export async function uploadSubmissionFile(id: string, user: AuthedUser, request: Request) {
   rateLimit(`upload:${user.id}`, 20, 60_000);
+  await durableRateLimit('upload', user.id, 300, 3600);
   const { assignment, enrollment } = await studentContext(id, user);
   if (!['file', 'document', 'mixed'].includes(assignment.assignment_type)) throw badRequest('This assignment does not accept file uploads.');
   const submission = await ensureDraft(assignment, user, enrollment.id);

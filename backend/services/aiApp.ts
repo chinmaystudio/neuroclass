@@ -1,4 +1,6 @@
 import { cors } from 'hono/cors';
+import { isOriginAllowed } from '../lib/cors';
+import { durableRateLimit } from '../modules/core/http';
 import type { Context } from 'hono';
 import { aiGenerationService } from './aiGenerationService';
 import { Hono } from 'hono';
@@ -110,7 +112,7 @@ const withHandlerErrors = async (c: Context, handler: () => Promise<Response>) =
 };
 
 aiApp.use('*', cors({
-  origin: '*',
+  origin: (origin) => (origin && isOriginAllowed(origin) ? origin : null),
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'X-PAYMENT'],
   exposeHeaders: ['PAYMENT-RESPONSE', 'X-402-Transaction-Id'],
@@ -123,18 +125,17 @@ aiApp.options('*', (c) => c.body(null, 204));
  * are no longer gated by an x402 payment. They now require a valid NeuroClass
  * session and are rate limited per user instead of being open to anyone.
  */
-const aiRateWindows = new Map<string, number[]>();
 const requireAiUser = async (c: Context, limitPerHour: number) => {
   const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return { error: c.json({ error: 'Authentication is required.' }, 401) };
   const { data: authData, error: authError } = await supabase.auth.getUser(token);
   if (authError || !authData.user) return { error: c.json({ error: 'Authentication is invalid or expired.' }, 401) };
-  const now = Date.now();
-  const key = `${c.req.path}:${authData.user.id}`;
-  const recent = (aiRateWindows.get(key) || []).filter((t) => now - t < 3_600_000);
-  if (recent.length >= limitPerHour) return { error: c.json({ error: 'You have reached the hourly AI generation limit. Please try again later.' }, 429) };
-  recent.push(now);
-  aiRateWindows.set(key, recent);
+  try {
+    // Durable across serverless instances (Postgres-backed).
+    await durableRateLimit(`ai:${c.req.path}`, authData.user.id, limitPerHour, 3600);
+  } catch {
+    return { error: c.json({ error: 'You have reached the hourly AI generation limit. Please try again later.' }, 429) };
+  }
   return { user: authData.user };
 };
 

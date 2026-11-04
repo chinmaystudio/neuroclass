@@ -108,46 +108,25 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
     setError(null);
     
     try {
-      const sanitizedCode = joinCode.trim().toUpperCase();
-      const { data: classroom, error: classErr } = await supabase
-        .from('classrooms')
-        .select('*')
-        .eq('code', sanitizedCode)
-        .single();
-      if (classErr || !classroom) {
-        throw new Error('Classroom not found. Please verify the 6-character code.');
-      }
-
-      const { data: student, error: enrollErr } = await supabase
-        .from('students')
-        .insert({
-          classroom_id: classroom.id,
-          user_id: user.id,
-          name: studentDetails.name,
-          roll_number: studentDetails.rollNumber,
-          phone: studentDetails.phoneNumber,
-          email: user.email || '',
-          joined_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
-      if (enrollErr || !student) {
-        if (enrollErr?.message?.includes('unique') || enrollErr?.code === '23505') {
-          throw new Error('You are already enrolled in this classroom.');
-        }
-        throw enrollErr || new Error('Unable to create student profile.');
+      // Joining goes through a database function: it validates the code, links
+      // this account and updates the roster count. Students cannot browse
+      // classrooms or write roster rows directly.
+      const { data: joined, error: joinErr } = await (supabase as any).rpc('nc_join_classroom', {
+        p_code: joinCode.trim().toUpperCase(),
+        p_name: studentDetails.name,
+        p_roll_number: studentDetails.rollNumber || null,
+        p_phone: studentDetails.phoneNumber || null,
+      });
+      const enrollment = Array.isArray(joined) ? joined[0] : joined;
+      if (joinErr || !enrollment?.student_id) {
+        throw new Error(joinErr?.message || 'Unable to join this classroom. Please try again.');
       }
 
       if (studentDetails.faceSamples.length > 0) {
         const { uploadFaceSamples } = await import('../../services/api/faceRegistration');
         const blobs = await Promise.all(studentDetails.faceSamples.map(async (dataUrl) => (await fetch(dataUrl)).blob()));
-        await uploadFaceSamples(student.id, classroom.id, blobs);
+        await uploadFaceSamples(enrollment.student_id, enrollment.classroom_id, blobs);
       }
-
-      await supabase
-        .from('classrooms')
-        .update({ students: (classroom.students || 0) + 1 })
-        .eq('id', classroom.id);
 
       stopCamera();
       onSuccess();
