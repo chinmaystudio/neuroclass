@@ -22,15 +22,28 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
     try {
       const { data, error } = await supabase
         .from('classrooms')
-        .select('*, students:students(count)')
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      const enrichedData = (data || []).map(cls => ({
+
+      // Count roster rows by id only: legacy face columns on `students` are not
+      // readable from the browser, so an embedded count(students.*) is refused.
+      const ids = (data || []).map((cls: any) => cls.id);
+      const counts = new Map<string, number>();
+      if (ids.length) {
+        const { data: roster, error: rosterError } = await (supabase.from('students') as any)
+          .select('id,classroom_id')
+          .in('classroom_id', ids)
+          .range(0, 9999);
+        if (rosterError) throw rosterError;
+        (roster || []).forEach((r: { classroom_id: string }) => counts.set(r.classroom_id, (counts.get(r.classroom_id) || 0) + 1));
+      }
+
+      const enrichedData = (data || []).map((cls: any) => ({
         ...cls,
-        students: cls.students?.[0]?.count || 0
+        students: counts.get(cls.id) || 0
       }));
       
       setClassrooms(enrichedData);
