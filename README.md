@@ -1,101 +1,65 @@
-
 # NeuroClass
 
-NeuroClass is an AI-powered classroom platform with separate teacher and student portals, Supabase-backed identity/data, and paid AI endpoints using x402 on Algorand Testnet.
+NeuroClass is an AI-assisted classroom platform: classrooms with join codes, Face ID attendance, classroom materials with an AI tutor, **classroom-specific tests with AI proctoring**, a **built-in coding IDE** for programming exams and assignments, and **assignment management**.
 
-## What this project includes
+This repository is the single, consolidated codebase. The former standalone `test_creation` portal has been merged in (see [docs/IMPLEMENTATION_REPORT.md](docs/IMPLEMENTATION_REPORT.md)); it is no longer deployed separately.
 
-- **Frontend**: React 19 + Vite + Tailwind (inside `/frontend`, bootstrapped from root Vite config)
-- **Backend**: Next.js API routes (inside `/backend/app/api`) with Hono-based x402 payment middleware
-- **Database**: Supabase/Postgres schema and migrations (inside `/supabase`)
-- **Paid AI flows**: x402 payment-gated endpoints for test generation, assignment generation, and project idea generation
-- **Classroom flows**: role-aware teacher/student dashboards, attendance session APIs, classroom learning assistant, exam attempt lifecycle APIs
+| Part | Folder | Deploys to |
+|---|---|---|
+| Web app (React 19 + Vite + Tailwind) | `frontend/` (root Vite config) | Cloudflare Pages |
+| API (Next.js route handlers) | `backend/` | Vercel |
+| ML proctoring service (FastAPI) | `ml-service/` | Render |
+| Database, auth, storage | `supabase/` | Supabase (PostgreSQL + RLS) |
+| Face recognition (existing ArcFace service) | external | Render (`AI_SERVICE_URL`) |
+| Code execution sandbox | external | Judge0 or Piston host (`CODE_RUNNER_URL`) |
 
-## Repository structure
+> **Payments are temporarily disabled.** The x402/Algorand and Stripe test-mode code is still in the repository behind `PAYMENTS_ENABLED` / `VITE_PAYMENTS_ENABLED` (both default to `false`).
 
-```text
-.
-├── frontend/                 # Vite React app (UI, context, services)
-├── backend/                  # Next.js backend APIs + auth/payment services
-├── supabase/                 # Canonical schema + SQL migrations
-├── docs/                     # Architecture/audit research documents
-├── .github/workflows/ci.yml  # CI pipeline
-├── Dockerfile                # Multi-stage frontend+backend build image
-└── docker-compose.yml        # Local/staging container orchestration
-```
+## What teachers and students can do
 
-## Core API surface (backend)
+**Teachers**: open a classroom, then use the **Tests** tab to create tests (multiple choice, multiple select, true/false, short answer, fill-in, numerical, long answer, coding). They can generate question suggestions with AI and review them before saving, set timing, scheduling, attempts, shuffling, negative marking and proctoring, then preview and publish. While a test is running they can watch a **live monitor**, then grade answers, review each attempt's proctoring timeline, release results and resolve appeals. The **Assignments** tab handles text, file, document, programming and mixed assignments with attachments, deadlines, late penalties, grading and feedback.
 
-- `POST /api/ai/generate-test` (x402 paid)
-- `POST /api/ai/generate-assignment` (x402 paid)
-- `POST /api/ai/project-idea` (x402 paid, authenticated)
-- `POST /api/ai/classroom-answer` (authenticated classroom assistant)
-- `GET /api/x402/ledger` and `GET/POST /api/x402/verify` (payment visibility/verification)
-- `POST /api/attendance/session`, `PATCH /api/attendance/session`, `POST /api/attendance/teacher-mark`, `POST /api/attendance/verify`, `POST /api/attendance/correct`, `GET /api/attendance/active`
-- `POST /api/exams/attempt/start`, `POST /api/exams/attempt/violation`, `POST /api/exams/attempt/submit`
-- `GET /api/health`
+**Students** see only their own classrooms' published tests and assignments. A test runs in a **full-screen exam**: consent, camera check, Face ID verification, a server-controlled timer, autosave with an offline queue, and resume after refresh. Coding questions open the IDE, where students can run their code against sample tests; hidden tests run on the server after submission.
 
 ## Local development
 
-### 1) Install dependencies
-
 ```bash
-npm ci
-cd backend && npm ci
+# 1. Install
+npm ci                     # frontend
+(cd backend && npm ci)     # API
+
+# 2. Configure
+cp frontend/.env.example .env.local          # VITE_* values (public)
+cp backend/.env.example backend/.env.local   # server secrets
+
+# 3. Database: apply supabase/schema.sql (new project) or the files in
+#    supabase/migrations/ in order (existing project). See docs/DATABASE.md.
+
+# 4. Run
+npm run dev                # frontend on :5173
+(cd backend && npm run dev)  # API on :3000 (set VITE_API_URL=http://localhost:3000)
 ```
 
-### 2) Configure environment variables
+ML service: see [ml-service/README.md](ml-service/README.md).
 
-Use the example files:
-
-- `/home/runner/work/neuro-class/neuro-class/frontend/.env.example`
-- `/home/runner/work/neuro-class/neuro-class/backend/.env.example`
-
-Important variables used by the app:
-
-- Frontend: `VITE_BACKEND_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_ALGOD_SERVER_URL`, `VITE_NEUROCLASS_TREASURY_ADDRESS`, `VITE_X402_NETWORK`, `VITE_X402_USDC_ASSET_ID`
-- Backend: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `ALLOWED_ORIGINS`, `NEUROCLASS_TREASURY_ADDRESS`, `X402_FACILITATOR_URL`, `X402_TEST_PRICE_USDC_MICRO`, `X402_ASSIGNMENT_PRICE_USDC_MICRO`, `X402_PROJECT_IDEA_PRICE_USDC_MICRO`, `ALGOD_SERVER_URL`, `ALGORAND_INDEXER_URL`
-
-### 3) Run frontend and backend
+## Quality checks
 
 ```bash
-# terminal 1 (root)
-npm run dev
-
-# terminal 2 (backend)
-cd backend && npm run dev
+npm run lint && npm run build                                     # frontend
+cd backend && npm run typecheck && npm test && npm run build      # API + unit tests
+TEST_DATABASE_ADMIN_URL=postgresql://postgres@localhost:5432/postgres ./tests/integration/prepare-db.sh
+TEST_DATABASE_URL=postgresql://postgres@localhost:5432/neuroclass_test npm run test:integration
+cd ../ml-service && ML_SERVICE_API_KEY=dev python -m pytest -q
 ```
 
-By default, Next.js backend runs on `http://localhost:3000`. Set `VITE_BACKEND_URL` accordingly when frontend and backend are split across hosts.
+## Documentation
 
-## Database setup
-
-- Apply `/home/runner/work/neuro-class/neuro-class/supabase/schema.sql` for a fresh instance, or
-- Run incremental migrations from `/home/runner/work/neuro-class/neuro-class/supabase/migrations/`
-
-## Quality checks (same checks used in CI)
-
-```bash
-# frontend
-npm run lint
-npm run build
-
-# backend
-cd backend && npm run typecheck && npm run build
-```
-
-CI (`.github/workflows/ci.yml`) runs frontend typecheck/build, backend typecheck/build, and container build validation.
-
-## Container workflow
-
-```bash
-docker-compose up --build -d
-```
-
-The Dockerfile builds frontend and backend artifacts, then runs the backend runtime container on port `3000`.
-
-## Additional documentation
-
-- `/home/runner/work/neuro-class/neuro-class/docs/PRODUCTION_FEATURE_INVENTORY.md`
-- `/home/runner/work/neuro-class/neuro-class/docs/PRODUCTION_ARCHITECTURE.md`
-- `/home/runner/work/neuro-class/neuro-class/PRODUCTION_GRADE.md`
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): components, request flows, design decisions
+- [docs/DATABASE.md](docs/DATABASE.md): schema, migrations, RLS, rollback
+- [docs/API.md](docs/API.md): `/api/v1` reference
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): Cloudflare Pages, Vercel, Render, Supabase, code sandbox
+- [docs/SECURITY.md](docs/SECURITY.md): threat model, controls, findings fixed, open items
+- [docs/TESTING.md](docs/TESTING.md): test suites and the end-to-end scenarios they cover
+- [docs/IMPLEMENTATION_REPORT.md](docs/IMPLEMENTATION_REPORT.md): what changed in the consolidation, and what remains
+- [ml-service/MODEL_CARD.md](ml-service/MODEL_CARD.md): proctoring models, thresholds, limitations
+- `docs/history/`: earlier fix reports and deployment notes, kept for reference

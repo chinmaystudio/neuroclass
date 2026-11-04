@@ -13,12 +13,14 @@ ML_SERVICE_API_KEY=local-development-key python scripts/check_model_size.py --th
 ML_SERVICE_API_KEY=local-development-key uvicorn app.main:app --host 0.0.0.0 --port 10000
 ```
 
-The Node portal sends feature vectors only; it does not send full webcam frames or answers to this service. Every `/v1/*` endpoint requires `X-Proctoring-Service-Key`.
+The NeuroClass API (`backend/modules/proctoring/mlClient.ts`) sends feature vectors only; it does not send full webcam frames or answers to this service. Every `/v1/*` endpoint requires `X-Proctoring-Service-Key`.
 
 ## Deployment and evaluation limits
 
-Deploy from the `ml-proctoring` root with `render.yaml`. Configure a long random `ML_SERVICE_API_KEY` in Render and use the same value as `ML_PROCTORING_API_KEY` in the Node app. The request limit defaults to 65,536 bytes, which rejects image and video payloads.
+Deploy with the repository-root `render.yaml` Blueprint (root directory `ml-service`). Configure a long random `ML_SERVICE_API_KEY` in Render and use the same value as `ML_PROCTORING_API_KEY` in the Vercel API. The request limit defaults to 65,536 bytes, which rejects image and video payloads.
 
 Render’s Free web-service plan currently provides 512 MB RAM and 0.1 CPU. This service uses a single CPU worker and excludes GPU frameworks, TensorFlow, PyTorch, OpenCV, and MediaPipe. The footprint script measures relevant packages plus model artifacts—not full image size.
 
 `scripts/evaluate.py` tests expected relative behavior on synthetic feature sequences. It does **not** establish real-world cheating-detection accuracy, precision, recall, ROC-AUC, or false-positive rate.
+
+See [MODEL_CARD.md](MODEL_CARD.md) for signals, thresholds, intended use and the evaluation still required.
