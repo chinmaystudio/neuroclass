@@ -6,6 +6,7 @@ import {
   Zap, ArrowRight
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { FEATURES } from '../../config/features';
 
 interface SidebarProps {
   activeSection: string;
@@ -18,10 +19,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSectio
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'classrooms', label: 'Classrooms', icon: <Users size={20} /> },
-    { id: 'stripe', label: 'Payments (Test)', icon: <Zap size={20} /> }, // Algorand Settlements
+    // Payments are temporarily disabled (config/features.ts).
+    ...(FEATURES.payments ? [{ id: 'stripe', label: 'Payments (Test)', icon: <Zap size={20} /> }] : []),
     { id: 'attendance', label: 'Attendance', icon: <UserCheck size={20} /> },
     { id: 'monitoring', label: 'Live Monitoring', icon: <Monitor size={20} /> },
-    { id: 'tests', label: 'Test Designer', icon: <BrainCircuit size={20} /> },
+    { id: 'tests', label: 'Tests & Assignments', icon: <BrainCircuit size={20} /> },
     { id: 'proctoring', label: 'Proctoring', icon: <ShieldCheck size={20} /> },
     { id: 'reports', label: 'Analytics', icon: <BarChart3 size={20} /> },
     { id: 'settings', label: 'Settings', icon: <Settings size={20} /> },

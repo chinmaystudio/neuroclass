@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../features/lms/api';
+import type { StudentTest } from '../../features/lms/types';
 
 interface StudentOverviewProps {
   onNavigate: (section: string) => void;
@@ -47,41 +49,18 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
 
       const isBio = (studentProfiles || []).some(s => s.face_registration_status === 'REGISTERED');
       const enrolledCount = studentProfiles ? studentProfiles.length : 0;
-      const classIds = (studentProfiles || []).map(s => s.classroom_id);
-      // 2. Fetch tests for enrolled classes
-      let pendingTests: any[] = [];
-      let completedResults: any[] = [];
-
-      if (classIds.length > 0) {
-        const { data: availableTests } = await supabase
-          .from('tests')
-          .select('*, classrooms(name)')
-          .in('classroom_id', classIds)
-          .order('created_at', { ascending: false });
-
-        const { data: results, error: attemptsError } = await (supabase.from('attempts') as any)
-          .select('*, tests(*)')
-          .eq('student_id', user!.id)
-          .in('status', ['submitted', 'flagged'])
-          .order('submitted_at', { ascending: false })
-          .limit(200);
-        if (attemptsError) throw attemptsError;
-        completedResults = results || [];
-
-        const completedTestIds = new Set(completedResults.map(r => r.test_id));
-        pendingTests = (availableTests || []).filter(t => !completedTestIds.has(t.id));
-      }
-
-      // Calculate average score percentage
-      let totalPercentSum = 0;
-      completedResults.forEach(r => {
-        const totalMarks = r.tests?.total_marks || 100;
-        const pct = Math.min(100, Math.round(((r.score || 0) / totalMarks) * 100));
-        totalPercentSum += pct;
-      });
-
-      const averageScorePercent = completedResults.length > 0 
-        ? Math.round(totalPercentSum / completedResults.length)
+      // 2. Tests come from the API: only published tests from the student's own
+      // classrooms, without answer keys, and scores only once the teacher releases them.
+      const myTests: StudentTest[] = enrolledCount > 0 ? (await api.get<{ tests: StudentTest[] }>('me/tests')).tests : [];
+      const pendingTests = myTests
+        .filter((t) => t.availability === 'active' && (t.canStart || t.openAttemptId))
+        .map((t) => ({ ...t, classrooms: { name: t.classroomName }, duration_mins: t.durationMinutes, questions: [] }));
+      const completedResults = myTests
+        .filter((t) => ['submitted', 'evaluated', 'results_published'].includes(t.myStatus))
+        .map((t) => ({ id: t.lastAttemptId ?? t.id, test_id: t.id, score: t.result?.score ?? null, released: Boolean(t.result), tests: { title: t.title, total_marks: t.totalMarks }, submitted_at: null, created_at: null, percentage: t.result?.percentage ?? null }));
+      const released = completedResults.filter((r) => r.released && r.percentage !== null);
+      const averageScorePercent = released.length > 0
+        ? Math.round(released.reduce((sum, r) => sum + Number(r.percentage), 0) / released.length)
         : 0;
 
       setStats({
@@ -112,8 +91,8 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
           id: `res-${cr.id}`,
           type: 'exam',
           title: `Completed Assessment: ${cr.tests?.title || 'Exam'}`,
-          detail: `Score: ${cr.score}/${cr.tests?.total_marks || 100}`,
-          time: new Date(cr.submitted_at || cr.created_at).toLocaleDateString(),
+          detail: cr.released ? `Score: ${cr.score}/${cr.tests?.total_marks || 100}` : 'Awaiting results',
+          time: 'Submitted',
           icon: <CheckCircle2 className="text-emerald-500" size={16} />,
         });
       });
@@ -282,13 +261,13 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
                       {t.classrooms?.name || 'Classroom'}
                     </span>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t.title}</h3>
-                    <p className="text-xs text-slate-500">Duration: {t.duration_minutes ?? t.duration_mins ?? 45} Mins • {t.questions?.length || 0} Questions</p>
+                    <p className="text-xs text-slate-500">Duration: {t.durationMinutes ?? t.duration_mins ?? 45} Mins • {t.totalMarks ?? 0} Marks</p>
                   </div>
                   <button
                     onClick={() => onStartTest(t.id)}
                     className="w-full rounded-xl bg-purple-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-purple-500/20 transition-colors active:scale-95 sm:w-auto"
                   >
-                    Start Exam
+                    {t.openAttemptId ? 'Resume Exam' : 'Start Exam'}
                   </button>
                 </div>
               ))}

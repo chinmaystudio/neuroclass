@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { StudentSidebar } from './StudentSidebar';
 import { EnrolledClasses } from './EnrolledClasses';
 import { JoinClassWizard } from './JoinClassWizard';
-import { ActiveTests } from './ActiveTests';
-import { ExamTaker } from './ExamTaker';
+import { StudentTestsPanel } from '../../features/tests/StudentTestsPanel';
 import { StudentOverview } from './StudentOverview';
 import { StudentPerformance } from './StudentPerformance';
 import { StudentHistory } from './StudentHistory';
@@ -16,6 +15,9 @@ import { useAuth } from '../../context/AuthContext';
 import { getApiUrl } from '../../config/apiConfig';
 import { Bell } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+
+// The secure exam is code-split: it pulls in the camera/vision and IDE bundles.
+const SecureExam = lazy(() => import('../../features/exam/SecureExam'));
 
 export const StudentDashboard: React.FC = () => {
   const location = useLocation();
@@ -139,7 +141,16 @@ export const StudentDashboard: React.FC = () => {
       case 'classes':
         return <EnrolledClasses onJoinClick={() => setJoinWizardOpen(true)} onStartTest={(testId) => setActiveTestId(testId)} />;
       case 'tests':
-        return <ActiveTests onStartTest={(testId) => setActiveTestId(testId)} />;
+        return (
+          <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
+            <header>
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-purple-500">Assessments</p>
+              <h1 className="text-2xl font-black sm:text-3xl">My tests</h1>
+              <p className="mt-1 text-sm text-slate-500">Tests from every classroom you have joined. Only your teachers' published tests appear here.</p>
+            </header>
+            <StudentTestsPanel />
+          </div>
+        );
       case 'performance':
         return <StudentPerformance />;
       case 'history':
@@ -226,13 +237,15 @@ export const StudentDashboard: React.FC = () => {
       />
       
       {activeTestId && (
-        <ExamTaker 
-          testId={activeTestId} 
-          onExit={() => {
-            setActiveTestId(null);
-            setActiveSection('history');
-          }} 
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-[200] flex items-center justify-center bg-black text-sm text-white">Loading exam…</div>}>
+          <SecureExam
+            testId={activeTestId}
+            onExit={() => {
+              setActiveTestId(null);
+              setActiveSection('tests');
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

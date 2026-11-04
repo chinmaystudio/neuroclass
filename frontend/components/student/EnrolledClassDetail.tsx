@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
-  BookOpen, Users, ShieldCheck, FileText, CheckCircle2, Clock, ArrowLeft, Plus, Sparkles, MapPin
+  BookOpen, Users, ShieldCheck, FileText, CheckCircle2, Clock, ArrowLeft, Sparkles, MapPin, ClipboardList
 } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { getApiUrl } from '../../config/apiConfig';
 import { StudentAttendanceModal } from './StudentAttendanceModal';
 import { StudentClassroomMaterials } from './StudentClassroomMaterials';
+import { StudentTestsPanel } from '../../features/tests/StudentTestsPanel';
+import { StudentAssignmentsPanel } from '../../features/assignments/StudentAssignmentsPanel';
 
 interface EnrolledClassDetailProps {
   classroom: any;
@@ -21,9 +23,9 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
   onStartTest,
 }) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'tests' | 'materials' | 'attendance' | 'announcements'>('tests');
+  const [activeTab, setActiveTab] = useState<'tests' | 'assignments' | 'materials' | 'attendance' | 'announcements'>('tests');
   const [loading, setLoading] = useState(true);
-  const [tests, setTests] = useState<any[]>([]);
+  const [testCount, setTestCount] = useState<number | null>(null);
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
   const [appealReason, setAppealReason] = useState('');
   const [appealSubmitting, setAppealSubmitting] = useState(false);
@@ -40,16 +42,8 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
   const fetchClassroomData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Tests for this classroom
-      const { data: testsData } = await supabase
-        .from('tests')
-        .select('*')
-        .eq('classroom_id', classroom.id)
-        .order('created_at', { ascending: false });
-
-      setTests(testsData || []);
-
-      // 2. Fetch Student Profile for this classroom
+      // Tests are loaded through the API (StudentTestsPanel); answer keys are never sent to the browser.
+      // Fetch the student's enrolment for this classroom
       const { data: profile } = await supabase
         .from('students')
         .select('id')
@@ -148,7 +142,16 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
             activeTab === 'tests' ? 'border-purple-500 text-purple-500' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
           }`}
         >
-          <FileText size={16} /> Course Tests ({tests.length})
+          <FileText size={16} /> Tests{testCount !== null ? ` (${testCount})` : ''}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('assignments')}
+          className={`shrink-0 pb-3 md:pb-4 text-[11px] md:text-xs font-bold uppercase tracking-widest border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === 'assignments' ? 'border-purple-500 text-purple-500' : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          <ClipboardList size={16} /> Assignments
         </button>
 
         <button
@@ -185,45 +188,9 @@ export const EnrolledClassDetail: React.FC<EnrolledClassDetailProps> = ({
           <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : activeTab === 'tests' ? (
-        <div className="space-y-4">
-          {tests.length === 0 ? (
-            <div className="p-12 border border-dashed border-black/10 dark:border-white/10 rounded-3xl text-center space-y-2 text-slate-400 text-xs">
-              <FileText size={40} className="mx-auto opacity-50 mb-2" />
-              <p>No tests published for this classroom yet.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tests.map((t) => (
-                <div
-                  key={t.id}
-                  className="min-w-0 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 space-y-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-                >
-                  <div className="space-y-2">
-                    <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
-                      <FileText size={20} />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t.title}</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{t.description || 'Proctored assessment'}</p>
-                  </div>
-
-                  <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-white/5">
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>Duration: {t.duration_minutes} Mins</span>
-                      <span>Marks: {t.total_marks || 100}</span>
-                    </div>
-
-                    <button
-                      onClick={() => onStartTest(t.id)}
-                      className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 transition-colors"
-                    >
-                      Start Exam
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <StudentTestsPanel classroomId={classroom.id} onCountChange={setTestCount} />
+      ) : activeTab === 'assignments' ? (
+        <StudentAssignmentsPanel classroomId={classroom.id} />
       ) : activeTab === 'materials' ? (
         <StudentClassroomMaterials classroomId={classroom.id} />
       ) : activeTab === 'attendance' ? (

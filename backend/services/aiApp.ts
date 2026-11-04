@@ -118,13 +118,37 @@ aiApp.use('*', cors({
 
 aiApp.options('*', (c) => c.body(null, 204));
 
+/**
+ * Payments are temporarily disabled (see lib/features.ts), so these AI routes
+ * are no longer gated by an x402 payment. They now require a valid NeuroClass
+ * session and are rate limited per user instead of being open to anyone.
+ */
+const aiRateWindows = new Map<string, number[]>();
+const requireAiUser = async (c: Context, limitPerHour: number) => {
+  const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+  if (!token) return { error: c.json({ error: 'Authentication is required.' }, 401) };
+  const { data: authData, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !authData.user) return { error: c.json({ error: 'Authentication is invalid or expired.' }, 401) };
+  const now = Date.now();
+  const key = `${c.req.path}:${authData.user.id}`;
+  const recent = (aiRateWindows.get(key) || []).filter((t) => now - t < 3_600_000);
+  if (recent.length >= limitPerHour) return { error: c.json({ error: 'You have reached the hourly AI generation limit. Please try again later.' }, 429) };
+  recent.push(now);
+  aiRateWindows.set(key, recent);
+  return { user: authData.user };
+};
+
 aiApp.post('/api/ai/generate-test', async (c) => withHandlerErrors(c, async () => {
+  const auth = await requireAiUser(c, 30);
+  if ('error' in auth) return auth.error;
   const params = validateTestBody(await getObjectBody(c));
   const test = await aiGenerationService.generateTest(params);
   return c.json({ success: true, test });
 }));
 
 aiApp.post('/api/ai/generate-assignment', async (c) => withHandlerErrors(c, async () => {
+  const auth = await requireAiUser(c, 30);
+  if ('error' in auth) return auth.error;
   const assignment = await aiGenerationService.generateAssignment(
     validateAssignmentBody(await getObjectBody(c)),
   );
@@ -132,13 +156,18 @@ aiApp.post('/api/ai/generate-assignment', async (c) => withHandlerErrors(c, asyn
 }));
 
 aiApp.post('/api/ai/project-idea', async (c) => withHandlerErrors(c, async () => {
-  const token = c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
-  if (!token) return c.json({ error: 'Authentication is required.' }, 401);
-  const { data: authData, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !authData.user) return c.json({ error: 'Authentication is invalid or expired.' }, 401);
-  const project = await aiGenerationService.generateProjectIdea(
-    validateProjectIdeaBody(await getObjectBody(c)),
-  );
+  const auth = await requireAiUser(c, 10);
+  if ('error' in auth) return auth.error;
+  const input = validateProjectIdeaBody(await getObjectBody(c));
+  const project = await aiGenerationService.generateProjectIdea(input);
+  // Persist server-side so the browser never writes project records directly.
+  const { error: saveError } = await (supabase.from('project_ideas') as any).insert({
+    student_user_id: auth.user.id,
+    category: input.category,
+    answers: { target: input.target, skills: input.skills, constraints: input.constraints, impact: input.impact, preferredStack: input.preferredStack },
+    result: project,
+  });
+  if (saveError) console.warn('[project-idea] save failed', saveError.message);
   return c.json({ success: true, project });
 }));
 

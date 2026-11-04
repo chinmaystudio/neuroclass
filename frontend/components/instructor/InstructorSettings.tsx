@@ -6,6 +6,7 @@ import {
   CheckCircle2, Sliders, Sparkles, Monitor, Key, RefreshCw
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { FEATURES } from '../../config/features';
 
 
 // Storage keys
@@ -228,7 +229,8 @@ export const InstructorSettings: React.FC = () => {
     { id: 'profile', label: 'Profile & Account', icon: <User size={18} /> },
     { id: 'ai', label: 'AI & Assessment', icon: <BrainCircuit size={18} /> },
     { id: 'proctoring', label: 'Proctoring & Security', icon: <ShieldCheck size={18} /> },
-    { id: 'stripe', label: 'Stripe Payments', icon: <Zap size={18} /> },
+    // Payments are temporarily disabled (config/features.ts).
+    ...(FEATURES.payments ? [{ id: 'stripe', label: 'Stripe Payments', icon: <Zap size={18} /> }] as const : []),
     { id: 'system', label: 'System & Theme', icon: <Sliders size={18} /> },
   ] as const;
 
@@ -259,7 +261,7 @@ export const InstructorSettings: React.FC = () => {
             <h1 className="text-2xl md:text-3xl font-black tracking-tight">Instructor Settings</h1>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            Configure default AI parameters, proctoring security levels, Stripe test payment options, and personal profile.
+            Configure default AI parameters, proctoring security levels, and your personal profile.
           </p>
         </div>
 

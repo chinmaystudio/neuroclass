@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import React, { Suspense, lazy, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/common/Navbar';
@@ -8,14 +8,22 @@ import { Hero } from './components/common/Hero';
 import Features from './components/common/Features';
 import { Process, DashboardPreview } from './components/common/WorkAndDashboard';
 import { TestSystem, Footer } from './components/common/TestAndFooter';
-import { InstructorDashboard } from './components/instructor/InstructorDashboard';
-import { StudentDashboard } from './components/student/StudentDashboard';
-import { AIModuleDashboard } from './components/ai/AIModuleDashboard';
 import { AnimatePresence } from 'motion/react';
 import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
-import { MobileAttendanceHandoff } from './components/auth/MobileAttendanceHandoff';
-import { MobileStudentAttendancePortal, MobileTeacherAttendancePortal } from './components/attendance/MobileAttendancePortals';
+
+// Dashboards pull in TensorFlow, camera and attendance code. Loading them on
+// demand keeps the public landing page small.
+const InstructorDashboard = lazy(() => import('./components/instructor/InstructorDashboard').then((m) => ({ default: m.InstructorDashboard })));
+const StudentDashboard = lazy(() => import('./components/student/StudentDashboard').then((m) => ({ default: m.StudentDashboard })));
+const AIModuleDashboard = lazy(() => import('./components/ai/AIModuleDashboard').then((m) => ({ default: m.AIModuleDashboard })));
+const MobileAttendanceHandoff = lazy(() => import('./components/auth/MobileAttendanceHandoff').then((m) => ({ default: m.MobileAttendanceHandoff })));
+const MobileStudentAttendancePortal = lazy(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileStudentAttendancePortal })));
+const MobileTeacherAttendancePortal = lazy(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileTeacherAttendancePortal })));
+
+const PageFallback = () => (
+  <div className="flex min-h-[60vh] items-center justify-center text-xs font-bold uppercase tracking-widest text-slate-400">Loading…</div>
+);
 
 const Home = ({ onLaunchAuth }: { onLaunchAuth: (mode: 'signin' | 'signup') => void }) => (
   <>
@@ -33,7 +41,6 @@ const AppContent = () => {
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [showAIModule, setShowAIModule] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
 
   const openAuth = (mode: 'signin' | 'signup') => {
     setAuthMode(mode);
@@ -52,6 +59,7 @@ const AppContent = () => {
       <Navbar onLogin={openAuth} />
 
       <main className="relative z-10">
+        <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<Home onLaunchAuth={openAuth} />} />
           <Route path="/attendance/mobile-handoff" element={<MobileAttendanceHandoff />} />
@@ -85,11 +93,14 @@ const AppContent = () => {
           {/* Catch-all redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </main>
 
       <AnimatePresence>
         {showAIModule && (
-          <AIModuleDashboard onClose={() => setShowAIModule(false)} />
+          <Suspense fallback={null}>
+            <AIModuleDashboard onClose={() => setShowAIModule(false)} />
+          </Suspense>
         )}
       </AnimatePresence>
       

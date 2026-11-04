@@ -9,6 +9,7 @@ import { AttendanceSystem } from '../ai/AttendanceSystem';
 import { ProctoringSystem } from '../ai/ProctoringSystem';
 import { AnalyticsDashboard } from '../evaluation/AnalyticsDashboard';
 import { useLocation } from 'react-router-dom';
+import { FEATURES } from '../../config/features';
 
 export const InstructorDashboard: React.FC = () => {
   const location = useLocation();
@@ -19,6 +20,7 @@ export const InstructorDashboard: React.FC = () => {
   const [activeSection, setActiveSection] = useState(() => classroomHandoff ? 'classroom-detail' : 'classrooms');
   const [isSidebarHovered, setSidebarHovered] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(() => classroomHandoff ? requestedClassroomId : null);
+  const [initialTab, setInitialTab] = useState<'tests' | undefined>(undefined);
 
   const handleSelectClass = (id: string) => {
     setSelectedClassId(id);
@@ -27,7 +29,7 @@ export const InstructorDashboard: React.FC = () => {
 
   const renderContent = () => {
     if (activeSection === 'classroom-detail' && selectedClassId) {
-      return <ClassroomDetail classroomId={selectedClassId} onBack={() => setActiveSection('classrooms')} />;
+      return <ClassroomDetail classroomId={selectedClassId} initialTab={initialTab} onBack={() => { setInitialTab(undefined); setActiveSection('classrooms'); }} />;
     }
     
     switch (activeSection) {
@@ -36,29 +38,15 @@ export const InstructorDashboard: React.FC = () => {
       case 'dashboard':
         return <ClassroomList onSelect={handleSelectClass} />;
       case 'stripe':
-        return <StripeDashboard />;
+        // Payments are temporarily disabled; fall back to the classroom list.
+        return FEATURES.payments ? <StripeDashboard /> : <ClassroomList onSelect={handleSelectClass} />;
       case 'tests':
         return (
-          <div className="h-full flex items-center justify-center p-6">
-            <div className="max-w-md w-full text-center space-y-6 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-8 rounded-3xl border border-black/5 dark:border-white/10 shadow-2xl">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
-                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </div>
-              <div>
-                <h4 className="text-xl font-black text-slate-900 dark:text-white">Advanced Test Portal</h4>
-                <p className="mt-2 text-sm text-slate-500">
-                  The test designer is now hosted on its own dedicated high-performance infrastructure.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveSection('classrooms')}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-4 text-sm font-bold text-white transition-all hover:bg-blue-700 shadow-lg shadow-blue-500/30"
-              >
-                Open a Classroom to Design Tests
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18"/><path d="m13 6 6 6-6 6"/></svg>
-              </button>
+          <div className="h-full overflow-y-auto p-6 scrollbar-hide">
+            <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5 text-sm text-slate-600 dark:text-slate-300">
+              Tests and assignments belong to a classroom. Open a classroom and use its <strong>Tests</strong> or <strong>Assignments</strong> tab. Only students enrolled in that classroom can see them.
             </div>
+            <ClassroomList onSelect={(id) => { setInitialTab('tests'); handleSelectClass(id); }} />
           </div>
         );
       case 'attendance':

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { requireGatewayAuth } from '../../../../lib/aiGateway';
 import { withCors } from '../../../../lib/cors';
+import { paymentsEnabled } from '../../../../lib/features';
 
 export const runtime = 'nodejs';
 
@@ -10,8 +11,13 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // Payments are temporarily disabled. Before re-enabling, move the price and
+  // redirect URLs server-side: they are currently taken from the request body.
+  if (!paymentsEnabled()) {
+    return withCors(NextResponse.json({ error: 'Payments are temporarily disabled.', code: 'payments_disabled' }, { status: 503 }), request.headers.get('origin'));
+  }
   try {
-    const auth = await requireGatewayAuth(request);
+    await requireGatewayAuth(request);
     const body = await request.json();
     
     // In test mode, we just return a simulated session ID
@@ -52,6 +58,7 @@ export async function POST(request: Request) {
     }), request.headers.get('origin'));
     
   } catch (error: any) {
-    return withCors(NextResponse.json({ error: error.message }, { status: 500 }), request.headers.get('origin'));
+    console.error('[stripe] checkout failed', error?.message);
+    return withCors(NextResponse.json({ error: 'Unable to start checkout.' }, { status: 500 }), request.headers.get('origin'));
   }
 }

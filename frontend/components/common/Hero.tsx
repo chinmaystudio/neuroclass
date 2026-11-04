@@ -115,7 +115,7 @@ const HeroVisualContent = () => {
         <FloatingPanel 
           icon={<Zap className="text-amber-400" size={16} />}
           label="Verified Results"
-          value="x402 Micropayments Live"
+          value="Server-graded Assessments"
         />
       </div>
     </div>
