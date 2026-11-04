@@ -23,6 +23,10 @@ BEGIN
   )
   ON CONFLICT (uid) DO NOTHING;
   RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Never block sign-up because of the profile row; the app can recover it.
+  RAISE WARNING 'nc_handle_new_auth_user failed for %: %', NEW.id, SQLERRM;
+  RETURN NEW;
 END;
 $$;
 

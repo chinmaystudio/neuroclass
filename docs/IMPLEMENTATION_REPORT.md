@@ -1,6 +1,6 @@
 # Implementation report: platform consolidation, LMS expansion, AI proctoring and security
 
-Branch: `feat/consolidated-lms-platform` · Nothing has been deployed. No production database was touched.
+Merged to `main`. Database migrations 0100 to 0500 were **applied to production on 2026-11-05**, after a backup (`nc_backup_20261105`) and testing against a snapshot of the production schema. Frontend and API deploy from `main` through the existing Cloudflare and Vercel integrations.
 
 ## 1. What was consolidated
 
@@ -50,13 +50,13 @@ Frontend: `StudentPortal`, `ClassroomView`, `AITestGeneratorModal`, `ClassroomDe
 ## 5. Limitations and what's still needed
 
 1. **Code sandbox not deployed.** A Judge0 or Piston host is required (DEPLOYMENT.md §5). Until then, runs return 503 and coding answers go to manual grading. The adapters are unit-tested but have not been exercised against a live sandbox.
-2. **Face service source isn't in any of the three repos.** Integration relies on its documented endpoints (`/ai/v1/proctoring/exam-frame`, falling back to `/ai/v1/attendance/frame`). Adding the exam-frame endpoint to that service is recommended. Liveness and anti-spoofing are not implemented.
+2. **Face service source isn't in any of the three repos.** Integration relies on its documented endpoints. A browser liveness check (head turn plus blink, enforced by the API) now runs before every Face ID capture; it stops photos and still images but is not certified presentation-attack detection.
 3. **Proctoring accuracy is not measured on real data.** Only rule behaviour on synthetic sequences is tested. No model was trained because no consented, labelled dataset exists. MODEL_CARD.md describes the evaluation needed.
 4. **No step debugger** in the IDE (run, test and compiler output only).
-5. `classrooms` remains readable by any signed-in user (needed for join-by-code), and `users.role` is self-editable (UI only). Fixes are listed in SECURITY.md.
-6. Rate limits are per instance except the code-run cap. Set `ALLOWED_ORIGINS` in production.
+5. Fixed: classrooms are visible only to owners and members (join by code goes through an RPC), and `users.role` can no longer be changed from the browser.
+6. Rate limits for AI generation, face checks, uploads and joining are durable (Postgres). CORS defaults to the known production origins.
 7. Integration tests use a Postgres shim instead of the real Supabase Auth and Storage. Run the post-deploy smoke test.
-8. An unused Firebase scaffold (`firebase-applet-config.json`) is still in the repo. Delete it if it isn't needed.
+8. The unused Firebase scaffold has been removed.
 
 ## 6. Deployment checklist
 

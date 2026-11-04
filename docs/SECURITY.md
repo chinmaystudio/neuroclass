@@ -54,3 +54,22 @@ No live secrets were found in tracked files. `frontend/database/supabase.ts` con
 - **Rate limits** are per serverless instance, except the code-run cap (durable). Add an edge limiter (Vercel WAF or Upstash) for stronger guarantees.
 - **Evidence snapshots** are not stored (privacy-first). If enabled in future, add a retention job honouring `security.evidenceRetentionDays`.
 - **Before re-enabling payments**: compute prices server-side, allow-list redirect URLs, verify webhook signatures, and make the x402 routes enforce settlement again.
+
+## Production database audit and changes (applied 2026-11-05)
+
+An audit of the live Supabase project (not just the repository) found problems that were exploitable with the public key. All are fixed by `20261105000400_production_rls_hardening.sql`, which has been **applied to production**:
+
+| Severity | Finding in production | Status |
+|---|---|---|
+| Critical | 15 tables had RLS disabled, including every `tc_*` portal table (questions, correct options, users, attempts) and `attendance_verification_attempts`, so they were readable and writable by anyone with the public key | RLS on every table; client access revoked |
+| Critical | `students`: anonymous SELECT/INSERT/UPDATE `USING (true)`, exposing names, emails, phones and a legacy face descriptor | Own rows (student) or own classroom (teacher) only; face columns never client-readable |
+| Critical | `face_embeddings` / `face_profiles` policies compared `s.classroom_id = s.classroom_id`, so any enrolled student could read **all biometric embeddings** | Embeddings server-only; profiles own or owner only |
+| High | The same bug on `classroom_materials` and chunks (all classrooms' materials, including teacher-private) | Fixed; private materials stay with the teacher |
+| High | `evaluations`: anonymous select/insert | Owner-only |
+| High | Students could insert their own `attendance` rows (bypassing Face ID) and update their `attempts` (score) | Writes are server-only |
+| Medium | `users` empty: the app's profile upsert wrote non-existent columns | 61 profiles backfilled; trigger creates new ones; role and email locked |
+| Medium | Joining needed table-wide classroom read access | `nc_join_classroom` RPC (rate-limited 30/h); classrooms visible to owners and members only |
+
+Verified after applying: 0 tables without RLS, 0 open policies, and student and teacher sessions simulated as the `authenticated` role see only their own classrooms. A pre-change copy of every touched table and of all policies and grants is in the private schema `nc_backup_20261105`. Drop it once you're satisfied: `DROP SCHEMA nc_backup_20261105 CASCADE;`.
+
+Still to do in the Supabase dashboard (not possible through SQL): enable **leaked password protection** (Auth → Passwords).
