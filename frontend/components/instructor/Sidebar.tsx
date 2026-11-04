@@ -3,8 +3,10 @@ import { motion } from 'motion/react';
 import { 
   LayoutDashboard, Users, UserCheck, Monitor, 
   FileText, BarChart3, Settings, BrainCircuit, ShieldCheck,
-  Zap, ArrowRight
+  Zap, LogOut
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
 import { FEATURES } from '../../config/features';
 
@@ -16,6 +18,12 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSection, isHovered, setHovered }) => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const signOut = async () => {
+    await logout();
+    navigate('/');
+  };
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'classrooms', label: 'Classrooms', icon: <Users size={20} /> },
@@ -74,8 +82,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSectio
       </div>
 
       <div className="px-4 mt-auto pt-6 border-t border-black/5 dark:border-white/10">
-        <button className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity">
-          <ArrowRight size={18} className={cn("transition-transform", isHovered ? "" : "rotate-180")} />
+        <button type="button" onClick={() => void signOut()} aria-label="Sign out" title="Sign out" className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-black hover:opacity-90 transition-opacity">
+          <LogOut size={18} />
+          {isHovered && <span className="text-[11px] font-bold uppercase tracking-widest">Sign out</span>}
         </button>
       </div>
     </motion.aside>
@@ -97,7 +106,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeSection, setActiveSectio
           <span>{item.label.split(' ')[0]}</span>
         </button>
       ))}
-    </nav>
+      <button
+          type="button"
+          aria-label="Sign out"
+          title="Sign out"
+          onClick={() => void signOut()}
+          className="flex min-w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-[9px] font-bold uppercase tracking-wide text-rose-600 transition-colors active:scale-95"
+        >
+          <LogOut size={18} />
+          <span>Sign out</span>
+        </button>
+      </nav>
     </>
   );
 };
