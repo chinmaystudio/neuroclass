@@ -4,8 +4,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LocalMLService } from '../../services/ml/LocalMLService';
 import { CameraService } from '../../services/ml/CameraService';
 import { logMalpracticeDetected } from '../../database/analytics';
+import { useToast } from '../ui';
 
 export const ProctoringSystem: React.FC = () => {
+  const toast = useToast();
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden' && activeRef.current) {
@@ -161,7 +163,7 @@ export const ProctoringSystem: React.FC = () => {
       
       runAnalysis();
     } catch (err: any) {
-      alert(err.message || "Proctoring failed to start camera.");
+      toast.error(err.message || "The camera couldn’t be started.");
     }
   };
 

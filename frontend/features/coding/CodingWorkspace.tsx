@@ -6,6 +6,7 @@ import { monaco } from './monacoSetup';
 import { api, ApiRequestError } from '../lms/api';
 import type { Language, LanguageId, RunResult } from '../lms/types';
 import { cn } from '../../lib/utils';
+import { useConfirm } from '../../components/ui';
 
 /**
  * One reusable coding workspace for coding exams, coding assignments and
@@ -49,6 +50,7 @@ function markersFrom(text: string, model: monaco.editor.ITextModel) {
 }
 
 export const CodingWorkspace: React.FC<CodingWorkspaceProps> = ({ mode, languages, value, starterCode = {}, onChange, runContext, sampleTestCases = [], blockClipboard = false, onViolation, readOnly = false, height = '100%', saveState }) => {
+  const askConfirm = useConfirm();
   const [allLanguages, setAllLanguages] = useState<Language[]>(languageCache ?? []);
   const [theme, setTheme] = useState<'vs-dark' | 'light'>(() => (document.documentElement.classList.contains('dark') ? 'vs-dark' : 'light'));
   const [stdin, setStdin] = useState(sampleTestCases[0]?.input ?? '');
@@ -72,10 +74,10 @@ export const CodingWorkspace: React.FC<CodingWorkspaceProps> = ({ mode, language
   const starterFor = (id: LanguageId) => starterCode[id] ?? allLanguages.find((l) => l.id === id)?.starter ?? '';
   const source = value ? value.source : starterFor(language);
 
-  const switchLanguage = (next: LanguageId) => {
+  const switchLanguage = async (next: LanguageId) => {
     if (next === language) return;
     const dirty = source.trim() && source !== starterFor(language);
-    if (dirty && !window.confirm('Switching language replaces your current code with the starter template. Continue?')) return;
+    if (dirty && !(await askConfirm({ title: 'Switch language?', body: 'Your current code will be replaced with the starter template for the new language.', confirmLabel: 'Switch language', tone: 'danger' }))) return;
     onChange({ language: next, source: starterFor(next) });
     setResult(null);
   };

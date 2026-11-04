@@ -7,6 +7,7 @@ import { QuestionEditor, blankQuestion, questionProblems } from './QuestionEdito
 import { QuestionView } from '../exam/QuestionView';
 import { AIQuestionGenerator } from './AIQuestionGenerator';
 import { cn } from '../../lib/utils';
+import { useConfirm } from '../../components/ui';
 
 type Props = { classroomId: string; testId: string | null; onClose: (changed: boolean) => void };
 type Step = 'details' | 'questions' | 'security' | 'publish';
@@ -15,6 +16,7 @@ type Meta = { title: string; subject: string; description: string; instructions:
 const emptyMeta: Meta = { title: '', subject: '', description: '', instructions: '', durationMinutes: 45, passingMarks: null, examMode: 'standard', scheduledStart: '', scheduledEnd: '', config: DEFAULT_CONFIG, security: DEFAULT_SECURITY };
 
 export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, onClose }) => {
+  const askConfirm = useConfirm();
   const [testId, setTestId] = useState(initialId);
   const [detail, setDetail] = useState<TeacherTestDetail | null>(null);
   const [meta, setMeta] = useState<Meta>(emptyMeta);
@@ -166,7 +168,7 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
               onChange={(next) => updateQuestion(i, next)}
               onMove={(dir) => { setQuestions((list) => { const copy = [...list]; const [item] = copy.splice(i, 1); copy.splice(i + dir, 0, item); return copy; }); setDirtyQuestions(true); }}
               onDuplicate={() => { setQuestions((list) => { const copy = [...list]; copy.splice(i + 1, 0, { ...structuredClone(q), id: undefined, testCases: q.testCases.map((t) => ({ ...t, id: undefined })) }); return copy; }); setDirtyQuestions(true); }}
-              onRemove={() => { if (window.confirm('Delete this question?')) { setQuestions((list) => list.filter((_, j) => j !== i)); setDirtyQuestions(true); } }} />
+              onRemove={async () => { if (await askConfirm({ title: 'Delete this question?', body: 'It is removed from the test when you save.', confirmLabel: 'Delete question', tone: 'danger' })) { setQuestions((list) => list.filter((_, j) => j !== i)); setDirtyQuestions(true); } }} />
           ))}
           {!locked && (
             <Card className="flex flex-wrap items-center gap-2">

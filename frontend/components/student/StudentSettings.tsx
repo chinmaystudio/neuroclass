@@ -5,12 +5,15 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm, useToast } from '../ui';
 
 interface StudentSettingsProps {
   onRegisterFaceClick: () => void;
 }
 
 export const StudentSettings: React.FC<StudentSettingsProps> = ({ onRegisterFaceClick }) => {
+  const askConfirm = useConfirm();
+  const toast = useToast();
   const { user } = useAuth();
   const [hasBiometric, setHasBiometric] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -40,15 +43,17 @@ export const StudentSettings: React.FC<StudentSettingsProps> = ({ onRegisterFace
   };
 
   const handleClearFaceData = async () => {
-    if (!user || !window.confirm('Are you sure you want to clear your Face-ID biometric data across all enrolled classrooms?')) return;
+    if (!user || !(await askConfirm({ title: 'Delete your Face ID data?', body: 'This removes your registered face from every classroom. You will need to register again before Face ID attendance or proctored tests.', confirmLabel: 'Delete Face ID data', tone: 'danger' }))) return;
     setClearing(true);
     try {
       // Deletes stored face embeddings and profiles for every classroom.
       const { error } = await (supabase as any).rpc('nc_clear_my_face_data');
       if (error) throw error;
       setHasBiometric(false);
+      toast.success('Your Face ID data was deleted.');
     } catch (e) {
       console.error('Error clearing face data:', e);
+      toast.error('Your Face ID data couldn’t be deleted. Please try again.');
     } finally {
       setClearing(false);
     }

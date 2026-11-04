@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarClock, CheckCircle2, ClipboardList, Download, FileUp
 import { api, formatDateTime, openDownload } from '../lms/api';
 import type { Assignment, LanguageId, Submission } from '../lms/types';
 import { Badge, Button, Card, EmptyState, ErrorNote, inputClass, Spinner, useAsync } from '../lms/ui';
+import { useConfirm } from '../../components/ui';
 
 const CodingWorkspace = lazy(() => import('../coding/CodingWorkspace'));
 const STATUS: Record<string, { label: string; tone: 'slate' | 'blue' | 'amber' | 'green' | 'purple' | 'red' }> = {
@@ -41,6 +42,7 @@ export const StudentAssignmentsPanel: React.FC<{ classroomId: string }> = ({ cla
 };
 
 const StudentAssignmentView: React.FC<{ assignmentId: string; onBack: () => void }> = ({ assignmentId, onBack }) => {
+  const askConfirm = useConfirm();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [text, setText] = useState('');
@@ -161,7 +163,7 @@ const StudentAssignmentView: React.FC<{ assignmentId: string; onBack: () => void
       <div className="flex flex-wrap items-center justify-end gap-3">
         {saveState !== 'idle' && editable && <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Draft saved' : 'Not saved'}</span>}
         {canReopen && <Button variant="secondary" loading={busy === 'reopen'} onClick={() => void run('reopen', async () => { await api.post(`assignments/${assignmentId}/my-submission/reopen`); await load(); })} icon={<Pencil size={14} />}>Edit submission</Button>}
-        {editable && <Button variant="student" loading={busy === 'submit'} onClick={() => { if (window.confirm(assignment.allowResubmission ? 'Submit your work? You can edit it again until it is graded.' : 'Submit your work? You will not be able to change it.')) void submit(); }} icon={<Send size={14} />}>{submission?.revision ? 'Resubmit' : 'Submit'}</Button>}
+        {editable && <Button variant="student" loading={busy === 'submit'} onClick={async () => { if (await askConfirm({ title: 'Submit your work?', body: assignment.allowResubmission ? 'You can still edit it until your teacher grades it.' : 'You won’t be able to change it after submitting.', confirmLabel: 'Submit' })) void submit(); }} icon={<Send size={14} />}>{submission?.revision ? 'Resubmit' : 'Submit'}</Button>}
       </div>
       {submission?.submittedAt && <p className="text-right text-xs text-slate-500">Last submitted {formatDateTime(submission.submittedAt)}{submission.isLate ? ' (late)' : ''}</p>}
     </div>

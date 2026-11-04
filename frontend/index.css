@@ -1,69 +1,231 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ==========================================================================
+   NeuroClass design tokens
+   Source of truth for colour, type, radius, elevation and motion.
+   Raw values live in --nc-* (switched by .dark); @theme exposes them as
+   Tailwind utilities: bg-surface, text-ink, border-line, bg-primary,
+   rounded-card, shadow-card, text-page, … See docs/DESIGN_SYSTEM.md.
+   ========================================================================== */
+
 :root {
-  --surface-shadow-button: 0 0.5rem 1.25rem rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
-  --surface-shadow-button-hover: 0 0.75rem 1.5rem rgba(15, 23, 42, 0.16), 0 2px 5px rgba(15, 23, 42, 0.1);
-  --surface-shadow-card: 0 1rem 2.5rem rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.05);
-  --surface-shadow-card-hover: 0 1.25rem 3rem rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.07);
+  /* Brand */
+  --nc-primary: #1a73e8;
+  --nc-primary-hover: #1558c0;
+  --nc-primary-light: #e8f0fe;
+  --nc-primary-soft: #d2e3fc;
+  --nc-primary-dark: #174ea6;
+  --nc-on-primary: #ffffff;
+
+  /* Neutrals */
+  --nc-canvas: #f8fafd;
+  --nc-surface: #ffffff;
+  --nc-surface-2: #f1f3f4;
+  --nc-ink: #202124;
+  --nc-ink-2: #5f6368;
+  --nc-ink-3: #80868b;
+  --nc-line: #dadce0;
+  --nc-line-2: #e8eaed;
+  --nc-overlay: rgb(32 33 36 / 0.5);
+
+  /* Status: fill colour, readable text colour, background */
+  --nc-success: #188038;
+  --nc-success-ink: #137333;
+  --nc-success-bg: #e6f4ea;
+  --nc-warning: #f9ab00;
+  --nc-warning-ink: #8a5300;
+  --nc-warning-bg: #fef7e0;
+  --nc-danger: #d93025;
+  --nc-danger-ink: #b3261e;
+  --nc-danger-bg: #fce8e6;
+  --nc-info: #1a73e8;
+  --nc-info-ink: #174ea6;
+  --nc-info-bg: #e8f0fe;
+
+  /* Elevation (Material-style, restrained) */
+  --nc-shadow-card: 0 1px 2px 0 rgb(60 64 67 / 0.16), 0 1px 3px 1px rgb(60 64 67 / 0.08);
+  --nc-shadow-raised: 0 1px 3px 0 rgb(60 64 67 / 0.2), 0 4px 8px 3px rgb(60 64 67 / 0.1);
+  --nc-shadow-dialog: 0 4px 8px 3px rgb(60 64 67 / 0.15), 0 1px 3px rgb(60 64 67 / 0.3);
+
+  --nc-gradient-brand: linear-gradient(110deg, #1a73e8 0%, #287ae6 55%, #4285f4 100%);
+  color-scheme: light;
 }
 
 .dark {
-  --surface-shadow-button: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.28), 0 0 1px rgba(255, 255, 255, 0.08);
-  --surface-shadow-button-hover: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.38), 0 0 1px rgba(255, 255, 255, 0.12);
-  --surface-shadow-card: 0 1rem 2.5rem rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.12);
-  --surface-shadow-card-hover: 0 1.25rem 3rem rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.16);
+  --nc-primary: #8ab4f8;
+  --nc-primary-hover: #aecbfa;
+  --nc-primary-light: rgb(138 180 248 / 0.14);
+  --nc-primary-soft: rgb(138 180 248 / 0.24);
+  --nc-primary-dark: #d2e3fc;
+  --nc-on-primary: #062e6f;
+
+  --nc-canvas: #121314;
+  --nc-surface: #1e1f22;
+  --nc-surface-2: #2a2b2e;
+  --nc-ink: #e8eaed;
+  --nc-ink-2: #bdc1c6;
+  --nc-ink-3: #9aa0a6;
+  --nc-line: #3c4043;
+  --nc-line-2: #303134;
+  --nc-overlay: rgb(0 0 0 / 0.6);
+
+  --nc-success: #81c995;
+  --nc-success-ink: #81c995;
+  --nc-success-bg: rgb(129 201 149 / 0.14);
+  --nc-warning: #fdd663;
+  --nc-warning-ink: #fdd663;
+  --nc-warning-bg: rgb(253 214 99 / 0.14);
+  --nc-danger: #f28b82;
+  --nc-danger-ink: #f28b82;
+  --nc-danger-bg: rgb(242 139 130 / 0.14);
+  --nc-info: #8ab4f8;
+  --nc-info-ink: #8ab4f8;
+  --nc-info-bg: rgb(138 180 248 / 0.14);
+
+  --nc-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 1px 3px 1px rgb(0 0 0 / 0.2);
+  --nc-shadow-raised: 0 1px 3px 0 rgb(0 0 0 / 0.45), 0 4px 8px 3px rgb(0 0 0 / 0.25);
+  --nc-shadow-dialog: 0 4px 8px 3px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.5);
+
+  --nc-gradient-brand: linear-gradient(110deg, #174ea6 0%, #1a5ac8 55%, #1a73e8 100%);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", "Inter", "Roboto", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+
+  --color-primary: var(--nc-primary);
+  --color-primary-hover: var(--nc-primary-hover);
+  --color-primary-light: var(--nc-primary-light);
+  --color-primary-soft: var(--nc-primary-soft);
+  --color-primary-dark: var(--nc-primary-dark);
+  --color-on-primary: var(--nc-on-primary);
+
+  --color-canvas: var(--nc-canvas);
+  --color-surface: var(--nc-surface);
+  --color-surface-2: var(--nc-surface-2);
+  --color-ink: var(--nc-ink);
+  --color-ink-2: var(--nc-ink-2);
+  --color-ink-3: var(--nc-ink-3);
+  --color-line: var(--nc-line);
+  --color-line-2: var(--nc-line-2);
+  --color-overlay: var(--nc-overlay);
+
+  --color-success: var(--nc-success);
+  --color-success-ink: var(--nc-success-ink);
+  --color-success-bg: var(--nc-success-bg);
+  --color-warning: var(--nc-warning);
+  --color-warning-ink: var(--nc-warning-ink);
+  --color-warning-bg: var(--nc-warning-bg);
+  --color-danger: var(--nc-danger);
+  --color-danger-ink: var(--nc-danger-ink);
+  --color-danger-bg: var(--nc-danger-bg);
+  --color-info: var(--nc-info);
+  --color-info-ink: var(--nc-info-ink);
+  --color-info-bg: var(--nc-info-bg);
+
+  --shadow-card: var(--nc-shadow-card);
+  --shadow-raised: var(--nc-shadow-raised);
+  --shadow-dialog: var(--nc-shadow-dialog);
+}
+
+@theme {
+  /* Radius: controls 4 · buttons 5 · cards and dialogs 8 */
+  --radius-control: 4px;
+  --radius-button: 5px;
+  --radius-card: 8px;
+  --radius-dialog: 8px;
+
+  /* Type scale (size / line height / weight) */
+  --text-page: 1.75rem;
+  --text-page--line-height: 2.25rem;
+  --text-page--font-weight: 650;
+  --text-section: 1.25rem;
+  --text-section--line-height: 1.75rem;
+  --text-section--font-weight: 600;
+  --text-card: 1rem;
+  --text-card--line-height: 1.5rem;
+  --text-card--font-weight: 600;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5rem;
+  --text-support: 0.8125rem;
+  --text-support--line-height: 1.25rem;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1rem;
+  --text-button: 0.875rem;
+  --text-button--line-height: 1.25rem;
+  --text-button--font-weight: 500;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+}
+
+@utility bg-brand-gradient {
+  background-image: var(--nc-gradient-brand);
+}
+
+/* Focus ring used by every interactive kit component. */
+@utility focus-ring {
+  outline: 2px solid transparent;
+  &:focus-visible {
+    outline: 2px solid var(--nc-primary);
+    outline-offset: 2px;
+  }
 }
 
 @layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Legacy surfaces (pre-design-system screens). Kit components opt out with
+     [data-ui]; these rules are removed screen by screen during the redesign. */
   .brand-link,
   .brand-link:hover,
   .brand-link:active {
     box-shadow: none !important;
   }
 
-  button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]),
-  a[href] {
-    box-shadow: var(--surface-shadow-button);
+  :is(button, [role="button"], a[href]):not(:disabled):not([aria-disabled="true"]):not([data-ui]):not([data-ui] *) {
+    box-shadow: 0 0.5rem 1.25rem rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
     transition: box-shadow 180ms ease-out, transform 160ms ease-out, background-color 180ms ease-out, color 180ms ease-out;
   }
-
-  button:not(:disabled):hover,
-  [role="button"]:not([aria-disabled="true"]):hover,
-  a[href]:hover {
-    box-shadow: var(--surface-shadow-button-hover);
+  .dark :is(button, [role="button"], a[href]):not(:disabled):not([aria-disabled="true"]):not([data-ui]):not([data-ui] *) {
+    box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.28), 0 0 1px rgba(255, 255, 255, 0.08);
   }
-
-  button:not(:disabled):active,
-  [role="button"]:not([aria-disabled="true"]):active,
-  a[href]:active {
+  :is(button, [role="button"], a[href]):not(:disabled):not([aria-disabled="true"]):not([data-ui]):not([data-ui] *):hover {
+    box-shadow: 0 0.75rem 1.5rem rgba(15, 23, 42, 0.16), 0 2px 5px rgba(15, 23, 42, 0.1);
+  }
+  :is(button, [role="button"], a[href]):not(:disabled):not([aria-disabled="true"]):not([data-ui]):not([data-ui] *):active {
     transform: scale(0.98);
   }
 
-  div[class~="rounded-xl"],
-  div[class~="rounded-2xl"],
-  div[class~="rounded-3xl"],
-  article[class~="rounded-xl"],
-  article[class~="rounded-2xl"],
-  article[class~="rounded-3xl"],
-  section[class~="rounded-xl"],
-  section[class~="rounded-2xl"],
-  section[class~="rounded-3xl"] {
-    box-shadow: var(--surface-shadow-card);
+  :is(div, article, section):is([class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"]):not([data-ui] *) {
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.05);
     transition: box-shadow 220ms ease-out, transform 220ms ease-out;
   }
+  .dark :is(div, article, section):is([class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"]):not([data-ui] *) {
+    box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+  :is(div, article, section):is([class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"]):not([data-ui] *):hover {
+    box-shadow: 0 1.25rem 3rem rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.07);
+  }
+}
 
-  div[class~="rounded-xl"]:hover,
-  div[class~="rounded-2xl"]:hover,
-  div[class~="rounded-3xl"]:hover,
-  article[class~="rounded-xl"]:hover,
-  article[class~="rounded-2xl"]:hover,
-  article[class~="rounded-3xl"]:hover,
-  section[class~="rounded-xl"]:hover,
-  section[class~="rounded-2xl"]:hover,
-  section[class~="rounded-3xl"]:hover {
-    box-shadow: var(--surface-shadow-card-hover);
+/* Respect users who ask for less motion, everywhere in the app. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

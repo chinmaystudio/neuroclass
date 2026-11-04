@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { FEATURES } from '../../config/features';
+import { useConfirm } from '../ui';
 
 
 // Storage keys
@@ -173,6 +174,7 @@ const AVATAR_OPTIONS = [
 ];
 
 export const InstructorSettings: React.FC = () => {
+  const askConfirm = useConfirm();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'profile' | 'ai' | 'proctoring' | 'stripe' | 'system'>('profile');
 
@@ -204,8 +206,8 @@ export const InstructorSettings: React.FC = () => {
     setTimeout(() => setSaveStatus(null), 3500);
   };
 
-  const handleResetDefaults = () => {
-    if (window.confirm('Reset all teacher settings to default values?')) {
+  const handleResetDefaults = async () => {
+    if (await askConfirm({ title: 'Reset settings?', body: 'All teacher settings return to their default values.', confirmLabel: 'Reset' })) {
       setProfile(DEFAULT_PROFILE);
       setAiSettings(DEFAULT_AI);
       setProctoring(DEFAULT_PROCTORING);

@@ -5,9 +5,11 @@ import type { TeacherTestSummary } from '../lms/types';
 import { AVAILABILITY_BADGE, Badge, Button, Card, EmptyState, ErrorNote, Spinner, useAsync } from '../lms/ui';
 import { TestEditor } from './TestEditor';
 import { TestResults } from './TestResults';
+import { useConfirm } from '../../components/ui';
 
 /** Classroom → Tests tab for the classroom teacher. */
 export const TeacherTestsPanel: React.FC<{ classroomId: string; classroomName: string }> = ({ classroomId, classroomName }) => {
+  const askConfirm = useConfirm();
   const list = useAsync(() => api.get<{ role: string; tests: TeacherTestSummary[] }>(`classrooms/${classroomId}/tests`), [classroomId]);
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [viewing, setViewing] = useState<{ id: string; view: 'results' | 'monitor' } | null>(null);
@@ -15,7 +17,7 @@ export const TeacherTestsPanel: React.FC<{ classroomId: string; classroomName: s
   const [error, setError] = useState<string | null>(null);
 
   const act = async (fn: () => Promise<unknown>, confirm?: string) => {
-    if (confirm && !window.confirm(confirm)) return;
+    if (confirm && !(await askConfirm({ title: 'Are you sure?', body: confirm, confirmLabel: 'Continue', tone: /delete|archive/i.test(confirm) ? 'danger' : 'default' }))) return;
     setError(null); setMenu(null);
     try { await fn(); list.reload(); } catch (e) { setError((e as Error).message); }
   };

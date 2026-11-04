@@ -4,8 +4,11 @@ import { Plus, Users, LayoutTemplate, X, Trash2 } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
+import { useConfirm, useToast } from '../ui';
 
 export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect }) => {
+  const askConfirm = useConfirm();
+  const toast = useToast();
   const { user } = useAuth();
   const [classrooms, setClassrooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,9 +63,15 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
 
   const handleDeleteClass = async (e: React.MouseEvent, classId: string) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this classroom? All associated tests, students, and attendance records will be permanently removed.')) {
-      return;
-    }
+    const target = classrooms.find((c: any) => c.id === classId);
+    const ok = await askConfirm({
+      title: `Delete ${target?.name ?? 'this classroom'}?`,
+      body: 'All of its tests, assignments, students and attendance records will be permanently removed. This cannot be undone.',
+      confirmLabel: 'Delete classroom',
+      tone: 'danger',
+      requireText: target?.name,
+    });
+    if (!ok) return;
     
     try {
       const { getApiUrl } = await import('../../config/apiConfig');
@@ -84,9 +93,10 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
       }
       
       fetchClassrooms();
+      toast.success(`${target?.name ?? 'Classroom'} was deleted.`);
     } catch (err: any) {
       console.error('Error deleting classroom:', err);
-      alert('Failed to delete classroom: ' + err.message);
+      toast.error(`Couldn’t delete the classroom: ${err.message}`);
     }
   };
 

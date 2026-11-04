@@ -5,6 +5,7 @@ import type { Assignment, LanguageId, Submission, TestCase } from '../lms/types'
 import { AVAILABILITY_BADGE, Badge, Button, Card, EmptyState, ErrorNote, Field, inputClass, Modal, Spinner, Toggle, useAsync } from '../lms/ui';
 import { ALL_LANGUAGES } from '../tests/QuestionEditor';
 import { cn } from '../../lib/utils';
+import { useConfirm } from '../../components/ui';
 
 const CodingWorkspace = lazy(() => import('../coding/CodingWorkspace'));
 const TYPES: Array<{ id: Assignment['assignmentType']; label: string; hint: string }> = [
@@ -17,13 +18,14 @@ const TYPES: Array<{ id: Assignment['assignmentType']; label: string; hint: stri
 const FILE_TYPES = ['pdf', 'docx', 'pptx', 'xlsx', 'txt', 'md', 'csv', 'png', 'jpg', 'jpeg', 'zip', 'py', 'java', 'c', 'cpp', 'js', 'ts', 'ipynb'];
 
 export const TeacherAssignmentsPanel: React.FC<{ classroomId: string; classroomName: string }> = ({ classroomId, classroomName }) => {
+  const askConfirm = useConfirm();
   const list = useAsync(() => api.get<{ assignments: Assignment[] }>(`classrooms/${classroomId}/assignments`), [classroomId]);
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const act = async (fn: () => Promise<unknown>, confirm?: string) => {
-    if (confirm && !window.confirm(confirm)) return;
+    if (confirm && !(await askConfirm({ title: 'Are you sure?', body: confirm, confirmLabel: 'Continue', tone: /delete|archive/i.test(confirm) ? 'danger' : 'default' }))) return;
     setError(null);
     try { await fn(); list.reload(); } catch (e) { setError((e as Error).message); }
   };

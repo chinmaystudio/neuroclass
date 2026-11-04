@@ -11,12 +11,14 @@ import { TestSystem, Footer } from './components/common/TestAndFooter';
 import { AnimatePresence } from 'motion/react';
 import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
+import { FeedbackProvider } from './components/ui';
 
 // Dashboards pull in TensorFlow, camera and attendance code. Loading them on
 // demand keeps the public landing page small.
 const InstructorDashboard = lazy(() => import('./components/instructor/InstructorDashboard').then((m) => ({ default: m.InstructorDashboard })));
 const StudentDashboard = lazy(() => import('./components/student/StudentDashboard').then((m) => ({ default: m.StudentDashboard })));
 const AIModuleDashboard = lazy(() => import('./components/ai/AIModuleDashboard').then((m) => ({ default: m.AIModuleDashboard })));
+const UIKitShowcase = lazy(() => import('./features/ui-kit/UIKitShowcase'));
 const MobileAttendanceHandoff = lazy(() => import('./components/auth/MobileAttendanceHandoff').then((m) => ({ default: m.MobileAttendanceHandoff })));
 const MobileStudentAttendancePortal = lazy(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileStudentAttendancePortal })));
 const MobileTeacherAttendancePortal = lazy(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileTeacherAttendancePortal })));
@@ -62,6 +64,7 @@ const AppContent = () => {
         <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<Home onLaunchAuth={openAuth} />} />
+          <Route path="/ui-kit" element={<UIKitShowcase />} />
           <Route path="/attendance/mobile-handoff" element={<MobileAttendanceHandoff />} />
           <Route
             path="/attendance/teacher"
@@ -120,7 +123,9 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <ThemeProvider>
-          <AppContent />
+          <FeedbackProvider>
+            <AppContent />
+          </FeedbackProvider>
         </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>

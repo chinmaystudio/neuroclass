@@ -16,7 +16,7 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
   const location = useLocation();
 
   // Do not render top navbar on dashboard portals
-  if (location.pathname.startsWith('/student') || location.pathname.startsWith('/teacher')) {
+  if (location.pathname.startsWith('/student') || location.pathname.startsWith('/teacher') || location.pathname.startsWith('/ui-kit')) {
     return null;
   }
 
