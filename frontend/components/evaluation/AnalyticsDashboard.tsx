@@ -1,294 +1,161 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
-import { Microscope, TrendingUp, AlertTriangle, Medal, Filter, Star } from 'lucide-react';
-import { getEvaluations, EvaluationRecord, subscribeToStoreChanges } from '../../services/evaluationStore';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { supabase } from '../../database/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../features/lms/api';
+import type { TeacherTestSummary } from '../../features/lms/types';
+import { Card, CardHeader, CHART, DataTable, EmptyState, ErrorState, Field, PageHeader, ProgressBar, Select, Skeleton, StatCard, StatusBadge } from '../ui';
 
-const COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444'];
+type Classroom = { id: string; name: string };
+type Row = TeacherTestSummary & { classroomName: string; metrics: { submitted: number; average: number; passRate: number | null; pendingManualReview: number } | null; percentages: number[]; weakest: Array<{ prompt: string; averagePercent: number }> };
 
+const BANDS = ['0–39', '40–49', '50–59', '60–69', '70–79', '80–89', '90–100'];
+const band = (p: number) => (p < 40 ? 0 : p >= 90 ? 6 : Math.floor(p / 10) - 3);
+
+/**
+ * Teacher analytics, computed from real tests and attempts via the API.
+ * Nothing is estimated: a test with no submissions contributes nothing.
+ */
 export const AnalyticsDashboard: React.FC = () => {
-  const [evaluations, setEvaluations] = useState<EvaluationRecord[]>([]);
-  const [subjectFilter, setSubjectFilter] = useState<string>('all');
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [classrooms, setClassrooms] = React.useState<Classroom[]>([]);
+  const [rows, setRows] = React.useState<Row[] | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [filter, setFilter] = React.useState('all');
+  const [reload, setReload] = React.useState(0);
 
-  useEffect(() => {
-    const load = () => {
-      setEvaluations(getEvaluations());
-    };
-    load();
-    return subscribeToStoreChanges(load);
-  }, []);
+  React.useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    setError(null);
+    setRows(null);
+    void (async () => {
+      try {
+        const { data, error: dbError } = await supabase.from('classrooms').select('id,name').eq('user_id', user.id).order('created_at', { ascending: false });
+        if (dbError) throw dbError;
+        const rooms = (data || []) as Classroom[];
+        const lists = await Promise.all(rooms.map(async (c) => ((await api.get<{ tests: TeacherTestSummary[] }>(`classrooms/${c.id}/tests`)).tests || []).map((t) => ({ ...t, classroomName: c.name }))));
+        const tests = lists.flat().filter((t) => t.status !== 'draft' && t.status !== 'archived');
+        const withResults = await Promise.all(tests.map(async (t): Promise<Row> => {
+          if (!t.stats?.submitted) return { ...t, metrics: null, percentages: [], weakest: [] };
+          const r = await api.get<any>(`tests/${t.id}/results`);
+          return {
+            ...t,
+            metrics: r.metrics,
+            percentages: (r.attempts || []).map((a: any) => a.percentage).filter((p: unknown): p is number => typeof p === 'number'),
+            weakest: [...(r.perQuestion || [])].sort((a: any, b: any) => a.averagePercent - b.averagePercent).slice(0, 3),
+          };
+        }));
+        if (cancelled) return;
+        setClassrooms(rooms);
+        setRows(withResults.sort((a, b) => new Date(b.scheduledStart ?? b.createdAt).getTime() - new Date(a.scheduledStart ?? a.createdAt).getTime()));
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message || 'Check your connection and try again.');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, reload]);
 
-  const subjects = ['all', ...Array.from(new Set(evaluations.map(e => e.subject)))];
-
-  const filteredEvals = evaluations.filter(e => 
-    subjectFilter === 'all' || e.subject === subjectFilter
-  );
-
-  // 1. Calculate Grade Distribution Data
-  const gradeCounts: { [key: string]: number } = {};
-  filteredEvals.forEach(e => {
-    // Simplify grade to A, B, C, D, F for pie chart grouping
-    const baseGrade = e.grade.charAt(0);
-    gradeCounts[baseGrade] = (gradeCounts[baseGrade] || 0) + 1;
-  });
-  const pieData = Object.keys(gradeCounts).map(g => ({
-    name: `Grade ${g}`,
-    value: gradeCounts[g]
-  })).sort((a,b) => a.name.localeCompare(b.name));
-
-  // 2. Score Distribution Histogram (ranges of marks e.g. <50, 50-60, 60-70, 70-80, 80-90, 90-100)
-  const ranges = [
-    { name: '<50', count: 0 },
-    { name: '50-60', count: 0 },
-    { name: '60-70', count: 0 },
-    { name: '70-80', count: 0 },
-    { name: '80-90', count: 0 },
-    { name: '90-100', count: 0 }
-  ];
-  filteredEvals.forEach(e => {
-    const marks = e.marksObtained;
-    if (marks < 50) ranges[0].count++;
-    else if (marks < 60) ranges[1].count++;
-    else if (marks < 70) ranges[2].count++;
-    else if (marks < 80) ranges[3].count++;
-    else if (marks < 90) ranges[4].count++;
-    else ranges[5].count++;
-  });
-
-  // 3. Trends over dates
-  const trendData = filteredEvals
-    .map(e => ({
-      date: new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      score: e.percentage,
-      name: e.studentName
-    }))
-    .reverse(); // simple chron order
-
-  // Calculating averages
-  const totalScoreObtained = filteredEvals.reduce((a, b) => a + b.marksObtained, 0);
-  const totalScorePossible = filteredEvals.reduce((a, b) => a + b.totalMarks, 0);
-  const classAvgPercentage = totalScorePossible > 0 ? Math.round((totalScoreObtained / totalScorePossible) * 100) : 0;
-
-  // Weak Topics Analysis (Simulated structured output from RAG feedback matching)
-  const weakTopics = [
-    { topic: 'Quantum Normalization Constant Limits', parentSubject: 'Quantum Mechanics', confidence: '42% Average Score', impact: 'High Impact' },
-    { topic: 'Exponent Calculations in Tunneling Coefficients', parentSubject: 'Quantum Mechanics', confidence: '48% Average Score', impact: 'Medium Impact' },
-    { topic: 'Sophisticated Scientific Syntax & Sentence Breakouts', parentSubject: 'Academic Writing', confidence: '55% Average Score', impact: 'Low Impact' },
-  ].filter(t => subjectFilter === 'all' || t.parentSubject === subjectFilter);
-
-  // Leaderboard lists
-  const leaderboard = [...filteredEvals]
-    .sort((a, b) => b.percentage - a.percentage)
-    .slice(0, 4);
+  const shown = (rows ?? []).filter((r) => filter === 'all' || r.classroomId === filter);
+  const graded = shown.filter((r) => r.metrics && r.metrics.submitted > 0);
+  const submissions = graded.reduce((n, r) => n + (r.metrics?.submitted ?? 0), 0);
+  const allScores = graded.flatMap((r) => r.percentages);
+  const average = allScores.length ? Math.round(allScores.reduce((n, p) => n + p, 0) / allScores.length) : null;
+  const pending = shown.reduce((n, r) => n + (r.metrics?.pendingManualReview ?? r.stats?.pendingReview ?? 0), 0);
+  const distribution = BANDS.map((name) => ({ name, students: 0 }));
+  graded.forEach((r) => r.percentages.forEach((p) => { distribution[band(p)].students += 1; }));
+  const hasScores = distribution.some((d) => d.students > 0);
+  const weakest = graded.flatMap((r) => r.weakest.map((q) => ({ ...q, test: r.title }))).sort((a, b) => a.averagePercent - b.averagePercent).slice(0, 5);
 
   return (
-    <div className="space-y-8">
-      {/* Top Filter Bar */}
-      <div className="flex items-center justify-between p-5 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl">
-        <div className="flex items-center gap-3">
-          <Filter size={16} className="opacity-40" />
-          <span className="text-xs font-bold uppercase tracking-wider opacity-60">Analytics Subject Filter</span>
-        </div>
-        <select 
-          value={subjectFilter}
-          onChange={e => setSubjectFilter(e.target.value)}
-          className="px-5 py-2 rounded-xl bg-slate-50 dark:bg-black/40 border border-black/5 dark:border-white/10 text-xs font-bold uppercase tracking-wider focus:outline-none"
-        >
-          {subjects.map(s => (
-            <option key={s} value={s}>{s === 'all' ? 'All Classes' : s}</option>
-          ))}
-        </select>
-      </div>
+    <>
+      <PageHeader
+        title="Analytics"
+        description="How your classes are doing on published tests. Scores include evaluated attempts only."
+        actions={classrooms.length > 1 ? (
+          <Field label="Classroom" hideLabel>
+            <Select value={filter} onChange={(e) => setFilter(e.target.value)} className="min-w-[220px]">
+              <option value="all">All classrooms</option>
+              {classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </Field>
+        ) : undefined}
+      />
 
-      {/* Grade and Performance Tiles */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="p-6 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-wider opacity-40">Class average score</span>
-            <h4 className="text-4xl font-black italic mt-1 text-slate-800 dark:text-white">{classAvgPercentage}%</h4>
-            <p className="text-[10px] opacity-40 font-bold mt-1.5 uppercase transition-all">Across {filteredEvals.length} evaluated items</p>
-          </div>
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
-            <TrendingUp size={24} />
-          </div>
-        </div>
+      {error ? (
+        <ErrorState className="mt-6" title="Couldn’t load analytics" message={error} onRetry={() => setReload((n) => n + 1)} />
+      ) : rows === null ? (
+        <>
+          <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map((n) => <Skeleton key={n} className="h-28" rounded="card" />)}</div>
+          <Skeleton className="mt-6 h-80" rounded="card" />
+        </>
+      ) : shown.length === 0 ? (
+        <EmptyState className="mt-6" title="No published tests yet" body="Analytics appear once you publish a test and students submit it." />
+      ) : (
+        <>
+          <section aria-label="Summary" className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Published tests" value={shown.length} />
+            <StatCard label="Submissions" value={submissions} tone="info" />
+            <StatCard label="Average score" value={average === null ? '—' : `${average}%`} tone="success" hint={average === null ? 'No evaluated attempts yet' : `${allScores.length} evaluated ${allScores.length === 1 ? 'attempt' : 'attempts'}`} />
+            <StatCard label="Needs grading" value={pending} tone="warning" hint={pending ? 'Open the test’s results to grade' : 'All caught up'} />
+          </section>
 
-        <div className="p-6 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-wider opacity-40">Flagged Submissions</span>
-            <h4 className="text-4xl font-black italic mt-1 text-amber-500">0</h4>
-            <p className="text-[10px] opacity-40 font-bold mt-1.5 uppercase">Plagiarism thresholds safe</p>
-          </div>
-          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center animate-pulse">
-            <Microscope size={24} />
-          </div>
-        </div>
-
-        <div className="p-6 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-wider opacity-40">Top Student Marks</span>
-            <h4 className="text-4xl font-black italic mt-1 text-emerald-500">
-              {leaderboard.length > 0 ? `${leaderboard[0].marksObtained}/${leaderboard[0].totalMarks}` : 'N/A'}
-            </h4>
-            <p className="text-[10px] opacity-40 font-bold mt-1.5 uppercase">
-              {leaderboard.length > 0 ? `Set by ${leaderboard[0].studentName}` : 'No submissions yet'}
-            </p>
-          </div>
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-            <Star size={24} />
-          </div>
-        </div>
-      </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Line Chart: Performance Trends Over Time */}
-        <div className="p-8 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl space-y-6 shadow-md">
-          <div>
-            <h3 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white">Performance Progression Timeline</h3>
-            <p className="text-xs opacity-40 mt-1">Timeline of direct percentages awarded on evaluations.</p>
-          </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="date" stroke="#888888" fontSize={11} />
-                <YAxis stroke="#888888" fontSize={11} domain={[0, 100]} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '16px' }}
-                  labelStyle={{ color: '#ffffff', fontWeight: 'bold' }}
-                />
-                <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={3} activeDot={{ r: 8 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Bar Chart: Marks Distribution Histogram */}
-        <div className="p-8 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl space-y-6 shadow-md">
-          <div>
-            <h3 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white">Score Density & Distribution</h3>
-            <p className="text-xs opacity-40 mt-1">Histogram displaying quantity of students in specified mark bandwidths.</p>
-          </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ranges}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="name" stroke="#888888" fontSize={11} />
-                <YAxis stroke="#888888" fontSize={11} allowDecimals={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '16px' }}
-                />
-                <Bar dataKey="count" fill="#a855f7" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Pie Chart: Grades Demographics */}
-        <div className="p-8 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl space-y-6 shadow-md">
-          <div>
-            <h3 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white">Grades Breakdown</h3>
-            <p className="text-xs opacity-40 mt-1">Demographics analysis of letter grades allocated to this course.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-6">
-            <div className="h-56 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-3">
-              {pieData.map((item, index) => (
-                <div key={item.name} className="flex items-center justify-between text-xs font-semibold">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                    <span className="opacity-80">{item.name}</span>
-                  </div>
-                  <span className="font-mono text-slate-500 dark:text-white/40">{item.value} Student(s)</span>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <Card as="section" aria-labelledby="dist-heading">
+              <CardHeader title={<span id="dist-heading">Score distribution</span>} subtitle="Evaluated attempts by percentage band." />
+              {hasScores ? (
+                <div className="mt-6 h-64" role="img" aria-label={`Score distribution: ${distribution.map((d) => `${d.name}%: ${d.students}`).join(', ')}`}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={distribution} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid vertical={false} stroke={CHART.grid} />
+                      <XAxis dataKey="name" tick={CHART.tick} stroke={CHART.grid} tickLine={false} />
+                      <YAxis allowDecimals={false} tick={CHART.tick} stroke={CHART.grid} tickLine={false} />
+                      <Tooltip {...CHART.tooltip} formatter={(v: any) => [v, 'Attempts']} labelFormatter={(l) => `${l}%`} />
+                      <Bar dataKey="students" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={48} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
+              ) : <div className="mt-4"><EmptyState compact title="No evaluated attempts yet" /></div>}
+            </Card>
 
-        {/* Leaderboard and Weak Topics */}
-        <div className="p-8 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl space-y-6 shadow-md">
-          <div>
-            <h3 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white">Top Student Rankings</h3>
-            <p className="text-xs opacity-40 mt-1">Leaderboard mapping our top-percentage achievers.</p>
+            <Card as="section" aria-labelledby="weak-heading">
+              <CardHeader title={<span id="weak-heading">Questions to revisit</span>} subtitle="Lowest average scores across your tests." />
+              {weakest.length === 0 ? <div className="mt-4"><EmptyState compact title="Nothing to show yet" body="Question scores appear once attempts are evaluated." /></div> : (
+                <ul className="mt-4 flex flex-col gap-4">
+                  {weakest.map((q, i) => (
+                    <li key={`${q.test}-${i}`} className="min-w-0">
+                      <p className="truncate text-body text-ink" title={q.prompt}>{q.prompt}</p>
+                      <p className="mb-1.5 truncate text-meta text-ink-2">{q.test}</p>
+                      <ProgressBar value={q.averagePercent} label={`Average score for this question`} showValue tone={q.averagePercent < 40 ? 'danger' : q.averagePercent < 70 ? 'warning' : 'success'} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
           </div>
-          <div className="space-y-4">
-            {leaderboard.length === 0 ? (
-              <p className="text-sm opacity-40 py-10 text-center">No evaluations cataloged for leaderboard yet.</p>
-            ) : (
-              leaderboard.map((item, idx) => (
-                <div key={item.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-[#0c0d12] border border-black/5 dark:border-white/5 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4.5">
-                    <div className={`w-9 h-9 rounded-xl font-bold flex items-center justify-center text-xs ${idx === 0 ? 'bg-amber-500/10 text-amber-500' : idx === 1 ? 'bg-slate-400/10 text-slate-400' : 'bg-orange-500/10 text-orange-500'}`}>
-                      {idx === 0 ? <Medal size={16} /> : `#${idx + 1}`}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">{item.studentName}</h4>
-                      <p className="text-[10px] opacity-40 mt-0.5 uppercase tracking-wider">Roll: {item.rollNumber}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="text-right">
-                    <span className="font-mono text-sm font-black text-blue-500">{item.percentage}%</span>
-                    <span className="block text-[9px] font-bold uppercase tracking-widest opacity-40 mt-0.5">Grade: {item.grade}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Weak Topics Section */}
-      <div className="p-8 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl space-y-6 shadow-md">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="text-rose-500 animate-bounce" size={20} />
-          <h3 className="text-lg font-bold tracking-tight text-slate-800 dark:text-white">Topic Gap Remediation (Urgent Focus)</h3>
-        </div>
-        <p className="text-xs opacity-40">Identified from student answer sheets via our automated semantic OCR grader.</p>
-
-        <div className="space-y-4">
-          {weakTopics.length === 0 ? (
-            <p className="text-sm opacity-40 py-5 text-center">No topic gap deficiencies registered.</p>
-          ) : (
-            weakTopics.map(t => (
-              <div key={t.topic} className="p-5 rounded-2xl bg-rose-500/5 border border-rose-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:bg-rose-500/10">
-                <div className="space-y-1">
-                  <span className="text-[8px] font-black uppercase text-rose-500 tracking-wider bg-rose-500/10 px-2 py-0.5 rounded-full">{t.impact}</span>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{t.topic}</h4>
-                  <p className="text-[10px] opacity-40 font-bold uppercase">Course: {t.parentSubject}</p>
-                </div>
-                <div className="text-left md:text-right">
-                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400 font-mono">{t.confidence}</span>
-                  <p className="text-[9px] opacity-40 uppercase tracking-widest mt-0.5">Class Average Math Gap</p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+          <Card as="section" padding="none" className="mt-6" aria-labelledby="tests-heading">
+            <div className="border-b border-line-2 px-5 py-4"><h2 id="tests-heading" className="text-card text-ink">Tests</h2></div>
+            <DataTable
+              caption="Published tests and their results"
+              rows={shown}
+              rowKey={(r) => `${r.classroomId}-${r.id}`}
+              primaryColumn="title"
+              onRowClick={(r) => navigate(`/teacher/classrooms/${r.classroomId}/tests`)}
+              columns={[
+                { key: 'title', header: 'Test', cell: (r) => <span className="min-w-0"><span className="block truncate font-medium text-ink">{r.title}</span><span className="block truncate text-support text-ink-2">{r.classroomName}</span></span> },
+                { key: 'status', header: 'Status', cell: (r) => <StatusBadge status={r.availability === 'active' ? 'active' : r.availability === 'ended' ? 'completed' : 'scheduled'} label={r.availability === 'active' ? 'Live' : r.availability === 'ended' ? 'Ended' : 'Scheduled'} /> },
+                { key: 'submitted', header: 'Submitted', align: 'right', cell: (r) => <span className="tabular-nums">{r.stats?.submitted ?? 0}</span> },
+                { key: 'average', header: 'Average', align: 'right', cell: (r) => <span className="tabular-nums">{r.percentages.length ? `${Math.round(r.metrics!.average)}%` : '—'}</span> },
+                { key: 'pass', header: 'Pass rate', align: 'right', hideOnMobile: true, cell: (r) => <span className="tabular-nums">{r.metrics?.passRate == null ? '—' : `${r.metrics.passRate}%`}</span> },
+                { key: 'grading', header: 'To grade', align: 'right', cell: (r) => <span className="tabular-nums">{r.metrics?.pendingManualReview ?? r.stats?.pendingReview ?? 0}</span> },
+              ]}
+            />
+          </Card>
+        </>
+      )}
+    </>
   );
 };

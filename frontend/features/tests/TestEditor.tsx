@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarClock, CheckCircle2, Code2, Eye, FileText, Lock, Plus, Rocket, Save, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, CalendarClock, CheckCircle2, Code2, Eye, FileText, Lock, Plus, Rocket, Save, ShieldCheck, Sparkles } from '../../components/ui/icons-compat';
 import { api, fromLocalInput, toLocalInput } from '../lms/api';
 import { DEFAULT_CONFIG, DEFAULT_SECURITY, QUESTION_TYPE_LABELS, type EditableQuestion, type QuestionType, type TeacherTestDetail, type TestConfig, type SecurityConfig } from '../lms/types';
 import { Badge, Button, Card, ErrorNote, Field, inputClass, Modal, Spinner, Toggle, AVAILABILITY_BADGE } from '../lms/ui';
@@ -113,7 +113,7 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" onClick={() => onClose(changed)} icon={<ArrowLeft size={14} />}>Tests</Button>
-        <h3 className="text-xl font-black">{testId ? meta.title || 'Untitled test' : 'New test'}</h3>
+        <h3 className="text-xl font-semibold">{testId ? meta.title || 'Untitled test' : 'New test'}</h3>
         {detail && <Badge tone={AVAILABILITY_BADGE[detail.availability]?.tone}>{AVAILABILITY_BADGE[detail.availability]?.label}</Badge>}
         {locked && <Badge tone="amber"><Lock size={11} /> Questions locked — students have attempted</Badge>}
         <div className="ml-auto flex gap-2">
@@ -122,11 +122,11 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
       </div>
 
       <nav className="flex gap-2 overflow-x-auto" aria-label="Test editor steps">
-        {steps.map((s) => <button key={s.id} type="button" disabled={!testId && s.id !== 'details'} onClick={() => setStep(s.id)} className={cn('flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-[11px] font-bold uppercase tracking-widest disabled:opacity-40', step === s.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-white/5')}>{s.icon}{s.label}</button>)}
+        {steps.map((s) => <button key={s.id} type="button" disabled={!testId && s.id !== 'details'} onClick={() => setStep(s.id)} className={cn('flex shrink-0 items-center gap-2 rounded-button px-4 py-2 text-meta font-bold disabled:opacity-40', step === s.id ? 'bg-primary text-on-primary' : 'bg-surface-2 text-ink-2 ')}>{s.icon}{s.label}</button>)}
       </nav>
 
       <ErrorNote message={error} />
-      {notice && <p role="status" className="rounded-2xl bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-600">{notice}</p>}
+      {notice && <p role="status" className="rounded-card bg-success-bg p-3 text-xs font-semibold text-success-ink">{notice}</p>}
 
       {step === 'details' && (
         <Card className="space-y-4">
@@ -162,7 +162,7 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
 
       {step === 'questions' && (
         <div className="space-y-4">
-          {questions.length === 0 && <Card className="text-center text-sm text-slate-500">Add your first question below. Answer keys stay on the server and are never sent to students.</Card>}
+          {questions.length === 0 && <Card className="text-center text-sm text-ink-2">Add your first question below. Answer keys stay on the server and are never sent to students.</Card>}
           {questions.map((q, i) => (
             <QuestionEditor key={i} question={q} index={i} total={questions.length} locked={locked} testId={testId ?? undefined} negativeMarking={meta.config.negativeMarking}
               onChange={(next) => updateQuestion(i, next)}
@@ -172,13 +172,13 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
           ))}
           {!locked && (
             <Card className="flex flex-wrap items-center gap-2">
-              <span className="mr-2 text-[11px] font-bold uppercase tracking-widest text-slate-500"><Plus size={12} className="inline" /> Add</span>
+              <span className="mr-2 text-meta font-bold text-ink-2"><Plus size={12} className="inline" /> Add</span>
               {(['mcq', 'multiple_select', 'true_false', 'short_answer', 'numerical', 'long_answer', 'coding'] as QuestionType[]).map((t) => <Button key={t} size="sm" variant="secondary" onClick={() => addQuestion(t)}>{QUESTION_TYPE_LABELS[t]}</Button>)}
               <Button size="sm" onClick={() => setAiOpen(true)} icon={<Sparkles size={13} />}>Generate with AI</Button>
             </Card>
           )}
-          <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/5 bg-white/90 p-3 backdrop-blur dark:border-white/10 dark:bg-black/70">
-            <span className="text-xs font-bold text-slate-500">{questions.length} questions · {totalMarks} marks {invalidCount ? <span className="text-amber-600">· {invalidCount} need attention</span> : null} {dirtyQuestions && <span className="text-blue-600">· unsaved changes</span>}</span>
+          <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface p-3 ">
+            <span className="text-xs font-bold text-ink-2">{questions.length} questions · {totalMarks} marks {invalidCount ? <span className="text-warning-ink">· {invalidCount} need attention</span> : null} {dirtyQuestions && <span className="text-primary">· unsaved changes</span>}</span>
             <div className="flex gap-2">
               <Button variant="secondary" disabled={locked} loading={saving === 'questions'} onClick={() => void saveQuestions()} icon={<Save size={14} />}>Save questions</Button>
               <Button disabled={locked && false} onClick={() => (locked || !dirtyQuestions ? setStep('security') : void saveQuestions('security'))}>Continue</Button>
@@ -199,8 +199,8 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
             <Toggle checked={sec.liveProctoring} onChange={(v) => setSec({ liveProctoring: v, requireCamera: v || sec.requireCamera })} label="Live AI proctoring" description="On-device face, head-pose and gaze checks plus periodic identity re-checks." />
           </div>
           {(sec.liveProctoring || sec.requireIdentityVerification) && (
-            <div className="space-y-4 rounded-2xl border border-purple-500/20 bg-purple-500/5 p-4">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-purple-600">Detection thresholds</p>
+            <div className="space-y-4 rounded-card border border-primary-soft bg-primary-light p-4">
+              <p className="text-meta font-bold text-primary">Detection thresholds</p>
               <div className="grid gap-3 md:grid-cols-3">
                 <Field label="Looking away for (s)"><input type="number" min={1} max={60} value={sec.thresholds.lookAwaySeconds} onChange={(e) => setThreshold('lookAwaySeconds', Number(e.target.value))} className={inputClass} /></Field>
                 <Field label="Head turn (°)"><input type="number" min={15} max={90} value={sec.thresholds.headYawDegrees} onChange={(e) => setThreshold('headYawDegrees', Number(e.target.value))} className={inputClass} /></Field>
@@ -217,7 +217,7 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
                 <Field label="If the camera disconnects"><select value={sec.cameraDisconnectPolicy} onChange={(e) => setSec({ cameraDisconnectPolicy: e.target.value as SecurityConfig['cameraDisconnectPolicy'] })} className={inputClass}><option value="flag">Record it and continue</option><option value="pause">Block the screen until reconnected</option></select></Field>
                 <Field label="If full screen is exited"><select value={sec.fullscreenExitPolicy} onChange={(e) => setSec({ fullscreenExitPolicy: e.target.value as SecurityConfig['fullscreenExitPolicy'] })} className={inputClass}><option value="flag">Record and ask to return</option><option value="pause">Record and block until return</option></select></Field>
               </div>
-              <p className="text-xs leading-5 text-slate-500">Warnings are review signals for you. They never fail a student automatically. Browser monitoring cannot see other devices or everything on a computer.</p>
+              <p className="text-xs leading-5 text-ink-2">Warnings are review signals for you. They never fail a student automatically. Browser monitoring cannot see other devices or everything on a computer.</p>
             </div>
           )}
           <div className="flex justify-end"><Button loading={saving === 'details'} onClick={() => void saveDetails('publish')} icon={<Save size={14} />}>Save & continue</Button></div>
@@ -253,7 +253,7 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
 
       {preview && detail && (
         <Modal title={`Preview — ${meta.title}`} onClose={() => setPreview(false)} wide>
-          <p className="mb-4 rounded-xl bg-blue-500/10 p-3 text-xs text-blue-700 dark:text-blue-300">This is what students see. Answer keys and hidden test cases are not part of the student view.</p>
+          <p className="mb-4 rounded-button bg-primary-light p-3 text-xs text-primary-dark ">This is what students see. Answer keys and hidden test cases are not part of the student view.</p>
           <div className="space-y-10">
             {detail.questions.map((q, i) => (
               <QuestionView key={q.id ?? i} index={i} attemptId="preview" readOnly blockClipboard={false} onViolation={() => undefined} onChange={() => undefined} response={null}
@@ -267,8 +267,8 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
 };
 
 const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="rounded-2xl border border-black/5 p-4 dark:border-white/10"><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</p><p className="mt-1 text-lg font-black">{value}</p></div>
+  <div className="rounded-card border border-line p-4 "><p className="text-meta font-bold text-ink-2">{label}</p><p className="mt-1 text-lg font-semibold">{value}</p></div>
 );
 const Check: React.FC<{ ok: boolean; label: string }> = ({ ok, label }) => (
-  <li className={cn('flex items-center gap-2', ok ? 'text-emerald-600' : 'text-amber-600')}><CheckCircle2 size={15} className={ok ? '' : 'opacity-40'} /> {label}</li>
+  <li className={cn('flex items-center gap-2', ok ? 'text-success-ink' : 'text-warning-ink')}><CheckCircle2 size={15} className={ok ? '' : 'opacity-40'} /> {label}</li>
 );

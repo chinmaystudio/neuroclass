@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Camera, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Expand, Flag, Loader2, LogOut, Send, ShieldCheck, Wifi, WifiOff, XCircle } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Expand, Flag, Loader2, LogOut, Send, ShieldCheck, Wifi, WifiOff, XCircle } from '../../components/ui/icons-compat';
 import { api, ApiRequestError } from '../lms/api';
 import type { AttemptState } from '../lms/types';
 import { Button, ErrorNote } from '../lms/ui';
@@ -269,41 +269,41 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
 
   // A render function (not a nested component) so the <video> element is not remounted every tick.
   const cameraPreview = (large = false) => (
-    <div className={cn('relative overflow-hidden rounded-2xl bg-black', large ? 'aspect-video w-full max-w-md' : 'aspect-[4/3] w-40 sm:w-48')}>
+    <div className={cn('relative overflow-hidden rounded-card bg-black', large ? 'aspect-video w-full max-w-md' : 'aspect-[4/3] w-40 sm:w-48')}>
       <video ref={proctor.attachVideo} muted playsInline autoPlay className="h-full w-full -scale-x-100 object-cover" aria-label="Your camera preview" />
       {/* Red boxes mark a detected event, not proven misconduct. */}
       {(proctor.activeWarning?.boxes?.length ? proctor.activeWarning.boxes : []).map((b, i) => (
-        <div key={i} className="absolute border-2 border-rose-500 shadow-[0_0_0_9999px_rgba(244,63,94,0.08)]" style={{ left: `${(1 - b.x - b.width) * 100}%`, top: `${b.y * 100}%`, width: `${b.width * 100}%`, height: `${b.height * 100}%` }}>
-          {b.label && <span className="absolute -top-5 left-0 whitespace-nowrap rounded bg-rose-500 px-1 text-[9px] font-bold uppercase text-white">{b.label}</span>}
+        <div key={i} className="absolute border-2 border-danger shadow-[0_0_0_9999px_rgba(244,63,94,0.08)]" style={{ left: `${(1 - b.x - b.width) * 100}%`, top: `${b.y * 100}%`, width: `${b.width * 100}%`, height: `${b.height * 100}%` }}>
+          {b.label && <span className="absolute -top-5 left-0 whitespace-nowrap rounded bg-danger px-1 text-meta font-bold text-on-primary">{b.label}</span>}
         </div>
       ))}
       {!proctor.activeWarning?.boxes?.length && proctor.liveBoxes.slice(0, 1).map((b, i) => (
-        <div key={i} className="absolute border border-emerald-400/70" style={{ left: `${(1 - b.x - b.width) * 100}%`, top: `${b.y * 100}%`, width: `${b.width * 100}%`, height: `${b.height * 100}%` }} />
+        <div key={i} className="absolute border border-success" style={{ left: `${(1 - b.x - b.width) * 100}%`, top: `${b.y * 100}%`, width: `${b.width * 100}%`, height: `${b.height * 100}%` }} />
       ))}
-      <span className={cn('absolute bottom-1.5 left-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest', proctor.cameraStatus === 'active' ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white')}>{proctor.cameraStatus === 'active' ? (security?.liveProctoring ? (proctor.visionStatus === 'ready' ? 'Monitoring' : proctor.visionStatus === 'loading' ? 'Starting' : 'Camera on') : 'Camera on') : proctor.cameraStatus}</span>
+      <span className={cn('absolute bottom-1.5 left-1.5 rounded-full px-2 py-0.5 text-meta font-bold ', proctor.cameraStatus === 'active' ? 'bg-success/90 text-white' : 'bg-danger/90 text-white')}>{proctor.cameraStatus === 'active' ? (security?.liveProctoring ? (proctor.visionStatus === 'ready' ? 'Monitoring' : proctor.visionStatus === 'loading' ? 'Starting' : 'Camera on') : 'Camera on') : proctor.cameraStatus}</span>
     </div>
   );
 
-  if (phase === 'loading') return <Shell><div className="flex h-full items-center justify-center gap-3 text-sm text-slate-400"><Loader2 className="animate-spin" size={18} /> Preparing your exam…</div></Shell>;
+  if (phase === 'loading') return <Shell><div className="flex h-full items-center justify-center gap-3 text-sm text-ink-2"><Loader2 className="animate-spin" size={18} /> Preparing your exam…</div></Shell>;
 
   if (phase === 'error') return (
-    <Shell><div className="mx-auto max-w-lg space-y-4 p-8 text-center"><XCircle className="mx-auto text-rose-500" size={36} /><h1 className="text-xl font-black">This exam can’t be opened</h1><p className="text-sm text-slate-400">{error}</p><Button variant="secondary" onClick={exit}>Back to classroom</Button></div></Shell>
+    <Shell><div className="mx-auto max-w-lg space-y-4 p-8 text-center"><XCircle className="mx-auto text-danger-ink" size={36} /><h1 className="text-xl font-semibold">This exam can’t be opened</h1><p className="text-sm text-ink-2">{error}</p><Button variant="secondary" onClick={exit}>Back to classroom</Button></div></Shell>
   );
 
   if (phase === 'instructions' && state) return (
     <Shell>
       <div className="mx-auto max-w-3xl space-y-6 p-6 sm:p-10">
-        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-purple-400">Before you begin</p>
-        <h1 className="text-3xl font-black tracking-tight">{state.test.title}</h1>
+        <p className="text-meta font-bold text-primary">Before you begin</p>
+        <h1 className="text-3xl font-semibold tracking-tight">{state.test.title}</h1>
         <div className="grid gap-3 sm:grid-cols-3">
           <Info icon={<Clock3 size={16} />} label="Duration" value={`${state.test.durationMinutes} minutes`} />
           <Info icon={<CheckCircle2 size={16} />} label="Total marks" value={String(state.test.totalMarks)} />
           <Info icon={<ShieldCheck size={16} />} label="Mode" value={state.test.examMode === 'coding' ? 'Coding exam' : 'Standard'} />
         </div>
-        {state.test.instructions && <div className="whitespace-pre-wrap rounded-2xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-slate-200">{state.test.instructions}</div>}
-        <div className="space-y-3 rounded-2xl border border-purple-400/20 bg-purple-500/10 p-5 text-sm leading-6 text-purple-50">
+        {state.test.instructions && <div className="whitespace-pre-wrap rounded-card border border-line bg-surface-2 p-5 text-sm leading-6 text-ink-3">{state.test.instructions}</div>}
+        <div className="space-y-3 rounded-card border border-primary-soft bg-primary-light p-5 text-sm leading-6 text-primary">
           <p className="font-bold">What is monitored during this exam</p>
-          <ul className="list-disc space-y-1 pl-5 text-purple-100/90">
+          <ul className="list-disc space-y-1 pl-5 text-primary">
             <li>The timer is controlled by the server and keeps running if you refresh or lose connection. Answers are saved automatically.</li>
             {security?.requireFullscreen && <li>The exam runs in full-screen mode. Leaving full screen is recorded.</li>}
             {security?.tabSwitchDetection && <li>Switching tabs or windows is recorded.</li>}
@@ -311,11 +311,11 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
             {needsCamera && <li>Your camera is used {security?.liveProctoring ? 'to check that you are present and facing the screen, using a face model that runs on your device; only numeric signals such as face count and head angle are sent to the server' : 'during the exam'}. Video is not recorded or uploaded.</li>}
             {security?.requireIdentityVerification && <li>A single photo is compared with your registered Face ID on our server{security.liveProctoring ? ', and re-checked periodically' : ''}. Face embeddings never leave the server.</li>}
           </ul>
-          <p className="text-xs text-purple-200/80">Warnings are signals for your teacher to review. They are not proof of cheating and never fail you automatically. You can appeal any decision after the exam. Browser monitoring cannot see other devices.</p>
+          <p className="text-xs text-primary">Warnings are signals for your teacher to review. They are not proof of cheating and never fail you automatically. You can appeal any decision after the exam. Browser monitoring cannot see other devices.</p>
         </div>
         {needsCamera && (
-          <label className="flex items-start gap-3 rounded-2xl border border-white/10 p-4 text-sm">
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-4 w-4 accent-purple-500" />
+          <label className="flex items-start gap-3 rounded-card border border-line p-4 text-sm">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
             <span>I understand and agree to camera monitoring for this exam.</span>
           </label>
         )}
@@ -331,11 +331,11 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
   if (phase === 'setup' && state) return (
     <Shell>
       <div className="mx-auto max-w-3xl space-y-6 p-6 sm:p-10">
-        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-purple-400">System check</p>
-        <h1 className="text-2xl font-black">Get ready for {state.test.title}</h1>
+        <p className="text-meta font-bold text-primary">System check</p>
+        <h1 className="text-2xl font-semibold">Get ready for {state.test.title}</h1>
         <div className="grid gap-6 md:grid-cols-[1fr_1fr]">
           <div className="space-y-3">
-            {needsCamera ? cameraPreview(true) : <div className="rounded-2xl border border-white/10 p-6 text-sm text-slate-400">This exam does not use your camera.</div>}
+            {needsCamera ? cameraPreview(true) : <div className="rounded-card border border-line p-6 text-sm text-ink-2">This exam does not use your camera.</div>}
             {liveness && <LivenessPrompt progress={liveness} />}
             {needsCamera && proctor.cameraStatus === 'blocked' && <ErrorNote message="Camera access was blocked. Allow the camera in your browser’s site settings, then press Retry." onRetry={() => void proctor.startCamera()} />}
           </div>
@@ -354,7 +354,7 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
           <Button variant="secondary" onClick={exit} icon={<LogOut size={14} />}>Leave</Button>
           <Button variant="student" disabled={!cameraReady || !identityReady} onClick={() => void begin()} icon={security?.requireFullscreen ? <Expand size={14} /> : <ChevronRight size={14} />}>{security?.requireFullscreen ? 'Enter full screen & start' : 'Start exam'}</Button>
         </div>
-        <p className="text-xs text-slate-500">The timer starts only when you press start.</p>
+        <p className="text-xs text-ink-2">The timer starts only when you press start.</p>
       </div>
     </Shell>
   );
@@ -362,37 +362,37 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
   if ((phase === 'submitting' || phase === 'done') && state) return (
     <Shell>
       <div className="mx-auto max-w-lg space-y-5 p-8 text-center">
-        {phase === 'submitting' ? <Loader2 className="mx-auto animate-spin text-purple-400" size={36} /> : <CheckCircle2 className="mx-auto text-emerald-400" size={40} />}
-        <h1 className="text-2xl font-black">{phase === 'submitting' ? 'Submitting your answers…' : 'Exam submitted'}</h1>
+        {phase === 'submitting' ? <Loader2 className="mx-auto animate-spin text-primary" size={36} /> : <CheckCircle2 className="mx-auto text-success-ink" size={40} />}
+        <h1 className="text-2xl font-semibold">{phase === 'submitting' ? 'Submitting your answers…' : 'Exam submitted'}</h1>
         {phase === 'done' && (result?.resultsReleased
-          ? <p className="text-lg font-bold">Score: {result.score} / {result.maxScore} <span className="text-slate-400">({result.percentage}%)</span></p>
-          : <p className="text-sm text-slate-400">{result?.note ?? 'Your answers are saved. Your teacher will release the results.'}</p>)}
+          ? <p className="text-lg font-bold">Score: {result.score} / {result.maxScore} <span className="text-ink-2">({result.percentage}%)</span></p>
+          : <p className="text-sm text-ink-2">{result?.note ?? 'Your answers are saved. Your teacher will release the results.'}</p>)}
         {phase === 'done' && <Button variant="student" onClick={exit}>Back to classroom</Button>}
       </div>
     </Shell>
   );
 
-  if (!state || !current) return <Shell><div className="p-8 text-sm text-slate-400">No questions are available.</div></Shell>;
+  if (!state || !current) return <Shell><div className="p-8 text-sm text-ink-2">No questions are available.</div></Shell>;
 
   return (
     <Shell>
       {/* Header */}
-      <header className="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-3">
+      <header className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-3">
         <div className="min-w-[8rem] flex-1">
-          <p className="line-clamp-2 text-sm font-black sm:truncate">{state.test.title}</p>
-          <p className="text-[11px] text-slate-400">{answered}/{questions.length} answered{flagged ? ` · ${flagged} flagged` : ''}</p>
+          <p className="line-clamp-2 text-sm font-semibold sm:truncate">{state.test.title}</p>
+          <p className="text-meta text-ink-2">{answered}/{questions.length} answered{flagged ? ` · ${flagged} flagged` : ''}</p>
         </div>
-        <span className={cn('order-last flex w-full items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest sm:order-none sm:w-auto', queue.state === 'saved' ? 'text-emerald-400' : queue.state === 'offline' ? 'text-amber-400' : 'text-slate-400')} aria-live="polite">
+        <span className={cn('order-last flex w-full items-center gap-1.5 text-meta font-bold sm:order-none sm:w-auto', queue.state === 'saved' ? 'text-success-ink' : queue.state === 'offline' ? 'text-warning-ink' : 'text-ink-2')} aria-live="polite">
           {online ? <Wifi size={13} /> : <WifiOff size={13} />}
           {queue.state === 'saving' ? 'Saving…' : queue.state === 'offline' || !online ? `Offline · ${queue.pendingCount} queued` : queue.state === 'error' ? 'Save failed — retrying' : 'All changes saved'}
         </span>
-        {proctor.warningCount > 0 && <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-300"><AlertTriangle size={12} /> {proctor.warningCount} warning{proctor.warningCount === 1 ? '' : 's'}</span>}
-        <span role="timer" aria-label="Time remaining" className={cn('rounded-xl px-3 py-1.5 font-mono text-lg font-black tabular-nums', lowTime ? 'bg-rose-500/20 text-rose-300' : 'bg-white/10')}>{remaining === null ? '--:--' : fmt(remaining)}</span>
+        {proctor.warningCount > 0 && <span className="flex items-center gap-1 rounded-full bg-warning-bg px-2.5 py-1 text-meta font-bold text-warning-ink"><AlertTriangle size={12} /> {proctor.warningCount} warning{proctor.warningCount === 1 ? '' : 's'}</span>}
+        <span role="timer" aria-label="Time remaining" className={cn('rounded-button px-3 py-1.5 font-mono text-lg font-semibold tabular-nums', lowTime ? 'bg-danger-bg text-danger-ink' : 'bg-surface-2')}>{remaining === null ? '--:--' : fmt(remaining)}</span>
         <Button variant="student" size="sm" onClick={() => setConfirmSubmit(true)} icon={<Send size={13} />}>Submit</Button>
       </header>
 
       {proctor.activeWarning && (
-        <div role="alert" className={cn('flex items-center gap-3 px-4 py-2 text-sm font-semibold', proctor.activeWarning.severity === 'high' ? 'bg-rose-600 text-white' : 'bg-amber-500 text-black')}>
+        <div role="alert" className={cn('flex items-center gap-3 px-4 py-2 text-sm font-semibold', proctor.activeWarning.severity === 'high' ? 'bg-danger text-on-primary' : 'bg-warning text-ink')}>
           <AlertTriangle size={16} /> <span className="flex-1">{proctor.activeWarning.message}</span>
           <button type="button" onClick={proctor.dismissWarning} className="text-xs font-bold underline">OK</button>
         </div>
@@ -401,7 +401,7 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
 
       <div className={cn('grid min-h-0 flex-1 gap-0', state.test.examMode === 'coding' ? 'lg:grid-cols-[220px_1fr]' : 'lg:grid-cols-[240px_1fr]')}>
         {/* Navigator + camera */}
-        <aside className="flex items-start gap-3 border-b border-white/10 p-3 sm:p-4 lg:block lg:space-y-4 lg:border-b-0 lg:border-r">
+        <aside className="flex items-start gap-3 border-b border-line p-3 sm:p-4 lg:block lg:space-y-4 lg:border-b-0 lg:border-r">
           {needsCamera && <div className="shrink-0 [&>div]:w-28 sm:[&>div]:w-40 lg:[&>div]:w-48">{cameraPreview()}</div>}
           <nav aria-label="Questions" className="grid flex-1 grid-cols-6 gap-1.5 sm:grid-cols-8 lg:grid-cols-5">
             {questions.map((q, i) => {
@@ -410,8 +410,8 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
               const disabled = !state.test.allowBackNavigation && i < index;
               return (
                 <button key={q.id} type="button" disabled={disabled} onClick={() => setIndex(i)} aria-current={i === index} aria-label={`Question ${i + 1}${has ? ', answered' : ''}${answers[q.id]?.markedForReview ? ', flagged' : ''}`}
-                  className={cn('relative h-9 rounded-lg text-xs font-bold', i === index ? 'bg-purple-600 text-white' : has ? 'bg-emerald-500/20 text-emerald-200' : 'bg-white/5 text-slate-300', disabled && 'opacity-30')}>
-                  {i + 1}{answers[q.id]?.markedForReview && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber-400" />}
+                  className={cn('relative h-9 rounded-lg text-xs font-bold', i === index ? 'bg-primary text-on-primary' : has ? 'bg-success-bg text-success-ink' : 'bg-surface-2 text-ink-2', disabled && 'opacity-30')}>
+                  {i + 1}{answers[q.id]?.markedForReview && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-warning" />}
                 </button>
               );
             })}
@@ -421,9 +421,9 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
         <main className="min-h-0 overflow-y-auto p-4 sm:p-8">
           <div className={cn('mx-auto', current.type === 'coding' ? 'max-w-none' : 'max-w-3xl')}>
             <QuestionView key={current.id} question={current} index={index} response={answers[current.id]?.response} onChange={(r, d) => updateAnswer(current.id, r, d)} attemptId={state.attempt.id} blockClipboard={blockClipboard} onViolation={onViolation} saveState={queue.state} />
-            <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
+            <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-line pt-5">
               <Button variant="secondary" disabled={index === 0 || !state.test.allowBackNavigation} onClick={() => setIndex((i) => Math.max(0, i - 1))} icon={<ChevronLeft size={14} />}>Previous</Button>
-              <Button variant="ghost" onClick={() => toggleReview(current.id)} icon={<Flag size={14} className={answers[current.id]?.markedForReview ? 'fill-amber-400 text-amber-400' : ''} />}>{answers[current.id]?.markedForReview ? 'Flagged' : 'Flag for review'}</Button>
+              <Button variant="ghost" onClick={() => toggleReview(current.id)} icon={<Flag size={14} className={answers[current.id]?.markedForReview ? 'fill-warning text-warning-ink' : ''} />}>{answers[current.id]?.markedForReview ? 'Flagged' : 'Flag for review'}</Button>
               <div className="flex-1" />
               {index < questions.length - 1 ? <Button variant="student" onClick={() => setIndex((i) => i + 1)} icon={<ChevronRight size={14} />}>Next</Button> : <Button variant="student" onClick={() => setConfirmSubmit(true)} icon={<Send size={14} />}>Review & submit</Button>}
             </div>
@@ -434,29 +434,29 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
       {/* Blocking overlays */}
       {(fullscreenBlocked || cameraBlocked) && (
         <Overlay>
-          <AlertTriangle className="mx-auto text-amber-400" size={32} />
-          <h2 className="text-xl font-black">{cameraBlocked ? 'Camera disconnected' : 'Return to full screen'}</h2>
-          <p className="text-sm text-slate-300">{cameraBlocked ? 'Reconnect your camera to continue. The timer is still running.' : 'This exam must stay in full screen. Leaving it has been recorded. The timer is still running.'}</p>
+          <AlertTriangle className="mx-auto text-warning-ink" size={32} />
+          <h2 className="text-xl font-semibold">{cameraBlocked ? 'Camera disconnected' : 'Return to full screen'}</h2>
+          <p className="text-sm text-ink-2">{cameraBlocked ? 'Reconnect your camera to continue. The timer is still running.' : 'This exam must stay in full screen. Leaving it has been recorded. The timer is still running.'}</p>
           {cameraBlocked ? <Button variant="student" onClick={() => void proctor.startCamera()} icon={<Camera size={14} />}>Reconnect camera</Button> : <Button variant="student" onClick={() => void enterFullscreen()} icon={<Expand size={14} />}>Back to full screen</Button>}
         </Overlay>
       )}
       {reverify && (
         <Overlay>
-          <ShieldCheck className="mx-auto text-rose-400" size={32} />
-          <h2 className="text-xl font-black">Verify your identity again</h2>
-          <p className="text-sm text-slate-300">Your face did not match your registered Face ID. Look at the camera and verify to continue. Your teacher can review this.</p>
+          <ShieldCheck className="mx-auto text-danger-ink" size={32} />
+          <h2 className="text-xl font-semibold">Verify your identity again</h2>
+          <p className="text-sm text-ink-2">Your face did not match your registered Face ID. Look at the camera and verify to continue. Your teacher can review this.</p>
           <div className="mx-auto w-fit">{cameraPreview()}</div>
           {liveness && <LivenessPrompt progress={liveness} />}
-          {identity.message && <p className="text-xs text-amber-300">{identity.message}</p>}
+          {identity.message && <p className="text-xs text-warning-ink">{identity.message}</p>}
           <Button variant="student" loading={identity.status === 'checking'} onClick={() => void verifyIdentity()}>Verify now</Button>
         </Overlay>
       )}
       {confirmSubmit && (
         <Overlay>
-          <Send className="mx-auto text-purple-300" size={28} />
-          <h2 className="text-xl font-black">Submit your exam?</h2>
-          <p className="text-sm text-slate-300">You answered {answered} of {questions.length} questions{flagged ? ` and flagged ${flagged}` : ''}. You can’t change answers after submitting.</p>
-          {queue.pendingCount > 0 && <p className="text-xs text-amber-300">{queue.pendingCount} answer(s) are still being saved. They will be sent before submitting.</p>}
+          <Send className="mx-auto text-primary" size={28} />
+          <h2 className="text-xl font-semibold">Submit your exam?</h2>
+          <p className="text-sm text-ink-2">You answered {answered} of {questions.length} questions{flagged ? ` and flagged ${flagged}` : ''}. You can’t change answers after submitting.</p>
+          {queue.pendingCount > 0 && <p className="text-xs text-warning-ink">{queue.pendingCount} answer(s) are still being saved. They will be sent before submitting.</p>}
           <div className="flex justify-center gap-3"><Button variant="secondary" onClick={() => setConfirmSubmit(false)}>Keep working</Button><Button variant="student" onClick={() => void submit('student')} icon={<Send size={14} />}>Submit now</Button></div>
         </Overlay>
       )}
@@ -466,13 +466,13 @@ export const SecureExam: React.FC<Props> = ({ testId, onExit }) => {
 
 const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   // Full-viewport, distraction-free surface above the dashboard.
-  <div className="fixed inset-0 z-[200] flex flex-col bg-[#09090b] text-white">{children}</div>
+  <div className="fixed inset-0 z-[200] flex flex-col bg-canvas text-ink">{children}</div>
 );
 const Overlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-6 backdrop-blur" role="alertdialog" aria-modal="true"><div className="max-w-md space-y-4 rounded-3xl border border-white/10 bg-[#111] p-6 text-center">{children}</div></div>
+  <div className="fixed inset-0 z-[210] flex items-center justify-center bg-overlay p-6 " role="alertdialog" aria-modal="true"><div className="max-w-md space-y-4 rounded-card border border-line bg-surface p-6 text-center">{children}</div></div>
 );
 const Info: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">{icon}{label}</p><p className="mt-1 text-sm font-bold">{value}</p></div>
+  <div className="rounded-card border border-line bg-surface-2 p-4"><p className="flex items-center gap-2 text-meta font-bold text-ink-2">{icon}{label}</p><p className="mt-1 text-sm font-bold">{value}</p></div>
 );
 const LivenessPrompt: React.FC<{ progress: LivenessProgress }> = ({ progress }) => {
   const text = progress.faces > 1 ? 'Only you should be in view.'
@@ -481,11 +481,11 @@ const LivenessPrompt: React.FC<{ progress: LivenessProgress }> = ({ progress }) 
     : progress.step === 'blink' ? 'Now blink once.'
     : 'Look straight at the camera.';
   const pill = (done: boolean, label: string) => (
-    <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-bold', done ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-slate-300')}>{done ? '✓ ' : ''}{label}</span>
+    <span className={cn('rounded-full px-2.5 py-1 text-meta font-bold', done ? 'bg-success-bg text-success-ink' : 'bg-surface-2 text-ink-2')}>{done ? '✓ ' : ''}{label}</span>
   );
   return (
-    <div role="status" aria-live="polite" className="space-y-2 rounded-2xl border border-purple-400/30 bg-purple-500/10 p-4 text-left">
-      <p className="text-sm font-bold text-white">{text}</p>
+    <div role="status" aria-live="polite" className="space-y-2 rounded-card border border-primary-soft bg-primary-light p-4 text-left">
+      <p className="text-sm font-bold text-primary-dark">{text}</p>
       <div className="flex flex-wrap gap-2">
         {pill(progress.turnedA, 'One side')}
         {pill(progress.turnedB, 'Other side')}
@@ -497,9 +497,9 @@ const LivenessPrompt: React.FC<{ progress: LivenessProgress }> = ({ progress }) 
 };
 
 const Step: React.FC<{ done: boolean; label: string; detail: string; action?: React.ReactNode; tone?: 'error' }> = ({ done, label, detail, action, tone }) => (
-  <li className="flex items-start gap-3 rounded-2xl border border-white/10 p-4">
-    {done ? <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-400" size={18} /> : tone === 'error' ? <XCircle className="mt-0.5 shrink-0 text-rose-400" size={18} /> : <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full border-2 border-slate-500" />}
-    <div className="min-w-0 flex-1"><p className="font-bold">{label}</p><p className={cn('text-xs', tone === 'error' ? 'text-rose-300' : 'text-slate-400')}>{detail}</p></div>
+  <li className="flex items-start gap-3 rounded-card border border-line p-4">
+    {done ? <CheckCircle2 className="mt-0.5 shrink-0 text-success-ink" size={18} /> : tone === 'error' ? <XCircle className="mt-0.5 shrink-0 text-danger-ink" size={18} /> : <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full border-2 border-line" />}
+    <div className="min-w-0 flex-1"><p className="font-bold">{label}</p><p className={cn('text-xs', tone === 'error' ? 'text-danger-ink' : 'text-ink-2')}>{detail}</p></div>
     {action}
   </li>
 );

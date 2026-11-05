@@ -1,13 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Shield, Activity, Play, Square } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Shield } from '../ui/icons-compat';
+import { useNavigate } from 'react-router-dom';
 import { LocalMLService } from '../../services/ml/LocalMLService';
 import { CameraService } from '../../services/ml/CameraService';
 import { logMalpracticeDetected } from '../../database/analytics';
-import { useToast } from '../ui';
+import { Button, Card, CardHeader, PageHeader, useToast } from '../ui';
 
 export const ProctoringSystem: React.FC = () => {
   const toast = useToast();
+  const navigate = useNavigate();
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden' && activeRef.current) {
@@ -181,72 +182,54 @@ export const ProctoringSystem: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-8 p-8 bg-white dark:bg-slate-950 rounded-[40px] border border-slate-200 dark:border-white/5 max-w-[1200px] mx-auto w-full">
-        <div className="w-full flex justify-between items-center bg-slate-50 dark:bg-white/5 p-6 rounded-3xl">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
-              <Shield size={24} />
-            </div>
+    <>
+      <PageHeader
+        title="Proctoring"
+        description="Proctoring runs inside each test. Choose the checks in a test’s Security and proctoring settings, then use Monitor on a live test to follow it."
+        actions={<Button variant="outline" onClick={() => navigate('/teacher/tests')}>Go to tests</Button>}
+      />
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Card as="section" padding="none" aria-labelledby="camcheck-heading" className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-2 px-5 py-4">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-800 dark:text-white">Proctor Engine v4.0</h3>
-              <p className="text-[10px] opacity-40 uppercase tracking-widest font-mono text-slate-500 dark:text-slate-400 italic">Standalone Offline Analysis Mode</p>
+              <h2 id="camcheck-heading" className="text-card text-ink">Try the camera checks</h2>
+              <p className="text-support text-ink-2">See what students’ devices detect, using your own camera. Nothing is recorded or uploaded.</p>
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {isModelsLoading && <div className="text-[9px] font-bold text-blue-500 animate-pulse uppercase tracking-widest">Warming Engines...</div>}
-            <button 
-              onClick={isActive ? stopMonitoring : startMonitoring}
-              className={`flex items-center gap-2 px-10 py-4 rounded-full font-bold uppercase tracking-widest text-[10px] transition-all transform active:scale-95 ${isActive ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'bg-blue-600 text-white shadow-xl shadow-blue-500/20 hover:bg-blue-500'}`}
+            <Button
+              variant={isActive ? 'outline' : 'primary'}
+              loading={isModelsLoading && !isActive}
+              onClick={isActive ? stopMonitoring : () => void startMonitoring()}
             >
-              {isActive ? <Square size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
-              {isActive ? 'Disable Guard' : 'Launch HUD'}
-            </button>
+              {isModelsLoading && !isActive ? 'Loading detection' : isActive ? 'Stop camera' : 'Start camera'}
+            </Button>
           </div>
-        </div>
-
-        <div className="relative w-full aspect-video bg-black rounded-[40px] overflow-hidden border-8 border-slate-100 dark:border-white/5 shadow-2xl group">
-           <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover transition-all duration-700 ${isActive ? 'opacity-100' : 'opacity-30 blur-md grayscale'}`} />
-           <canvas ref={canvasOverlayRef} className="absolute inset-0 z-10 pointer-events-none" />
-           
-           <AnimatePresence>
-            {isAnalyzing && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                exit={{ opacity: 0, y: 10 }}
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/40 backdrop-blur-md text-white/60 px-6 py-3 rounded-full border border-white/10"
-              >
-                <Activity size={14} className="animate-pulse" />
-                <span className="text-[10px] font-bold uppercase tracking-widest">OFFLINE ANALYSIS ACTIVE: {new Date().toLocaleTimeString()}</span>
-              </motion.div>
+          <div className="relative aspect-video w-full bg-black">
+            <video ref={videoRef} autoPlay playsInline muted className={`h-full w-full object-cover ${isActive ? 'opacity-100' : 'opacity-0'}`} />
+            <canvas ref={canvasOverlayRef} className="pointer-events-none absolute inset-0 z-10" />
+            {!isActive && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-white">
+                <Shield size={32} />
+                <p className="text-body">Camera is off</p>
+                <p className="max-w-sm text-support text-white/90">Start the camera to preview face, gaze and object detection.</p>
+              </div>
             )}
-           </AnimatePresence>
+            {isAnalyzing && (
+              <p role="status" className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/70 px-4 py-1.5 text-support text-white">Analysing on this device</p>
+            )}
+          </div>
+        </Card>
 
-           {isActive && (
-             <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-blue-500/5 to-transparent opacity-30" />
-                <div className="absolute top-10 left-10 w-20 h-20 border-t-2 border-l-2 border-blue-500/40 rounded-tl-3xl" />
-                <div className="absolute top-10 right-10 w-20 h-20 border-t-2 border-r-2 border-blue-500/40 rounded-tr-3xl" />
-                <div className="absolute bottom-10 left-10 w-20 h-20 border-b-2 border-l-2 border-blue-500/40 rounded-bl-3xl" />
-                <div className="absolute bottom-10 right-10 w-20 h-20 border-b-2 border-r-2 border-blue-500/40 rounded-br-3xl" />
-             </div>
-           )}
-        </div>
-
-        <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6">
-           <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-black/5 dark:border-white/5">
-              <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-3">Target: Objects</h4>
-              <p className="text-xs font-light">Detects phones, headphones, books, and unauthorized hardware instantly.</p>
-           </div>
-           <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-black/5 dark:border-white/5">
-              <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-3">Target: Biometrics</h4>
-              <p className="text-xs font-light">Monitors lateral gaze, suspicious looking down, and face accessibility.</p>
-           </div>
-           <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-black/5 dark:border-white/5">
-              <h4 className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-3">Target: Interaction</h4>
-              <p className="text-xs font-light">Identifies speech patterns, communication, and multi-person presence.</p>
-           </div>
-        </div>
-    </div>
+        <Card as="section" aria-labelledby="checks-heading">
+          <CardHeader title={<span id="checks-heading">What’s checked</span>} />
+          <dl className="mt-4 flex flex-col gap-4 text-body">
+            <div><dt className="font-medium text-ink">Objects</dt><dd className="text-support text-ink-2">Phones, books and other devices in view.</dd></div>
+            <div><dt className="font-medium text-ink">Face and gaze</dt><dd className="text-support text-ink-2">Whether the student is present and looking at the screen.</dd></div>
+            <div><dt className="font-medium text-ink">Other people</dt><dd className="text-support text-ink-2">More than one face, or someone talking.</dd></div>
+          </dl>
+          <p className="mt-4 border-t border-line-2 pt-4 text-support text-ink-2">Signals help you review an attempt. Students are never failed automatically, and they can appeal.</p>
+        </Card>
+      </div>
+    </>
   );
 };

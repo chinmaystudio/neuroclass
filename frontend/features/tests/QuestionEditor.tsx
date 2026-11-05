@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useState } from 'react';
-import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Eye, EyeOff, Plus, Trash2 } from '../../components/ui/icons-compat';
 import type { EditableQuestion, LanguageId, QuestionType } from '../lms/types';
 import { QUESTION_TYPE_LABELS } from '../lms/types';
 import { Button, Field, inputClass, Toggle } from '../lms/ui';
@@ -70,13 +70,13 @@ export const QuestionEditor: React.FC<Props> = ({ question: q, index, total, loc
   };
 
   return (
-    <article className="space-y-4 rounded-3xl border border-black/5 bg-white p-5 dark:border-white/10 dark:bg-white/5">
+    <article className="space-y-4 rounded-card border border-line bg-surface p-5 ">
       <header className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-blue-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-blue-600">Q{index + 1}</span>
-        <select aria-label="Question type" disabled={locked} value={q.type} onChange={(e) => onChange({ ...blankQuestion(e.target.value as QuestionType), prompt: q.prompt, marks: q.marks })} className="rounded-lg border border-black/10 bg-slate-50 px-2 py-1.5 text-xs font-bold dark:border-white/10 dark:bg-black/30">
+        <span className="rounded-full bg-primary-light px-3 py-1 text-meta font-bold text-primary">Q{index + 1}</span>
+        <select aria-label="Question type" disabled={locked} value={q.type} onChange={(e) => onChange({ ...blankQuestion(e.target.value as QuestionType), prompt: q.prompt, marks: q.marks })} className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-xs font-bold ">
           {(Object.keys(QUESTION_TYPE_LABELS) as QuestionType[]).filter((t) => t !== 'file_upload').map((t) => <option key={t} value={t}>{QUESTION_TYPE_LABELS[t]}</option>)}
         </select>
-        {problems.length > 0 && <span className="text-[11px] font-semibold text-amber-600">{problems[0]}</span>}
+        {problems.length > 0 && <span className="text-meta font-semibold text-warning-ink">{problems[0]}</span>}
         <div className="ml-auto flex gap-1">
           <IconButton label="Move up" disabled={locked || index === 0} onClick={() => onMove(-1)}><ArrowUp size={14} /></IconButton>
           <IconButton label="Move down" disabled={locked || index === total - 1} onClick={() => onMove(1)}><ArrowDown size={14} /></IconButton>
@@ -94,7 +94,7 @@ export const QuestionEditor: React.FC<Props> = ({ question: q, index, total, loc
 
       {['mcq', 'multiple_select'].includes(q.type) && (
         <div className="space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Options <span className="normal-case tracking-normal text-slate-400">— {q.type === 'mcq' ? 'select the correct one' : 'tick every correct option'}</span></p>
+          <p className="text-meta font-bold text-ink-2">Options <span className="normal-case tracking-normal text-ink-2">— {q.type === 'mcq' ? 'select the correct one' : 'tick every correct option'}</span></p>
           {q.options.map((o, i) => (
             <div key={i} className="flex items-center gap-2">
               <input type={q.type === 'mcq' ? 'radio' : 'checkbox'} name={`correct-${index}`} aria-label={`Option ${i + 1} is correct`} disabled={locked} checked={o.isCorrect} onChange={(e) => setOption(i, { isCorrect: e.target.checked })} className="h-4 w-4 accent-blue-600" />
@@ -110,7 +110,7 @@ export const QuestionEditor: React.FC<Props> = ({ question: q, index, total, loc
       {q.type === 'true_false' && (
         <div className="flex gap-3">
           {['True', 'False'].map((label, i) => (
-            <label key={label} className={cn('flex flex-1 cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-bold', q.options[i]?.isCorrect ? 'border-blue-500 bg-blue-500/10' : 'border-black/10 dark:border-white/10')}>
+            <label key={label} className={cn('flex flex-1 cursor-pointer items-center gap-2 rounded-button border p-3 text-sm font-bold', q.options[i]?.isCorrect ? 'border-primary bg-primary-light' : 'border-line ')}>
               <input type="radio" disabled={locked} name={`tf-${index}`} checked={Boolean(q.options[i]?.isCorrect)} onChange={() => set({ options: [{ text: 'True', isCorrect: i === 0 }, { text: 'False', isCorrect: i === 1 }] })} className="accent-blue-600" /> {label} is correct
             </label>
           ))}
@@ -140,11 +140,11 @@ export const QuestionEditor: React.FC<Props> = ({ question: q, index, total, loc
       {q.type === 'coding' && q.coding && (
         <div className="space-y-4">
           <div>
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-500">Allowed languages</p>
+            <p className="mb-2 text-meta font-bold text-ink-2">Allowed languages</p>
             <div className="flex flex-wrap gap-2">
               {ALL_LANGUAGES.map((l) => {
                 const on = q.coding!.languages.includes(l.id);
-                return <button key={l.id} type="button" disabled={locked} onClick={() => set({ coding: { ...q.coding!, languages: on ? q.coding!.languages.filter((x) => x !== l.id) : [...q.coding!.languages, l.id] } })} className={cn('rounded-full border px-3 py-1 text-xs font-bold', on ? 'border-blue-500 bg-blue-500/10 text-blue-600' : 'border-black/10 text-slate-500 dark:border-white/10')}>{l.label}</button>;
+                return <button key={l.id} type="button" disabled={locked} onClick={() => set({ coding: { ...q.coding!, languages: on ? q.coding!.languages.filter((x) => x !== l.id) : [...q.coding!.languages, l.id] } })} className={cn('rounded-full border px-3 py-1 text-xs font-bold', on ? 'border-primary bg-primary-light text-primary' : 'border-line text-ink-2 ')}>{l.label}</button>;
               })}
             </div>
           </div>
@@ -153,14 +153,14 @@ export const QuestionEditor: React.FC<Props> = ({ question: q, index, total, loc
             <Field label="Memory limit (MB)"><input type="number" min={32} max={512} step={32} disabled={locked} value={q.coding.memoryLimitMb} onChange={(e) => set({ coding: { ...q.coding!, memoryLimitMb: Number(e.target.value) } })} className={inputClass} /></Field>
           </div>
           <div className="space-y-2">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Test cases <span className="normal-case tracking-normal text-slate-400">— visible cases are samples students can run; hidden cases are only run by the server after submission</span></p>
+            <p className="text-meta font-bold text-ink-2">Test cases <span className="normal-case tracking-normal text-ink-2">— visible cases are samples students can run; hidden cases are only run by the server after submission</span></p>
             {q.testCases.map((tc, i) => (
-              <div key={i} className="grid gap-2 rounded-2xl border border-black/5 p-3 dark:border-white/10 md:grid-cols-[1fr_1fr_auto]">
+              <div key={i} className="grid gap-2 rounded-card border border-line p-3 md:grid-cols-[1fr_1fr_auto]">
                 <textarea aria-label={`Test ${i + 1} input`} disabled={locked} rows={2} value={tc.input} onChange={(e) => set({ testCases: q.testCases.map((t, j) => (j === i ? { ...t, input: e.target.value } : t)) })} placeholder="stdin" className={cn(inputClass, 'font-mono text-xs')} />
                 <textarea aria-label={`Test ${i + 1} expected output`} disabled={locked} rows={2} value={tc.expectedOutput} onChange={(e) => set({ testCases: q.testCases.map((t, j) => (j === i ? { ...t, expectedOutput: e.target.value } : t)) })} placeholder="expected stdout" className={cn(inputClass, 'font-mono text-xs')} />
                 <div className="flex items-center gap-1 md:flex-col md:items-stretch">
-                  <button type="button" disabled={locked} onClick={() => set({ testCases: q.testCases.map((t, j) => (j === i ? { ...t, isHidden: !t.isHidden } : t)) })} className={cn('inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase', tc.isHidden ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'bg-emerald-500/15 text-emerald-600')}>{tc.isHidden ? <><EyeOff size={12} /> Hidden</> : <><Eye size={12} /> Sample</>}</button>
-                  <input type="number" aria-label="Weight" title="Weight" min={0.5} max={100} step={0.5} disabled={locked} value={tc.weight} onChange={(e) => set({ testCases: q.testCases.map((t, j) => (j === i ? { ...t, weight: Number(e.target.value) } : t)) })} className="w-16 rounded-lg border border-black/10 bg-transparent px-2 py-1 text-xs dark:border-white/10" />
+                  <button type="button" disabled={locked} onClick={() => set({ testCases: q.testCases.map((t, j) => (j === i ? { ...t, isHidden: !t.isHidden } : t)) })} className={cn('inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-meta font-bold ', tc.isHidden ? 'bg-ink text-on-primary ' : 'bg-success-bg text-success-ink')}>{tc.isHidden ? <><EyeOff size={12} /> Hidden</> : <><Eye size={12} /> Sample</>}</button>
+                  <input type="number" aria-label="Weight" title="Weight" min={0.5} max={100} step={0.5} disabled={locked} value={tc.weight} onChange={(e) => set({ testCases: q.testCases.map((t, j) => (j === i ? { ...t, weight: Number(e.target.value) } : t)) })} className="w-16 rounded-lg border border-line bg-transparent px-2 py-1 text-xs " />
                   <IconButton label="Remove test case" disabled={locked} onClick={() => set({ testCases: q.testCases.filter((_, j) => j !== i) })}><Trash2 size={13} /></IconButton>
                 </div>
               </div>
@@ -172,10 +172,10 @@ export const QuestionEditor: React.FC<Props> = ({ question: q, index, total, loc
               <Button size="sm" variant="secondary" onClick={() => setShowReference((v) => !v)}>{showReference ? 'Hide' : 'Check test cases with a reference solution'}</Button>
               {showReference && (
                 <div className="mt-3 h-[480px]">
-                  <Suspense fallback={<p className="text-xs text-slate-500">Loading editor…</p>}>
+                  <Suspense fallback={<p className="text-xs text-ink-2">Loading editor…</p>}>
                     <CodingWorkspace mode="teacher" languages={q.coding.languages} value={reference} onChange={setReference} runContext={{ contextType: 'teacher_question', contextId: testId, questionId: q.id }} />
                   </Suspense>
-                  <p className="mt-1 text-[11px] text-slate-400">Runs against the saved test cases. Save the test first after editing cases.</p>
+                  <p className="mt-1 text-meta text-ink-2">Runs against the saved test cases. Save the test first after editing cases.</p>
                 </div>
               )}
             </div>
@@ -184,7 +184,7 @@ export const QuestionEditor: React.FC<Props> = ({ question: q, index, total, loc
       )}
 
       <details className="text-sm">
-        <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest text-slate-500">Explanation (optional)</summary>
+        <summary className="cursor-pointer text-meta font-bold text-ink-2">Explanation (optional)</summary>
         <textarea disabled={locked} rows={2} value={q.explanation ?? ''} onChange={(e) => set({ explanation: e.target.value })} className={cn(inputClass, 'mt-2')} placeholder="Shown to students after results are released if you allow correct answers." />
       </details>
     </article>
@@ -192,5 +192,5 @@ export const QuestionEditor: React.FC<Props> = ({ question: q, index, total, loc
 };
 
 const IconButton: React.FC<{ label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }> = ({ label, onClick, disabled, children }) => (
-  <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-30 dark:hover:bg-white/10 dark:hover:text-white">{children}</button>
+  <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} className="rounded-lg p-2 text-ink-2 hover:bg-surface-2 hover:text-ink disabled:opacity-30 ">{children}</button>
 );

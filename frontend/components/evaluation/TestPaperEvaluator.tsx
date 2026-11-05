@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   FileText, UploadCloud, Copy, Sparkles, CheckCircle2, AlertCircle, 
   ArrowRight, FileSpreadsheet, ListFilter, RotateCcw, Play, Check, HelpCircle, X, Plus, BookOpen, Layers, Award, User, Hash, HelpCircle as QuestionIcon, ChevronRight
-} from 'lucide-react';
+} from '../ui/icons-compat';
 import { getEvaluations, saveEvaluation, EvaluationRecord, subscribeToStoreChanges } from '../../services/evaluationStore';
 import { getApiUrl } from '../../config/apiConfig';
 import { supabase } from '../../database/supabase';
@@ -311,14 +311,14 @@ export const TestPaperEvaluator: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Top Controls: Subject Filter, Excel report and Active reference info */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 border-b border-black/5 dark:border-white/5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 border-b border-line ">
         <div className="flex flex-wrap items-center gap-3">
           <ListFilter size={14} className="opacity-45" />
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Filter:</span>
+          <span className="text-meta font-bold text-ink-2 ">Filter:</span>
           <select 
             value={filterSubject}
             onChange={e => setFilterSubject(e.target.value)}
-            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/5 border border-black/5 dark:border-white/10 text-xs font-bold uppercase tracking-wider focus:outline-none"
+            className="px-4 py-2 rounded-button bg-surface-2 border border-line text-xs font-bold focus:outline-none"
           >
             {subjects.map(s => (
               <option key={s} value={s}>{s === 'all' ? 'All Subjects' : s}</option>
@@ -329,7 +329,7 @@ export const TestPaperEvaluator: React.FC = () => {
         <button
           onClick={exportSpreadsheet}
           disabled={evalList.length === 0}
-          className="px-5 py-3 rounded-2xl bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-500/10 cursor-pointer disabled:opacity-40 hover:bg-emerald-600 transition-all active:scale-95"
+          className="px-5 py-3 rounded-card bg-success text-on-primary font-bold text-xs flex items-center gap-2 shadow-raised cursor-pointer disabled:opacity-40 hover:bg-success transition-all active:scale-95"
         >
           <FileSpreadsheet size={14} /> Export Grading Sheet (.csv)
         </button>
@@ -341,25 +341,25 @@ export const TestPaperEvaluator: React.FC = () => {
         <div className="lg:col-span-8 space-y-8">
           
           {/* SECTION 1: QUESTION PAPER REFERENCE SELECTOR/ANALYZER */}
-          <div className="bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl p-6 shadow-xl">
+          <div className="bg-surface border border-line rounded-card p-6 shadow-raised">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
-                <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
-                  <BookOpen size={18} className="text-blue-500" />
+                <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                  <BookOpen size={18} className="text-primary" />
                   1. CHOOSE ACTIVE QUESTION PAPER
                 </h3>
                 <p className="text-xs opacity-50 mt-1">Select an analyzed paper context to evaluate student submissions against.</p>
               </div>
               <button
                 onClick={() => setShowNewPaperForm(!showNewPaperForm)}
-                className="px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-[10px] uppercase tracking-widest flex items-center gap-1.5 transition-all self-start"
+                className="px-4 py-2.5 rounded-button bg-primary hover:bg-primary-hover text-on-primary font-bold text-meta flex items-center gap-1.5 transition-all self-start"
               >
                 <Plus size={14} /> Analyze New Paper
               </button>
             </div>
 
             {errorMsg && (
-              <div className="p-4 mb-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs flex items-center gap-3">
+              <div className="p-4 mb-4 rounded-card bg-danger-bg border border-danger/30 text-danger-ink text-xs flex items-center gap-3">
                 <AlertCircle size={16} className="shrink-0" /> 
                 <span>{errorMsg}</span>
               </div>
@@ -367,52 +367,52 @@ export const TestPaperEvaluator: React.FC = () => {
 
             {/* Collapsible New Paper Analysis Form */}
             {showNewPaperForm && (
-              <form onSubmit={handleAnalyzeQuestionPaper} className="bg-slate-50 dark:bg-black/30 border border-black/5 dark:border-white/5 rounded-2xl p-5 mb-6 space-y-4 animate-in fade-in duration-200">
-                <h4 className="text-xs font-black uppercase tracking-widest border-b border-black/5 dark:border-white/5 pb-2">AI Paper Extraction & Setup</h4>
+              <form onSubmit={handleAnalyzeQuestionPaper} className="bg-surface-2 border border-line rounded-card p-5 mb-6 space-y-4 animate-in fade-in duration-200">
+                <h4 className="text-xs font-semibold border-b border-line pb-2">AI Paper Extraction & Setup</h4>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Exam Title / Label</label>
+                    <label className="text-meta font-bold text-ink-2">Exam Title / Label</label>
                     <input 
                       type="text" required placeholder="e.g., Physics Midterm 2026"
                       value={newPaperTitle} onChange={e => setNewPaperTitle(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                      className="w-full px-4 py-3 rounded-button bg-surface border border-line focus:outline-none focus:ring-1 focus:ring-primary text-xs"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Subject Name</label>
+                    <label className="text-meta font-bold text-ink-2">Subject Name</label>
                     <input 
                       type="text" required placeholder="e.g., Quantum Mechanics"
                       value={newPaperSubject} onChange={e => setNewPaperSubject(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                      className="w-full px-4 py-3 rounded-button bg-surface border border-line focus:outline-none focus:ring-1 focus:ring-primary text-xs"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Question Paper Text OR Upload Scan</label>
-                    <span className="text-[8px] opacity-40 uppercase font-black">Fast OCR Enabled</span>
+                    <label className="text-meta font-bold text-ink-2">Question Paper Text OR Upload Scan</label>
+                    <span className="text-meta opacity-40 font-semibold">Fast OCR Enabled</span>
                   </div>
                   
                   <textarea
                     rows={4} placeholder="Type or paste question paper guidelines here, OR upload an exam sheet scan below..."
                     value={newPaperContent} onChange={e => setNewPaperContent(e.target.value)}
-                    className="w-full p-4 rounded-xl bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 text-xs font-mono focus:outline-none custom-scrollbar"
+                    className="w-full p-4 rounded-button bg-surface border border-line text-xs font-mono focus:outline-none custom-scrollbar"
                   />
 
                   <div className="pt-2">
-                    <div className="flex items-center justify-center p-6 bg-white dark:bg-slate-900/50 border border-dashed border-black/10 dark:border-white/10 rounded-xl relative">
+                    <div className="flex items-center justify-center p-6 bg-surface border border-dashed border-line rounded-button relative">
                       <div className="space-y-2 text-center">
-                        <UploadCloud size={24} className="mx-auto text-blue-500" />
-                        <p className="text-[10px] font-bold uppercase tracking-wider">Upload Question Exam Image</p>
-                        <p className="text-[8px] opacity-40">Drop a scan page to identify exact questions</p>
-                        <label className="inline-block mt-1 px-4 py-2 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-white/80 hover:bg-slate-200 hover:text-black rounded-lg font-bold uppercase text-[8px] tracking-wider cursor-pointer">
+                        <UploadCloud size={24} className="mx-auto text-primary" />
+                        <p className="text-meta font-bold ">Upload Question Exam Image</p>
+                        <p className="text-meta opacity-40">Drop a scan page to identify exact questions</p>
+                        <label className="inline-block mt-1 px-4 py-2 bg-surface-2 text-ink-2 hover:bg-line-2 hover:text-ink rounded-lg font-bold text-meta cursor-pointer">
                           Upload file
                           <input type="file" accept="image/*" onChange={handlePaperFileUpload} className="hidden" />
                         </label>
                         {paperUploadName && (
-                          <p className="text-[9px] text-emerald-500 font-bold mt-1 flex items-center justify-center gap-1"><Check size={10} /> {paperUploadName}</p>
+                          <p className="text-meta text-success-ink font-bold mt-1 flex items-center justify-center gap-1"><Check size={10} /> {paperUploadName}</p>
                         )}
                       </div>
                     </div>
@@ -422,17 +422,17 @@ export const TestPaperEvaluator: React.FC = () => {
                 <div className="flex justify-end gap-3 pt-2">
                   <button
                     type="button" onClick={() => setShowNewPaperForm(false)}
-                    className="px-4 py-2.5 text-[9px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-white/5 rounded-xl cursor-pointer"
+                    className="px-4 py-2.5 text-meta font-bold bg-surface-2 rounded-button cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit" disabled={isAnalyzingPaper}
-                    className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-[9px] uppercase tracking-widest flex items-center gap-2 rounded-xl"
+                    className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-on-primary font-bold text-meta flex items-center gap-2 rounded-button"
                   >
                     {isAnalyzingPaper ? (
                       <>
-                        <div className="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-line border-t-line animate-spin" />
                         Analyzing...
                       </>
                     ) : (
@@ -448,7 +448,7 @@ export const TestPaperEvaluator: React.FC = () => {
 
             {/* List of analyzed question papers */}
             {analyzedPapers.length === 0 ? (
-              <div className="p-8 text-center border border-dashed border-black/10 dark:border-white/10 rounded-2xl opacity-40">
+              <div className="p-8 text-center border border-dashed border-line rounded-card opacity-40">
                 No question papers analyzed yet. Upload one to get started.
               </div>
             ) : (
@@ -457,14 +457,14 @@ export const TestPaperEvaluator: React.FC = () => {
                   <div
                     key={paper.id}
                     onClick={() => handleSelectPaper(paper.id)}
-                    className={`p-4 rounded-2xl cursor-pointer border relative text-left transition-all ${activePaper?.id === paper.id ? 'bg-blue-500/5 border-blue-500/40 shadow-sm ring-1 ring-blue-500/10' : 'bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100/60 dark:hover:bg-slate-800/40 border-black/5 dark:border-white/5'}`}
+                    className={`p-4 rounded-card cursor-pointer border relative text-left transition-all ${activePaper?.id === paper.id ? 'bg-primary-light border-primary shadow-card ring-1 ring-primary' : 'bg-surface-2 hover:bg-surface-2 border-line '}`}
                   >
                     {activePaper?.id === paper.id && (
-                      <span className="absolute top-3 right-3 text-[8px] bg-emerald-500 text-black px-1.5 py-0.5 rounded font-black uppercase tracking-widest">Active</span>
+                      <span className="absolute top-3 right-3 text-meta bg-success text-ink px-1.5 py-0.5 rounded font-semibold ">Active</span>
                     )}
-                    <span className="text-[8px] font-black uppercase tracking-wider text-blue-500">{paper.subject}</span>
-                    <h4 className="font-black text-xs text-slate-800 dark:text-white mt-0.5 truncate pr-16">{paper.title}</h4>
-                    <div className="flex gap-4 mt-2 text-[10px] opacity-50 font-semibold font-mono">
+                    <span className="text-meta font-semibold text-primary">{paper.subject}</span>
+                    <h4 className="font-semibold text-xs text-ink mt-0.5 truncate pr-16">{paper.title}</h4>
+                    <div className="flex gap-4 mt-2 text-meta opacity-50 font-semibold font-mono">
                       <span>{paper.questions?.length || 0} Questions</span>
                       <span>{paper.totalMarks} Max Marks</span>
                     </div>
@@ -472,7 +472,7 @@ export const TestPaperEvaluator: React.FC = () => {
                     {paper.id !== 'paper-sample-1' && (
                       <button
                         onClick={(e) => deletePaperReference(paper.id, e)}
-                        className="absolute bottom-3 right-3 p-1.5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                        className="absolute bottom-3 right-3 p-1.5 hover:bg-danger-bg text-ink-2 hover:text-danger-ink rounded-lg transition-colors"
                         title="Delete Reference"
                       >
                         <X size={10} />
@@ -485,21 +485,21 @@ export const TestPaperEvaluator: React.FC = () => {
 
             {/* Displays questions inside the active paper context */}
             {activePaper && (
-              <div className="mt-6 pt-5 border-t border-black/5 dark:border-white/5">
+              <div className="mt-6 pt-5 border-t border-line ">
                 <div className="flex items-center justify-between pb-3">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">ACTIVE PAPER STRUCTURE (NO RAG INDEXING)</h4>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 italic">Checks strictly against these questions</span>
+                  <h4 className="text-meta font-semibold text-ink-2">ACTIVE PAPER STRUCTURE (NO RAG INDEXING)</h4>
+                  <span className="text-meta font-bold text-ink-2 italic">Checks strictly against these questions</span>
                 </div>
                 <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
                   {activePaper.questions?.map((q, idx) => (
-                    <div key={idx} className="p-3 bg-slate-50 dark:bg-black/20 border border-black/5 dark:border-white/5 rounded-xl text-left flex gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 font-bold font-mono text-xs flex items-center justify-center shrink-0">
+                    <div key={idx} className="p-3 bg-surface-2 border border-line rounded-button text-left flex gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary-light text-primary font-bold font-mono text-xs flex items-center justify-center shrink-0">
                         {q.questionNumber}
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs font-bold text-slate-800 dark:text-white leading-snug">{q.questionText}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">
-                          <span className="font-extrabold text-blue-500">[{q.maxMarks} MARKS]</span> Expected: {q.expectedAnswerSummary}
+                        <p className="text-xs font-bold text-ink leading-snug">{q.questionText}</p>
+                        <p className="text-meta text-ink-2 font-medium">
+                          <span className="font-semibold text-primary">[{q.maxMarks} MARKS]</span> Expected: {q.expectedAnswerSummary}
                         </p>
                       </div>
                     </div>
@@ -512,35 +512,35 @@ export const TestPaperEvaluator: React.FC = () => {
           {/* SECTION 2: GRADER PANEL (FOR GRADING SUBSEQUENT PAPERS SPECIFICALLY AGAINST ACTIVE PAPER) */}
           {activePaper ? (
             isGrading ? (
-              <div className="p-12 text-center bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl min-h-[400px] flex flex-col items-center justify-center space-y-6 shadow-xl">
+              <div className="p-12 text-center bg-surface border border-line rounded-card min-h-[400px] flex flex-col items-center justify-center space-y-6 shadow-raised">
                 <div className="relative">
-                  <div className="w-16 h-16 rounded-full border-4 border-blue-500/10 border-t-blue-500 animate-spin" />
-                  <Sparkles className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500 animate-pulse" size={20} />
+                  <div className="w-16 h-16 rounded-full border-4 border-primary-soft border-t-primary animate-spin" />
+                  <Sparkles className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-primary animate-pulse" size={20} />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-black italic tracking-tight uppercase">AI GRADER ACTIVE</h3>
+                  <h3 className="text-xl font-semibold italic tracking-tight ">AI GRADER ACTIVE</h3>
                   <p className="text-sm opacity-50 max-w-sm mx-auto leading-relaxed">
                     Evaluating student answer sheet sheet specifically against <strong>{activePaper.title}</strong>...
                   </p>
                 </div>
-                <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400 p-3 bg-slate-50 dark:bg-black/20 border border-black/5 dark:border-white/5 rounded-xl">
+                <div className="text-meta font-bold text-ink-2 p-3 bg-surface-2 border border-line rounded-button">
                   Executing Context Check • Strict Grading Rules
                 </div>
               </div>
             ) : selectedEval ? (
               /* High-fidelity Student Evaluation Report Inspector */
-              <div className="p-8 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl space-y-8 shadow-xl">
-                <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-5">
+              <div className="p-8 bg-surface border border-line rounded-card space-y-8 shadow-raised">
+                <div className="flex items-center justify-between border-b border-line pb-5">
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-blue-500">{selectedEval.subject}</span>
-                    <h3 className="text-2xl font-black italic tracking-tighter mt-1">{selectedEval.assessmentName}</h3>
-                    <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                    <span className="text-meta font-semibold text-primary">{selectedEval.subject}</span>
+                    <h3 className="text-2xl font-semibold italic tracking-tighter mt-1">{selectedEval.assessmentName}</h3>
+                    <p className="text-xs text-ink-2 mt-1 flex items-center gap-2">
                       <User size={12} /> Student: <strong>{selectedEval.studentName}</strong> • {selectedEval.rollNumber}
                     </p>
                   </div>
                   <button
                     onClick={() => setSelectedEval(null)}
-                    className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-white/5 rounded-xl cursor-pointer hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+                    className="px-4 py-2 text-meta font-bold bg-surface-2 rounded-button cursor-pointer hover:bg-line-2 transition-colors"
                   >
                     Grade New Student
                   </button>
@@ -548,24 +548,24 @@ export const TestPaperEvaluator: React.FC = () => {
 
                 {/* Score Summary Metrics */}
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/10 text-center">
-                    <span className="text-[9px] font-black uppercase text-blue-500 tracking-wider">Marks Scored</span>
-                    <p className="text-4xl font-black italic mt-1">{selectedEval.marksObtained} <span className="text-xs font-normal opacity-40">/ {selectedEval.totalMarks}</span></p>
+                  <div className="p-5 rounded-card bg-primary-light border border-primary-soft text-center">
+                    <span className="text-meta font-semibold text-primary ">Marks Scored</span>
+                    <p className="text-4xl font-semibold italic mt-1">{selectedEval.marksObtained} <span className="text-xs font-normal opacity-40">/ {selectedEval.totalMarks}</span></p>
                   </div>
-                  <div className="p-5 rounded-2xl bg-purple-500/5 border border-purple-500/10 text-center">
-                    <span className="text-[9px] font-black uppercase text-purple-500 tracking-wider">Final Grade</span>
-                    <p className="text-4xl font-black italic mt-1 text-purple-500">{selectedEval.grade}</p>
+                  <div className="p-5 rounded-card bg-primary-light border border-primary-soft text-center">
+                    <span className="text-meta font-semibold text-primary ">Final Grade</span>
+                    <p className="text-4xl font-semibold italic mt-1 text-primary">{selectedEval.grade}</p>
                   </div>
-                  <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-center">
-                    <span className="text-[9px] font-black uppercase text-emerald-500 tracking-wider">Percentage</span>
-                    <p className="text-4xl font-black italic mt-1 text-emerald-500">{selectedEval.percentage}%</p>
+                  <div className="p-5 rounded-card bg-success-bg border border-success/30 text-center">
+                    <span className="text-meta font-semibold text-success-ink ">Percentage</span>
+                    <p className="text-4xl font-semibold italic mt-1 text-success-ink">{selectedEval.percentage}%</p>
                   </div>
                 </div>
 
                 {/* Overarching Commentary Text */}
                 <div className="space-y-2 text-left">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Overarching Evaluator Commentary</h4>
-                  <div className="p-6 bg-slate-50 dark:bg-black/30 border border-black/5 dark:border-white/5 rounded-2xl text-sm leading-relaxed font-medium">
+                  <h4 className="text-xs font-semibold text-ink-2">Overarching Evaluator Commentary</h4>
+                  <div className="p-6 bg-surface-2 border border-line rounded-card text-sm leading-relaxed font-medium">
                     {selectedEval.feedback}
                   </div>
                 </div>
@@ -573,31 +573,31 @@ export const TestPaperEvaluator: React.FC = () => {
                 {/* Question by Question matched evaluation scores *if* stored */}
                 {selectedEval.questionEvaluations && selectedEval.questionEvaluations.length > 0 && (
                   <div className="space-y-3 pt-2 text-left">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">Detailed Question Breakdown</h4>
+                    <h4 className="text-xs font-semibold text-ink-2">Detailed Question Breakdown</h4>
                     <div className="space-y-3">
                       {selectedEval.questionEvaluations.map((qe: any, qIdx: number) => (
-                        <div key={qIdx} className="p-4 bg-slate-50 dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-2xl space-y-2">
-                          <div className="flex justify-between items-center border-b border-black/5 dark:border-white/5 pb-2">
-                            <span className="text-xs font-extrabold text-blue-500">{qe.questionNumber} - {qe.questionSummary || 'Question Details'}</span>
-                            <span className="text-xs font-black font-mono px-2.5 py-1 rounded bg-black/5 dark:bg-white/5">
+                        <div key={qIdx} className="p-4 bg-surface-2 border border-line rounded-card space-y-2">
+                          <div className="flex justify-between items-center border-b border-line pb-2">
+                            <span className="text-xs font-semibold text-primary">{qe.questionNumber} - {qe.questionSummary || 'Question Details'}</span>
+                            <span className="text-xs font-semibold font-mono px-2.5 py-1 rounded bg-surface-2 ">
                               {qe.marksAwarded} / {qe.maxMarks} Marks
                             </span>
                           </div>
-                          <div className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                          <div className="space-y-1.5 text-xs text-ink-2 ">
                             <div>
-                              <strong className="text-slate-400 uppercase tracking-wide text-[9px] block">Extracted Answer:</strong>
-                              <p className="p-2.5 bg-black/[0.02] dark:bg-white/[0.02] rounded-lg mt-0.5 max-h-24 overflow-y-auto italic font-medium leading-relaxed">
+                              <strong className="text-ink-2 text-meta block">Extracted Answer:</strong>
+                              <p className="p-2.5 bg-black/[0.02] rounded-lg mt-0.5 max-h-24 overflow-y-auto italic font-medium leading-relaxed">
                                 {qe.studentAnswerExtracted || "No response matched or empty."}
                               </p>
                             </div>
                             {qe.deductionExplanation && (
-                              <div className="pt-1.5 flex gap-1.5 items-start text-red-500">
+                              <div className="pt-1.5 flex gap-1.5 items-start text-danger-ink">
                                 <AlertCircle size={12} className="shrink-0 mt-0.5" />
                                 <p><strong>Deduction Justification:</strong> {qe.deductionExplanation}</p>
                               </div>
                             )}
                             {qe.feedback && (
-                              <div className="pt-1 flex gap-1.5 items-start text-emerald-500 font-medium">
+                              <div className="pt-1 flex gap-1.5 items-start text-success-ink font-medium">
                                 <CheckCircle2 size={12} className="shrink-0 mt-0.5" />
                                 <p><strong>Guidance:</strong> {qe.feedback}</p>
                               </div>
@@ -612,25 +612,25 @@ export const TestPaperEvaluator: React.FC = () => {
                 {/* Strengths & Weaknesses row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
                   <div className="space-y-3">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-500 flex items-center gap-2">
+                    <h4 className="text-meta font-semibold text-success-ink flex items-center gap-2">
                       <CheckCircle2 size={14} /> Strengths
                     </h4>
                     <ul className="space-y-2">
                       {selectedEval.strengths?.map((s, idx) => (
-                        <li key={idx} className="text-xs opacity-75 leading-relaxed bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10 flex items-start gap-2">
-                          <Check size={14} className="text-emerald-500 shrink-0 mt-0.5" /> {s}
+                        <li key={idx} className="text-xs opacity-75 leading-relaxed bg-success-bg p-3 rounded-button border border-success/30 flex items-start gap-2">
+                          <Check size={14} className="text-success-ink shrink-0 mt-0.5" /> {s}
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div className="space-y-3">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-500 flex items-center gap-2">
+                    <h4 className="text-meta font-semibold text-danger-ink flex items-center gap-2">
                       <AlertCircle size={14} /> Weaknesses
                     </h4>
                     <ul className="space-y-2">
                       {selectedEval.weaknesses?.map((w, idx) => (
-                        <li key={idx} className="text-xs opacity-75 leading-relaxed bg-rose-500/5 p-3 rounded-xl border border-rose-500/10 flex items-start gap-2">
-                          <X size={14} className="text-rose-500 shrink-0 mt-0.5" /> {w}
+                        <li key={idx} className="text-xs opacity-75 leading-relaxed bg-danger-bg p-3 rounded-button border border-danger/30 flex items-start gap-2">
+                          <X size={14} className="text-danger-ink shrink-0 mt-0.5" /> {w}
                         </li>
                       ))}
                     </ul>
@@ -638,12 +638,12 @@ export const TestPaperEvaluator: React.FC = () => {
                 </div>
 
                 {/* Stepwise suggestions */}
-                <div className="space-y-3 pt-4 border-t border-black/5 dark:border-white/5 text-left">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-blue-500">Stepwise Recommendations for Student</h4>
+                <div className="space-y-3 pt-4 border-t border-line text-left">
+                  <h4 className="text-xs font-semibold text-primary">Stepwise Recommendations for Student</h4>
                   <div className="space-y-2">
                     {selectedEval.improvementSuggestions?.map((s, idx) => (
-                      <div key={idx} className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-black/5 dark:border-white/5 text-xs font-medium">
-                        <span className="w-6 h-6 rounded-lg bg-blue-500/10 text-blue-500 font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                      <div key={idx} className="flex items-center gap-3 p-3.5 rounded-button bg-surface-2 border border-line text-xs font-medium">
+                        <span className="w-6 h-6 rounded-lg bg-primary-light text-primary font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
                         <span>{s}</span>
                       </div>
                     ))}
@@ -652,26 +652,26 @@ export const TestPaperEvaluator: React.FC = () => {
               </div>
             ) : (
               /* Simple Student Answer Sheet Submission form */
-              <form onSubmit={runEvaluation} className="p-8 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl space-y-6 shadow-xl text-left">
+              <form onSubmit={runEvaluation} className="p-8 bg-surface border border-line rounded-card space-y-6 shadow-raised text-left">
                 <div>
-                  <h3 className="text-xs font-black tracking-widest text-slate-400">STEP 2. ENTER STUDENT ANSWER SHEET TO CHECK</h3>
+                  <h3 className="text-xs font-semibold text-ink-2">STEP 2. ENTER STUDENT ANSWER SHEET TO CHECK</h3>
                   <p className="text-xs opacity-50 mt-1">Grade individual student paper against active reference: <strong>{activePaper.title}</strong>.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1"><User size={10} /> Student Full Name</label>
+                    <label className="text-meta font-bold text-ink-2 flex items-center gap-1"><User size={10} /> Student Full Name</label>
                     <input 
                       type="text" required value={studentName} onChange={e => setStudentName(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                      className="w-full px-4 py-3 rounded-button bg-surface-2 border border-line focus:outline-none focus:ring-1 focus:ring-primary text-xs"
                       placeholder="e.g. Arjun Mehta"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1"><Hash size={10} /> Roll / Seat Number</label>
+                    <label className="text-meta font-bold text-ink-2 flex items-center gap-1"><Hash size={10} /> Roll / Seat Number</label>
                     <input 
                       type="text" required value={rollNumber} onChange={e => setRollNumber(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                      className="w-full px-4 py-3 rounded-button bg-surface-2 border border-line focus:outline-none focus:ring-1 focus:ring-primary text-xs"
                       placeholder="SEC-109"
                     />
                   </div>
@@ -679,17 +679,17 @@ export const TestPaperEvaluator: React.FC = () => {
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">Student Answer Sheet Content</label>
-                    <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl">
+                    <label className="text-meta font-semibold text-ink-2">Student Answer Sheet Content</label>
+                    <div className="flex bg-surface-2 p-1 rounded-button">
                       <button
                         type="button" onClick={() => setSubmissionType('text')}
-                        className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${submissionType === 'text' ? 'bg-white dark:bg-slate-800 text-blue-500 shadow-sm' : 'opacity-40 text-slate-500'}`}
+                        className={`px-3 py-1.5 rounded-lg text-meta font-bold transition-all cursor-pointer ${submissionType === 'text' ? 'bg-surface text-primary shadow-card' : 'opacity-40 text-ink-2'}`}
                       >
                         Paste text
                       </button>
                       <button
                         type="button" onClick={() => setSubmissionType('upload')}
-                        className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${submissionType === 'upload' ? 'bg-white dark:bg-slate-800 text-blue-500 shadow-sm' : 'opacity-40 text-slate-500'}`}
+                        className={`px-3 py-1.5 rounded-lg text-meta font-bold transition-all cursor-pointer ${submissionType === 'upload' ? 'bg-surface text-primary shadow-card' : 'opacity-40 text-ink-2'}`}
                       >
                         OCR Scan Upload
                       </button>
@@ -699,22 +699,22 @@ export const TestPaperEvaluator: React.FC = () => {
                   {submissionType === 'text' ? (
                     <textarea
                       rows={6} required value={answerSheetText} onChange={e => setAnswerSheetText(e.target.value)}
-                      className="w-full p-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 text-xs font-mono leading-relaxed focus:outline-none custom-scrollbar"
+                      className="w-full p-4 rounded-card bg-surface-2 border border-line text-xs font-mono leading-relaxed focus:outline-none custom-scrollbar"
                       placeholder="Type or paste the student's handwritten draft text or answers..."
                     />
                   ) : (
-                    <div className="flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-black/20 border-2 border-dashed border-black/10 dark:border-white/10 rounded-2xl text-center space-y-4">
-                      <UploadCloud size={32} className="text-blue-500 animate-bounce" />
+                    <div className="flex flex-col items-center justify-center p-8 bg-surface-2 border-2 border-dashed border-line rounded-card text-center space-y-4">
+                      <UploadCloud size={32} className="text-primary animate-bounce" />
                       <div className="space-y-1 animate-pulse">
-                        <p className="text-xs font-bold uppercase tracking-wider">Upload student scan image</p>
-                        <p className="text-[9px] opacity-40">JPEG, WebP, PNG images under 5MB</p>
+                        <p className="text-xs font-bold ">Upload student scan image</p>
+                        <p className="text-meta opacity-40">JPEG, WebP, PNG images under 5MB</p>
                       </div>
-                      <label className="px-5 py-2.5 bg-blue-500 text-white hover:bg-blue-600 rounded-xl font-bold uppercase text-[9px] tracking-wider cursor-pointer transition-all">
+                      <label className="px-5 py-2.5 bg-primary text-on-primary hover:bg-primary-hover rounded-button font-bold text-meta cursor-pointer transition-all">
                         Browse Scan Photo
                         <input type="file" accept="image/*" onChange={handleStudentFileUpload} className="hidden" />
                       </label>
                       {uploadedFileName && (
-                        <p className="text-[10px] text-emerald-500 font-bold uppercase flex items-center gap-1.5"><Check size={12} /> Received: {uploadedFileName}</p>
+                        <p className="text-meta text-success-ink font-bold flex items-center gap-1.5"><Check size={12} /> Received: {uploadedFileName}</p>
                       )}
                     </div>
                   )}
@@ -722,16 +722,16 @@ export const TestPaperEvaluator: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-blue-500/15 cursor-pointer transform hover:scale-[1.01] transition-all duration-300 flex items-center justify-center gap-2.5"
+                  className="w-full py-5 bg-primary hover:bg-primary-hover text-on-primary font-bold text-xs rounded-card shadow-raised cursor-pointer transform hover:scale-[1.01] transition-all duration-300 flex items-center justify-center gap-2.5"
                 >
                   <Sparkles size={16} /> Evaluate Student Sheet vs Active Paper
                 </button>
               </form>
             )
           ) : (
-            <div className="p-12 text-center bg-slate-100 dark:bg-slate-900 rounded-3xl opacity-50 space-y-2">
-              <HelpCircle className="mx-auto text-blue-500" size={32} />
-              <p className="text-sm font-bold uppercase tracking-wider">No Active Question Paper Reference</p>
+            <div className="p-12 text-center bg-surface-2 rounded-card opacity-50 space-y-2">
+              <HelpCircle className="mx-auto text-primary" size={32} />
+              <p className="text-sm font-bold ">No Active Question Paper Reference</p>
               <p className="text-xs">Setup a paper in Step 1 to begin grading student transcripts.</p>
             </div>
           )}
@@ -739,8 +739,8 @@ export const TestPaperEvaluator: React.FC = () => {
 
         {/* Right column: Archived student evaluations list */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="p-6 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl space-y-4 shadow-xl text-left">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">EVALUATION ARCHIVE</h3>
+          <div className="p-6 bg-surface border border-line rounded-card space-y-4 shadow-raised text-left">
+            <h3 className="text-xs font-semibold text-ink-2">EVALUATION ARCHIVE</h3>
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
               {filteredEvals.length === 0 ? (
                 <p className="text-xs opacity-40 py-10 text-center">No evaluations completed yet.</p>
@@ -749,16 +749,16 @@ export const TestPaperEvaluator: React.FC = () => {
                   <div
                     key={evalItem.id}
                     onClick={() => { setSelectedEval(evalItem); }}
-                    className={`p-4 rounded-2xl cursor-pointer transition-all border text-left ${selectedEval?.id === evalItem.id ? 'bg-blue-500/5 border-blue-500/40 shadow-sm ring-1 ring-blue-500/20' : 'bg-slate-50 dark:bg-black/30 hover:bg-slate-100/50 dark:hover:bg-black/60 border-black/5 dark:border-white/5'}`}
+                    className={`p-4 rounded-card cursor-pointer transition-all border text-left ${selectedEval?.id === evalItem.id ? 'bg-primary-light border-primary shadow-card ring-1 ring-primary' : 'bg-surface-2 hover:bg-surface-2 border-line '}`}
                   >
                     <div className="flex justify-between items-start gap-4">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-tight">{evalItem.studentName}</h4>
-                        <p className="text-[9px] opacity-40 uppercase tracking-widest mt-0.5">{evalItem.assessmentName}</p>
+                        <h4 className="text-xs font-bold text-ink tracking-tight">{evalItem.studentName}</h4>
+                        <p className="text-meta opacity-40 mt-0.5">{evalItem.assessmentName}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <span className="font-mono text-xs font-black text-blue-500">{evalItem.percentage}%</span>
-                        <span className="block text-[8px] font-bold uppercase tracking-wider opacity-40">Grade {evalItem.grade}</span>
+                        <span className="font-mono text-xs font-semibold text-primary">{evalItem.percentage}%</span>
+                        <span className="block text-meta font-bold opacity-40">Grade {evalItem.grade}</span>
                       </div>
                     </div>
                   </div>

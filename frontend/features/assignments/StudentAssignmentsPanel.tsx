@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, CalendarClock, CheckCircle2, ClipboardList, Download, FileUp, Paperclip, Pencil, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarClock, CheckCircle2, ClipboardList, Download, FileUp, Paperclip, Pencil, Send, Trash2 } from '../../components/ui/icons-compat';
 import { api, formatDateTime, openDownload } from '../lms/api';
 import type { Assignment, LanguageId, Submission } from '../lms/types';
 import { Badge, Button, Card, EmptyState, ErrorNote, inputClass, Spinner, useAsync } from '../lms/ui';
@@ -21,15 +21,15 @@ export const StudentAssignmentsPanel: React.FC<{ classroomId: string }> = ({ cla
     <div className="space-y-4">
       <ErrorNote message={list.error} onRetry={list.reload} />
       {items.length === 0 ? <EmptyState icon={<ClipboardList size={36} />} title="No assignments yet" body="Assignments your teacher publishes for this classroom will appear here." /> : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {items.map((a) => {
             const st = STATUS[a.myStatus ?? 'not_started'] ?? STATUS.not_started;
             return (
               <Card key={a.id} className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2"><Badge tone={st.tone}>{st.label}</Badge>{a.status === 'closed' && <Badge tone="slate">Closed</Badge>}</div>
                 <h4 className="text-lg font-bold">{a.title}</h4>
-                {a.description && <p className="line-clamp-2 text-xs text-slate-500">{a.description}</p>}
-                <p className="flex items-center gap-1.5 text-xs text-slate-500"><CalendarClock size={12} /> {a.dueAt ? `Due ${formatDateTime(a.dueAt)}` : 'No deadline'} · {a.totalMarks} marks</p>
+                {a.description && <p className="line-clamp-2 text-xs text-ink-2">{a.description}</p>}
+                <p className="flex items-center gap-1.5 text-xs text-ink-2"><CalendarClock size={12} /> {a.dueAt ? `Due ${formatDateTime(a.dueAt)}` : 'No deadline'} · {a.totalMarks} marks</p>
                 {a.mySubmission?.finalScore !== null && a.mySubmission?.finalScore !== undefined && <p className="text-sm font-bold">Marks: {a.mySubmission.finalScore} / {a.totalMarks}</p>}
                 <Button variant="student" className="mt-auto" onClick={() => setOpen(a.id)}>{a.mySubmission ? 'Open' : 'Start'}</Button>
               </Card>
@@ -102,16 +102,16 @@ const StudentAssignmentView: React.FC<{ assignmentId: string; onBack: () => void
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3"><Button variant="ghost" onClick={onBack} icon={<ArrowLeft size={14} />}>Assignments</Button><h3 className="text-xl font-black">{assignment.title}</h3><Badge tone={st.tone}>{st.label}</Badge></div>
+      <div className="flex flex-wrap items-center gap-3"><Button variant="ghost" onClick={onBack} icon={<ArrowLeft size={14} />}>Assignments</Button><h3 className="text-xl font-semibold">{assignment.title}</h3><Badge tone={st.tone}>{st.label}</Badge></div>
       <Card className="space-y-3">
-        <p className="flex flex-wrap items-center gap-3 text-xs text-slate-500"><span className="flex items-center gap-1"><CalendarClock size={12} /> {assignment.dueAt ? `Due ${formatDateTime(assignment.dueAt)}` : 'No deadline'}</span><span>{assignment.totalMarks} marks</span>{overdue && (assignment.latePolicy.allowLate ? <Badge tone="amber">Late work accepted · −{assignment.latePolicy.penaltyPercentPerDay}%/day</Badge> : <Badge tone="red">Deadline passed</Badge>)}</p>
+        <p className="flex flex-wrap items-center gap-3 text-xs text-ink-2"><span className="flex items-center gap-1"><CalendarClock size={12} /> {assignment.dueAt ? `Due ${formatDateTime(assignment.dueAt)}` : 'No deadline'}</span><span>{assignment.totalMarks} marks</span>{overdue && (assignment.latePolicy.allowLate ? <Badge tone="amber">Late work accepted · −{assignment.latePolicy.penaltyPercentPerDay}%/day</Badge> : <Badge tone="red">Deadline passed</Badge>)}</p>
         {assignment.instructions && <p className="whitespace-pre-wrap text-sm leading-6">{assignment.instructions}</p>}
-        {(assignment.attachments ?? []).length > 0 && <div className="space-y-1">{assignment.attachments!.map((f) => <button key={f.id} type="button" onClick={() => void openDownload(`assignments/${assignmentId}/attachments/${f.id}/download`)} className="flex items-center gap-2 text-sm text-purple-600 hover:underline"><Paperclip size={13} /> {f.name}</button>)}</div>}
+        {(assignment.attachments ?? []).length > 0 && <div className="space-y-1">{assignment.attachments!.map((f) => <button key={f.id} type="button" onClick={() => void openDownload(`assignments/${assignmentId}/attachments/${f.id}/download`)} className="flex items-center gap-2 text-sm text-primary hover:underline"><Paperclip size={13} /> {f.name}</button>)}</div>}
       </Card>
 
       {submission?.status === 'returned' && (
-        <Card className="space-y-2 border-emerald-500/30 bg-emerald-500/5">
-          <p className="flex items-center gap-2 text-sm font-bold text-emerald-600"><CheckCircle2 size={16} /> Graded: {submission.finalScore} / {assignment.totalMarks}{submission.penaltyPercent ? ` (late penalty −${submission.penaltyPercent}%)` : ''}</p>
+        <Card className="space-y-2 border-success/30 bg-success-bg">
+          <p className="flex items-center gap-2 text-sm font-bold text-success-ink"><CheckCircle2 size={16} /> Graded: {submission.finalScore} / {assignment.totalMarks}{submission.penaltyPercent ? ` (late penalty −${submission.penaltyPercent}%)` : ''}</p>
           {submission.feedback && <p className="whitespace-pre-wrap text-sm">{submission.feedback}</p>}
         </Card>
       )}
@@ -120,22 +120,22 @@ const StudentAssignmentView: React.FC<{ assignmentId: string; onBack: () => void
 
       {['text', 'mixed', 'document'].includes(type) && (
         <Card className="space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{type === 'document' ? 'Notes for your teacher (optional)' : 'Your answer'}</p>
+          <p className="text-meta font-bold text-ink-2">{type === 'document' ? 'Notes for your teacher (optional)' : 'Your answer'}</p>
           <textarea rows={type === 'document' ? 3 : 10} disabled={!editable} value={text} onChange={(e) => { setText(e.target.value); autosave({ textResponse: e.target.value }); }} className={inputClass} placeholder="Write here. Your work saves automatically." />
         </Card>
       )}
 
       {['file', 'document', 'mixed'].includes(type) && (
         <Card className="space-y-2">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Files · {assignment.acceptedFileTypes.map((e) => `.${e}`).join(', ')} · up to {assignment.maxFileSizeMb} MB each, {assignment.maxFiles} max</p>
+          <p className="text-meta font-bold text-ink-2">Files · {assignment.acceptedFileTypes.map((e) => `.${e}`).join(', ')} · up to {assignment.maxFileSizeMb} MB each, {assignment.maxFiles} max</p>
           {(submission?.files ?? []).map((f) => (
-            <div key={f.id} className="flex items-center gap-2 rounded-xl border border-black/5 px-3 py-2 text-sm dark:border-white/10"><Paperclip size={13} /><span className="flex-1 truncate">{f.name}</span><span className="text-xs text-slate-400">{Math.round(f.size / 1024)} KB</span>
-              <button type="button" aria-label="Download" onClick={() => void openDownload(`assignments/${assignmentId}/my-submission/files/${f.id}/download`)} className="p-1 text-slate-400 hover:text-purple-600"><Download size={14} /></button>
-              {editable && <button type="button" aria-label="Remove" onClick={() => void run('del', async () => { await api.del(`assignments/${assignmentId}/my-submission/files/${f.id}`); await load(); })} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 size={14} /></button>}
+            <div key={f.id} className="flex items-center gap-2 rounded-button border border-line px-3 py-2 text-sm "><Paperclip size={13} /><span className="flex-1 truncate">{f.name}</span><span className="text-xs text-ink-2">{Math.round(f.size / 1024)} KB</span>
+              <button type="button" aria-label="Download" onClick={() => void openDownload(`assignments/${assignmentId}/my-submission/files/${f.id}/download`)} className="p-1 text-ink-2 hover:text-primary"><Download size={14} /></button>
+              {editable && <button type="button" aria-label="Remove" onClick={() => void run('del', async () => { await api.del(`assignments/${assignmentId}/my-submission/files/${f.id}`); await load(); })} className="p-1 text-ink-2 hover:text-danger-ink"><Trash2 size={14} /></button>}
             </div>
           ))}
           {editable && (submission?.files.length ?? 0) < assignment.maxFiles && (
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-black/20 px-4 py-3 text-xs font-bold text-slate-500 dark:border-white/20">{busy === 'upload' ? 'Uploading…' : <><FileUp size={14} /> Upload a file</>}
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-button border border-dashed border-line px-4 py-3 text-xs font-bold text-ink-2 ">{busy === 'upload' ? 'Uploading…' : <><FileUp size={14} /> Upload a file</>}
               <input type="file" className="sr-only" accept={assignment.acceptedFileTypes.map((e) => `.${e}`).join(',')} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} />
             </label>
           )}
@@ -161,11 +161,11 @@ const StudentAssignmentView: React.FC<{ assignmentId: string; onBack: () => void
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-3">
-        {saveState !== 'idle' && editable && <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Draft saved' : 'Not saved'}</span>}
+        {saveState !== 'idle' && editable && <span className="text-meta font-bold text-ink-2">{saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Draft saved' : 'Not saved'}</span>}
         {canReopen && <Button variant="secondary" loading={busy === 'reopen'} onClick={() => void run('reopen', async () => { await api.post(`assignments/${assignmentId}/my-submission/reopen`); await load(); })} icon={<Pencil size={14} />}>Edit submission</Button>}
         {editable && <Button variant="student" loading={busy === 'submit'} onClick={async () => { if (await askConfirm({ title: 'Submit your work?', body: assignment.allowResubmission ? 'You can still edit it until your teacher grades it.' : 'You won’t be able to change it after submitting.', confirmLabel: 'Submit' })) void submit(); }} icon={<Send size={14} />}>{submission?.revision ? 'Resubmit' : 'Submit'}</Button>}
       </div>
-      {submission?.submittedAt && <p className="text-right text-xs text-slate-500">Last submitted {formatDateTime(submission.submittedAt)}{submission.isLate ? ' (late)' : ''}</p>}
+      {submission?.submittedAt && <p className="text-right text-xs text-ink-2">Last submitted {formatDateTime(submission.submittedAt)}{submission.isLate ? ' (late)' : ''}</p>}
     </div>
   );
 };

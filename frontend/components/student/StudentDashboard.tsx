@@ -1,5 +1,4 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { StudentSidebar } from './StudentSidebar';
 import { EnrolledClasses } from './EnrolledClasses';
 import { JoinClassWizard } from './JoinClassWizard';
 import { StudentTestsPanel } from '../../features/tests/StudentTestsPanel';
@@ -13,16 +12,23 @@ import { StudentAttendanceModal } from './StudentAttendanceModal';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { getApiUrl } from '../../config/apiConfig';
-import { Bell } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { BarChart3, BookOpen, Clock, FileText, LayoutDashboard, Lightbulb, MessageCircle, Settings } from '../ui/icons-compat';
+import { Button, buttonClasses, Modal, PageHeader, Spinner, type NavSectionDef } from '../ui';
+import { RoleShell, PageBody } from '../../features/shell/RoleShell';
+
+type Section = 'dashboard' | 'classes' | 'tests' | 'performance' | 'history' | 'project-advisor' | 'learning-bot' | 'settings';
+const SECTIONS: Section[] = ['dashboard', 'classes', 'tests', 'performance', 'history', 'project-advisor', 'learning-bot', 'settings'];
 
 // The secure exam is code-split: it pulls in the camera/vision and IDE bundles.
 const SecureExam = lazy(() => import('../../features/exam/SecureExam'));
 
 export const StudentDashboard: React.FC = () => {
   const location = useLocation();
-  const [activeSection, setActiveSection] = useState('dashboard');
-  const [isSidebarHovered, setSidebarHovered] = useState(false);
+  const navigate = useNavigate();
+  const rawSection = location.pathname.split('/')[2] as Section;
+  const activeSection: Section = SECTIONS.includes(rawSection) ? rawSection : 'dashboard';
+  const setActiveSection = (next: string) => navigate(`/student/${next === 'dashboard' ? '' : next}${location.search}`);
   const [isJoinWizardOpen, setJoinWizardOpen] = useState(false);
     const [activeTestId, setActiveTestId] = useState<string | null>(null);
   const [attendanceAlert, setAttendanceAlert] = useState<{ sessionId: string; classroomId: string; classroomName: string; sessionCode?: string; radiusMeters?: number } | null>(null);
@@ -142,14 +148,10 @@ export const StudentDashboard: React.FC = () => {
         return <EnrolledClasses onJoinClick={() => setJoinWizardOpen(true)} onStartTest={(testId) => setActiveTestId(testId)} />;
       case 'tests':
         return (
-          <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 md:p-8">
-            <header>
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-purple-500">Assessments</p>
-              <h1 className="text-2xl font-black sm:text-3xl">My tests</h1>
-              <p className="mt-1 text-sm text-slate-500">Tests from every classroom you have joined. Only your teachers' published tests appear here.</p>
-            </header>
-            <StudentTestsPanel />
-          </div>
+          <PageBody>
+            <PageHeader title="Tests" description="Tests from every classroom you have joined. Only tests your teachers have published appear here." />
+            <div className="mt-6"><StudentTestsPanel /></div>
+          </PageBody>
         );
       case 'performance':
         return <StudentPerformance />;
@@ -172,47 +174,51 @@ export const StudentDashboard: React.FC = () => {
     }
   };
 
+  const sections: NavSectionDef[] = [
+    {
+      id: 'learn',
+      items: [
+        { id: 'dashboard', label: 'Home', icon: <LayoutDashboard size={20} />, href: '/student' },
+        { id: 'classes', label: 'Classes', icon: <BookOpen size={20} />, href: '/student/classes' },
+        { id: 'tests', label: 'Tests', icon: <FileText size={20} />, href: '/student/tests' },
+        { id: 'performance', label: 'Performance', icon: <BarChart3 size={20} />, href: '/student/performance' },
+        { id: 'history', label: 'History', icon: <Clock size={20} />, href: '/student/history' },
+      ],
+    },
+    {
+      id: 'help',
+      label: 'Study help',
+      items: [
+        { id: 'project-advisor', label: 'Project advisor', icon: <Lightbulb size={20} />, href: '/student/project-advisor' },
+        { id: 'learning-bot', label: 'Class assistant', icon: <MessageCircle size={20} />, href: '/student/learning-bot' },
+      ],
+    },
+    { id: 'account', items: [{ id: 'settings', label: 'Settings', icon: <Settings size={20} />, href: '/student/settings' }] },
+  ];
+
   return (
-    <div className="fixed inset-0 z-[60] min-w-0 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white flex font-sans overflow-hidden">
-      {/* Background Glows */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30 z-0">
-        <div className="absolute top-0 left-0 w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[150px] -translate-y-1/2 -translate-x-1/2" />
-        <div className="absolute bottom-0 right-0 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[150px] translate-y-1/2 translate-x-1/2" />
-      </div>
-
-      <StudentSidebar 
-        activeSection={activeSection} 
-        setActiveSection={setActiveSection} 
-        isHovered={isSidebarHovered} 
-        setHovered={setSidebarHovered} 
-      />
-      
-      <main 
-        className={`!ml-0 flex-1 min-w-0 relative z-10 pb-24 md:pb-0 transition-all duration-500 overflow-y-auto bg-white/50 dark:bg-black/20 backdrop-blur-3xl border-l border-black/5 dark:border-white/10 ${isSidebarHovered ? 'md:!ml-64' : 'md:!ml-20'}`}
-      >
-        {renderContent()}
-      </main>
-      {hasReturnToApp && <a href={returnTo!} className="fixed right-5 top-5 z-[110] rounded-xl bg-slate-900 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white shadow-xl dark:bg-white dark:text-slate-900">Return to app</a>}
-
-      {attendanceAlert && (
-        <div className="fixed inset-0 z-[95] flex items-start justify-center bg-black/40 p-4 pt-20 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-purple-200 bg-white p-6 shadow-2xl dark:border-purple-500/20 dark:bg-[#121212]">
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl bg-purple-500/10 p-3 text-purple-500"><Bell size={20} /></div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-purple-500">Attendance Verification</p>
-                <h2 className="mt-1 text-lg font-black text-slate-900 dark:text-white">Your teacher started attendance</h2>
-                <p className="mt-2 text-xs leading-5 text-slate-500">Verify your presence now for <span className="font-bold">{attendanceAlert.classroomName}</span>. You will need to allow location and complete Face ID on your own device.</p>
-                {attendanceAlert.sessionCode && <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-purple-500">Session: {attendanceAlert.sessionCode}</p>}
-              </div>
-            </div>
-            <div className="mt-5 flex gap-3">
-              <button type="button" onClick={() => setAttendanceAlert(null)} className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:bg-white/10 dark:text-slate-300">Later</button>
-              <button type="button" onClick={() => { setAttendancePortal(attendanceAlert); setIsAttendancePortalOpen(true); setAttendanceAlert(null); }} className="flex-1 rounded-xl bg-purple-600 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white">Verify Attendance</button>
-            </div>
-          </div>
+    <RoleShell roleLabel="Student" sections={sections} activeId={activeSection} onNavigate={setActiveSection} onOpenSettings={() => setActiveSection('settings')}>
+      {hasReturnToApp && (
+        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 lg:px-8">
+          <a href={returnTo!} className={buttonClasses('outline', 'sm')}>Return to the NeuroClass app</a>
         </div>
       )}
+      {renderContent()}
+
+      <Modal
+        open={Boolean(attendanceAlert)}
+        onClose={() => setAttendanceAlert(null)}
+        title="Your teacher started attendance"
+        description={attendanceAlert ? <>Confirm you’re present for <strong className="font-semibold text-ink">{attendanceAlert.classroomName}</strong>. You’ll need to allow location access and complete Face ID on this device.</> : undefined}
+        footer={
+          <>
+            <Button variant="text" onClick={() => setAttendanceAlert(null)}>Later</Button>
+            <Button onClick={() => { setAttendancePortal(attendanceAlert); setIsAttendancePortalOpen(true); setAttendanceAlert(null); }}>Mark attendance</Button>
+          </>
+        }
+      >
+        {attendanceAlert?.sessionCode && <p className="text-support text-ink-2">Session code <span className="font-mono font-semibold text-ink">{attendanceAlert.sessionCode}</span></p>}
+      </Modal>
 
       {isAttendancePortalOpen && attendancePortal && (
         <StudentAttendanceModal
@@ -227,17 +233,14 @@ export const StudentDashboard: React.FC = () => {
         />
       )}
 
-      {/* Biometric Join Wizard */}
-      <JoinClassWizard 
-        isOpen={isJoinWizardOpen} 
-        onClose={() => setJoinWizardOpen(false)} 
-        onSuccess={() => {
-          setActiveSection('classes');
-        }}
+      <JoinClassWizard
+        isOpen={isJoinWizardOpen}
+        onClose={() => setJoinWizardOpen(false)}
+        onSuccess={() => setActiveSection('classes')}
       />
-      
+
       {activeTestId && (
-        <Suspense fallback={<div className="fixed inset-0 z-[200] flex items-center justify-center bg-black text-sm text-white">Loading exam…</div>}>
+        <Suspense fallback={<div className="fixed inset-0 z-[200] flex items-center justify-center bg-canvas"><Spinner label="Opening the test…" /></div>}>
           <SecureExam
             testId={activeTestId}
             onExit={() => {
@@ -247,6 +250,6 @@ export const StudentDashboard: React.FC = () => {
           />
         </Suspense>
       )}
-    </div>
+    </RoleShell>
   );
 };

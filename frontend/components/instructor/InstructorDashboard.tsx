@@ -1,111 +1,108 @@
-import React, { useState } from 'react';
-import { Sidebar } from './Sidebar';
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ClassroomList } from './ClassroomList';
 import { ClassroomDetail } from './ClassroomDetail';
 import { StripeDashboard } from './stripe/StripeDashboard';
-
 import { InstructorSettings } from './InstructorSettings';
 import { AttendanceSystem } from '../ai/AttendanceSystem';
 import { ProctoringSystem } from '../ai/ProctoringSystem';
 import { AnalyticsDashboard } from '../evaluation/AnalyticsDashboard';
-import { useLocation } from 'react-router-dom';
 import { FEATURES } from '../../config/features';
+import { PageHeader, type NavSectionDef } from '../ui';
+import { BarChart3, ClipboardList, CreditCard, Settings, ShieldCheck, UserCheck, Users } from '../ui/icons-compat';
+import { RoleShell, PageBody } from '../../features/shell/RoleShell';
+
+type Section = 'classrooms' | 'attendance' | 'tests' | 'proctoring' | 'reports' | 'settings' | 'stripe';
+const SECTIONS: Section[] = ['classrooms', 'attendance', 'tests', 'proctoring', 'reports', 'settings', 'stripe'];
+// Older links and nav ids that pointed at duplicate screens.
+const ALIASES: Record<string, Section> = { dashboard: 'classrooms', monitoring: 'proctoring', 'classroom-detail': 'classrooms' };
 
 export const InstructorDashboard: React.FC = () => {
   const location = useLocation();
-  const requestedClassroomId = new URLSearchParams(location.search).get('classroomId');
-  const attendanceHandoff = new URLSearchParams(location.search).get('attendance') === '1' && Boolean(requestedClassroomId);
-  const driveHandoff = Boolean(requestedClassroomId) && ['connected', 'denied', 'error'].includes(new URLSearchParams(location.search).get('drive') || '');
-  const classroomHandoff = attendanceHandoff || driveHandoff;
-  const [activeSection, setActiveSection] = useState(() => classroomHandoff ? 'classroom-detail' : 'classrooms');
-  const [isSidebarHovered, setSidebarHovered] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(() => classroomHandoff ? requestedClassroomId : null);
-  const [initialTab, setInitialTab] = useState<'tests' | undefined>(undefined);
+  const navigate = useNavigate();
+  const params = new URLSearchParams(location.search);
+  const handoffClassroomId = params.get('classroomId');
+  const classroomHandoff = Boolean(handoffClassroomId) && (params.get('attendance') === '1' || ['connected', 'denied', 'error'].includes(params.get('drive') || ''));
 
-  const handleSelectClass = (id: string) => {
-    setSelectedClassId(id);
-    setActiveSection('classroom-detail');
-  };
+  // /teacher/<section>[/<classroomId>[/<tab>]]
+  const [, , rawSection, pathId, pathTab] = location.pathname.split('/');
+  const section: Section = classroomHandoff ? 'classrooms' : (SECTIONS.includes(rawSection as Section) ? rawSection as Section : ALIASES[rawSection] ?? 'classrooms');
+  const classroomId = classroomHandoff ? handoffClassroomId : section === 'classrooms' || section === 'attendance' ? pathId ?? null : null;
 
-  const renderContent = () => {
-    if (activeSection === 'classroom-detail' && selectedClassId) {
-      return <ClassroomDetail classroomId={selectedClassId} initialTab={initialTab} onBack={() => { setInitialTab(undefined); setActiveSection('classrooms'); }} />;
+  const go = (next: string) => navigate(`/teacher/${next}`);
+  const openClassroom = (id: string, tab?: string) => navigate(`/teacher/classrooms/${id}${tab ? `/${tab}` : ''}`);
+
+  const sections: NavSectionDef[] = [
+    {
+      id: 'teach',
+      items: [
+        { id: 'classrooms', label: 'Classrooms', icon: <Users size={20} />, href: '/teacher/classrooms' },
+        { id: 'tests', label: 'Tests and assignments', icon: <ClipboardList size={20} />, href: '/teacher/tests' },
+        { id: 'attendance', label: 'Attendance', icon: <UserCheck size={20} />, href: '/teacher/attendance' },
+        { id: 'proctoring', label: 'Proctoring', icon: <ShieldCheck size={20} />, href: '/teacher/proctoring' },
+        { id: 'reports', label: 'Analytics', icon: <BarChart3 size={20} />, href: '/teacher/reports' },
+      ],
+    },
+    {
+      id: 'account',
+      items: [
+        ...(FEATURES.payments ? [{ id: 'stripe', label: 'Payments', icon: <CreditCard size={20} />, href: '/teacher/stripe' }] : []),
+        { id: 'settings', label: 'Settings', icon: <Settings size={20} />, href: '/teacher/settings' },
+      ],
+    },
+  ];
+
+  const content = (() => {
+    if (section === 'classrooms' && classroomId) {
+      return (
+        <ClassroomDetail
+          key={classroomId}
+          classroomId={classroomId}
+          initialTab={pathTab === 'tests' ? 'tests' : undefined}
+          onBack={() => go('classrooms')}
+        />
+      );
     }
-    
-    switch (activeSection) {
-      case 'classrooms':
-        return <ClassroomList onSelect={handleSelectClass} />;
-      case 'dashboard':
-        return <ClassroomList onSelect={handleSelectClass} />;
-      case 'stripe':
-        // Payments are temporarily disabled; fall back to the classroom list.
-        return FEATURES.payments ? <StripeDashboard /> : <ClassroomList onSelect={handleSelectClass} />;
+    switch (section) {
       case 'tests':
         return (
-          <div className="h-full overflow-y-auto p-6 scrollbar-hide">
-            <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5 text-sm text-slate-600 dark:text-slate-300">
-              Tests and assignments belong to a classroom. Open a classroom and use its <strong>Tests</strong> or <strong>Assignments</strong> tab. Only students enrolled in that classroom can see them.
-            </div>
-            <ClassroomList onSelect={(id) => { setInitialTab('tests'); handleSelectClass(id); }} />
-          </div>
+          <PageBody>
+            <PageHeader title="Tests and assignments" description="Tests and assignments belong to a classroom. Choose a classroom to create, publish and grade its work. Only students enrolled in that classroom can see it." />
+            <div className="mt-6"><ClassroomList embedded onSelect={(id) => openClassroom(id, 'tests')} /></div>
+          </PageBody>
         );
       case 'attendance':
-        return selectedClassId ? (
-          <div className="h-full overflow-y-auto p-6 scrollbar-hide">
-            <AttendanceSystem classId={selectedClassId} className="Selected classroom" />
-          </div>
+        return classroomId ? (
+          <PageBody>
+            <PageHeader
+              breadcrumbs={[{ label: 'Attendance', onClick: () => go('attendance') }, { label: 'Session' }]}
+              title="Attendance"
+              description="Start a teacher-authorized session for this classroom."
+            />
+            <div className="mt-6"><AttendanceSystem classId={classroomId} className="Selected classroom" /></div>
+          </PageBody>
         ) : (
-          <div className="h-full overflow-y-auto p-6 scrollbar-hide">
-            <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-5 text-sm text-slate-600 dark:text-slate-300">
-              Choose one of your classrooms to open a teacher-authorized attendance session. Attendance is never recorded against a demo or hardcoded class.
-            </div>
-            <ClassroomList onSelect={handleSelectClass} />
-          </div>
+          <PageBody>
+            <PageHeader title="Attendance" description="Choose a classroom to start a verified attendance session. Attendance is only ever recorded against your real classrooms." />
+            <div className="mt-6"><ClassroomList embedded onSelect={(id) => navigate(`/teacher/attendance/${id}`)} /></div>
+          </PageBody>
         );
-      case 'monitoring':
       case 'proctoring':
-        return (
-          <div className="h-full overflow-y-auto p-6 scrollbar-hide">
-            <ProctoringSystem />
-          </div>
-        );
+        return <PageBody><ProctoringSystem /></PageBody>;
       case 'reports':
-        return (
-          <div className="h-full overflow-y-auto p-6 scrollbar-hide">
-            <AnalyticsDashboard />
-          </div>
-        );
+        return <PageBody><AnalyticsDashboard /></PageBody>;
       case 'settings':
         return <InstructorSettings />;
+      case 'stripe':
+        return FEATURES.payments ? <StripeDashboard /> : <ClassroomList onSelect={(id) => openClassroom(id)} />;
       default:
-        return (
-          <div className="flex items-center justify-center h-full text-slate-400 font-bold uppercase tracking-widest text-sm">
-            {activeSection} - Work in Progress
-          </div>
-        );
+        return <ClassroomList onSelect={(id) => openClassroom(id)} />;
     }
-  };
+  })();
 
   return (
-    <div className="fixed inset-0 z-[60] min-w-0 bg-white dark:bg-[#0a0a0a] text-slate-900 dark:text-white flex font-sans overflow-hidden">
-      {/* Background Glows */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30 z-0">
-         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-purple-600/10 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/2" />
-         <div className="absolute bottom-0 left-0 w-[800px] h-[800px] bg-blue-600/10 rounded-full blur-[150px] translate-y-1/2 -translate-x-1/2" />
-      </div>
-
-      <Sidebar 
-        activeSection={activeSection} 
-        setActiveSection={setActiveSection} 
-        isHovered={isSidebarHovered} 
-        setHovered={setSidebarHovered} 
-      />
-      
-      <main 
-        className={`!ml-0 flex-1 min-w-0 relative z-10 pb-24 md:pb-0 transition-all duration-500 overflow-hidden bg-white/50 dark:bg-black/20 backdrop-blur-3xl border-l border-black/5 dark:border-white/10 ${isSidebarHovered ? 'md:!ml-64' : 'md:!ml-20'}`}
-      >
-        {renderContent()}
-      </main>
-    </div>
+    <RoleShell roleLabel="Teacher" sections={sections} activeId={section} onNavigate={go} onOpenSettings={() => go('settings')}>
+      {content}
+    </RoleShell>
   );
 };

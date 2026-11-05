@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Archive, BarChart3, CalendarClock, Code2, Copy, FileText, MoreHorizontal, Pencil, Plus, Radio, ShieldCheck, Square, Trash2, Undo2 } from 'lucide-react';
+import { Archive, BarChart3, CalendarClock, Code2, Copy, FileText, MoreHorizontal, Pencil, Plus, Radio, ShieldCheck, Square, Trash2, Undo2 } from '../../components/ui/icons-compat';
 import { api, formatDateTime } from '../lms/api';
 import type { TeacherTestSummary } from '../lms/types';
 import { AVAILABILITY_BADGE, Badge, Button, Card, EmptyState, ErrorNote, Spinner, useAsync } from '../lms/ui';
@@ -31,7 +31,7 @@ export const TeacherTestsPanel: React.FC<{ classroomId: string; classroomName: s
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-xl font-bold">Tests</h3>
-          <p className="text-sm text-slate-500">Create, schedule and proctor tests for {classroomName}. Only enrolled students can see published tests.</p>
+          <p className="text-sm text-ink-2">Create, schedule and proctor tests for {classroomName}. Only enrolled students can see published tests.</p>
         </div>
         <Button onClick={() => setEditing('new')} icon={<Plus size={14} />}>New test</Button>
       </div>
@@ -39,7 +39,7 @@ export const TeacherTestsPanel: React.FC<{ classroomId: string; classroomName: s
       {list.loading && !list.data ? <Spinner label="Loading tests…" /> : tests.length === 0 ? (
         <EmptyState icon={<FileText size={36} />} title="No tests yet" body="Create a draft, add questions (including coding questions), set proctoring, then publish or schedule it." action={<Button onClick={() => setEditing('new')} icon={<Plus size={14} />}>Create your first test</Button>} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {tests.map((t) => {
             const badge = AVAILABILITY_BADGE[t.availability] ?? AVAILABILITY_BADGE.draft;
             return (
@@ -48,11 +48,11 @@ export const TeacherTestsPanel: React.FC<{ classroomId: string; classroomName: s
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2"><Badge tone={badge.tone}>{badge.label}</Badge>{t.examMode === 'coding' && <Badge tone="purple"><Code2 size={11} /> Coding</Badge>}{(t.security.liveProctoring || t.security.requireIdentityVerification) && <Badge tone="blue"><ShieldCheck size={11} /> Proctored</Badge>}</div>
                     <h4 className="mt-2 truncate text-lg font-bold" title={t.title}>{t.title}</h4>
-                    <p className="text-xs text-slate-500">{t.questionCount ?? 0} questions · {t.totalMarks} marks · {t.durationMinutes} min</p>
+                    <p className="text-xs text-ink-2">{t.questionCount ?? 0} questions · {t.totalMarks} marks · {t.durationMinutes} min</p>
                   </div>
-                  <button type="button" aria-label="More actions" onClick={() => setMenu(menu === t.id ? null : t.id)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"><MoreHorizontal size={16} /></button>
+                  <button type="button" aria-label="More actions" onClick={() => setMenu(menu === t.id ? null : t.id)} className="rounded-lg p-2 text-ink-2 hover:bg-surface-2 "><MoreHorizontal size={16} /></button>
                   {menu === t.id && (
-                    <div className="absolute right-4 top-14 z-20 w-48 overflow-hidden rounded-2xl border border-black/10 bg-white text-sm shadow-xl dark:border-white/10 dark:bg-[#151515]">
+                    <div className="absolute right-4 top-14 z-20 w-48 overflow-hidden rounded-card border border-line bg-surface text-sm shadow-raised ">
                       <MenuItem icon={<Copy size={14} />} label="Duplicate" onClick={() => void act(() => api.post(`tests/${t.id}/duplicate`, {}))} />
                       {t.status === 'published' && <MenuItem icon={<Square size={14} />} label="Close now" onClick={() => void act(() => api.post(`tests/${t.id}/close`), 'Close this test? Students in progress keep their remaining time; no new attempts can start.')} />}
                       {t.status === 'published' && !(t.stats?.submitted || t.stats?.active) && <MenuItem icon={<Undo2 size={14} />} label="Unpublish" onClick={() => void act(() => api.post(`tests/${t.id}/unpublish`))} />}
@@ -62,7 +62,7 @@ export const TeacherTestsPanel: React.FC<{ classroomId: string; classroomName: s
                     </div>
                   )}
                 </div>
-                <div className="space-y-1 text-xs text-slate-500">
+                <div className="space-y-1 text-xs text-ink-2">
                   {t.scheduledStart && <p className="flex items-center gap-1.5"><CalendarClock size={12} /> Opens {formatDateTime(t.scheduledStart)}</p>}
                   {t.scheduledEnd && <p className="flex items-center gap-1.5"><CalendarClock size={12} /> Closes {formatDateTime(t.scheduledEnd)}</p>}
                   {t.stats && (t.stats.submitted > 0 || t.stats.active > 0) && <p>{t.stats.submitted} submitted · {t.stats.active} in progress{t.stats.pendingReview ? ` · ${t.stats.pendingReview} to grade` : ''}</p>}
@@ -82,5 +82,5 @@ export const TeacherTestsPanel: React.FC<{ classroomId: string; classroomName: s
 };
 
 const MenuItem: React.FC<{ icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }> = ({ icon, label, onClick, danger }) => (
-  <button type="button" onClick={onClick} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-white/5 ${danger ? 'text-rose-600' : ''}`}>{icon}{label}</button>
+  <button type="button" onClick={onClick} className={`flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2 ${danger ? 'text-danger-ink' : ''}`}>{icon}{label}</button>
 );

@@ -3,15 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/common/Navbar';
-import ParticleBackground from './components/common/ParticleBackground';
-import { Hero } from './components/common/Hero';
-import Features from './components/common/Features';
-import { Process, DashboardPreview } from './components/common/WorkAndDashboard';
-import { TestSystem, Footer } from './components/common/TestAndFooter';
+import { Landing } from './features/landing/Landing';
 import { AnimatePresence } from 'motion/react';
 import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
-import { FeedbackProvider } from './components/ui';
+import { FeedbackProvider, Spinner } from './components/ui';
 
 // Dashboards pull in TensorFlow, camera and attendance code. Loading them on
 // demand keeps the public landing page small.
@@ -24,18 +20,11 @@ const MobileStudentAttendancePortal = lazy(() => import('./components/attendance
 const MobileTeacherAttendancePortal = lazy(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileTeacherAttendancePortal })));
 
 const PageFallback = () => (
-  <div className="flex min-h-[60vh] items-center justify-center text-xs font-bold uppercase tracking-widest text-slate-400">Loading…</div>
+  <div className="flex min-h-[60vh] items-center justify-center"><Spinner label="Loading…" /></div>
 );
 
 const Home = ({ onLaunchAuth }: { onLaunchAuth: (mode: 'signin' | 'signup') => void }) => (
-  <>
-    <Hero onLaunch={() => onLaunchAuth('signin')} />
-    <Features />
-    <Process />
-    <DashboardPreview />
-    <TestSystem />
-    <Footer />
-  </>
+  <Landing onSignIn={() => onLaunchAuth('signin')} onSignUp={() => onLaunchAuth('signup')} />
 );
 
 const AppContent = () => {
@@ -55,8 +44,7 @@ const AppContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-white selection:bg-blue-500 selection:text-white relative transition-colors duration-300 font-sans">
-      <ParticleBackground />
+    <div className="relative min-h-screen bg-canvas font-sans text-ink">
 
       <Navbar onLogin={openAuth} />
 

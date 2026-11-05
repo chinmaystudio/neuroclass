@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckSquare, Sparkles, Square } from 'lucide-react';
+import { CheckSquare, Sparkles, Square } from '../../components/ui/icons-compat';
 import { api } from '../lms/api';
 import type { EditableQuestion } from '../lms/types';
 import { Button, ErrorNote, Field, inputClass, Modal } from '../lms/ui';
@@ -71,13 +71,13 @@ export const AIQuestionGenerator: React.FC<{ subject: string; onAdd: (questions:
         <Button loading={loading} disabled={topic.trim().length < 2} onClick={() => void generate()} icon={<Sparkles size={14} />}>{candidates.length ? 'Generate again' : 'Generate'}</Button>
         {candidates.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-slate-500">Review each suggestion. Selected questions are added to your test as editable drafts — check every answer key before saving.</p>
+            <p className="text-xs text-ink-2">Review each suggestion. Selected questions are added to your test as editable drafts — check every answer key before saving.</p>
             {candidates.map((q, i) => (
-              <button key={i} type="button" onClick={() => setSelected((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; })} className="flex w-full items-start gap-3 rounded-2xl border border-black/5 p-3 text-left text-sm hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
-                {selected.has(i) ? <CheckSquare size={18} className="mt-0.5 shrink-0 text-blue-600" /> : <Square size={18} className="mt-0.5 shrink-0 text-slate-400" />}
+              <button key={i} type="button" onClick={() => setSelected((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; })} className="flex w-full items-start gap-3 rounded-card border border-line p-3 text-left text-sm hover:bg-surface-2 ">
+                {selected.has(i) ? <CheckSquare size={18} className="mt-0.5 shrink-0 text-primary" /> : <Square size={18} className="mt-0.5 shrink-0 text-ink-2" />}
                 <span className="min-w-0"><span className="block font-semibold">{q.prompt}</span>
-                  {q.options.length > 0 && <span className="mt-1 block text-xs text-slate-500">{q.options.map((o) => `${o.isCorrect ? '✓ ' : ''}${o.text}`).join(' · ')}</span>}
-                  {q.acceptedAnswers.length > 0 && <span className="mt-1 block text-xs text-slate-500">Answer: {q.acceptedAnswers[0]}</span>}
+                  {q.options.length > 0 && <span className="mt-1 block text-xs text-ink-2">{q.options.map((o) => `${o.isCorrect ? '✓ ' : ''}${o.text}`).join(' · ')}</span>}
+                  {q.acceptedAnswers.length > 0 && <span className="mt-1 block text-xs text-ink-2">Answer: {q.acceptedAnswers[0]}</span>}
                 </span>
               </button>
             ))}

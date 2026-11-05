@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowRight, BrainCircuit, CheckCircle2, Lightbulb, Sparkles } from 'lucide-react';
+import { PageHeader } from '../ui';
+import { ArrowRight, BrainCircuit, CheckCircle2, Lightbulb, Sparkles } from '../ui/icons-compat';
 
 import { getApiUrl } from '../../config/apiConfig';
 import { supabase } from '../../database/supabase';
@@ -50,22 +51,15 @@ export const ProjectAdvisor: React.FC = () => {
     }
   };
 
-  const field = 'mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-purple-500 dark:border-white/10 dark:bg-black/20';
+  const field = 'mt-2 w-full rounded-button border border-line bg-surface-2 p-3 text-sm outline-none focus:border-primary ';
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-4 sm:p-8">
-      <header className="flex items-start gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-purple-600 text-white shadow-lg shadow-purple-500/25"><Lightbulb size={26} /></div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-purple-600">Project studio</p>
-          <h1 className="text-3xl font-black tracking-tight">Find a project worth building</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">Answer four focused questions. The advisor returns a competition-ready problem, MVP scope, architecture, milestones, risks, and demo story.</p>
-        </div>
-      </header>
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <PageHeader title="Project advisor" description="Answer four questions and get a project plan: the problem, first version, architecture, milestones, risks and how to demo it." />
 
       {!result ? (
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-          <form onSubmit={handleSubmit} className="space-y-5 rounded-3xl border border-black/5 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-white/5">
+          <form onSubmit={handleSubmit} className="space-y-5 rounded-card border border-line bg-surface p-6 shadow-raised ">
             <label className="block text-sm font-bold">What category interests you?
               <select value={category} onChange={(event) => setCategory(event.target.value)} className={field}>
                 {categories.map((item) => <option key={item}>{item}</option>)}
@@ -83,32 +77,32 @@ export const ProjectAdvisor: React.FC = () => {
             <label className="block text-sm font-bold">4. What measurable impact would make it successful?
               <textarea value={impact} onChange={(event) => setImpact(event.target.value)} placeholder="Example: reduce time to find a study partner by 30% in a pilot" rows={3} className={field} />
             </label>
-            <label className="block text-sm font-bold">Preferred stack, if any <span className="font-normal text-slate-400">(optional)</span>
+            <label className="block text-sm font-bold">Preferred stack, if any <span className="font-normal text-ink-2">(optional)</span>
               <input value={preferredStack} onChange={(event) => setPreferredStack(event.target.value)} placeholder="React, Python, Supabase..." className={field} />
             </label>
-            {error && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-xs font-semibold text-rose-600">{error}</p>}
-            <button type="submit" disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-5 py-4 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-purple-500/25 disabled:opacity-50">
+            {error && <p role="alert" className="rounded-button bg-danger-bg p-3 text-xs font-semibold text-danger-ink">{error}</p>}
+            <button type="submit" disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-button bg-primary px-5 py-4 text-xs font-bold text-on-primary shadow-raised disabled:opacity-50">
               <Sparkles size={16} /> {loading ? 'Generating your plan…' : 'Generate project plan'} {!loading && <ArrowRight size={16} />}
             </button>
           </form>
-          <aside className="rounded-3xl border border-purple-500/20 bg-gradient-to-br from-purple-600 to-indigo-700 p-7 text-white shadow-xl">
+          <aside className="rounded-card border border-primary-soft bg-brand-gradient p-7 text-white shadow-raised">
             <BrainCircuit size={32} className="mb-8 opacity-80" />
-            <h2 className="text-2xl font-black">Your deliverable</h2>
-            <p className="mt-3 text-sm leading-6 text-white/75">One structured blueprint designed for execution, not a generic list of ideas.</p>
-            <div className="mt-8 space-y-3 text-sm text-white/85">{['Specific problem and target users', 'MVP and stretch scope', 'Architecture and milestones', 'Risks and mitigations', 'Competition demo flow and metrics'].map((item) => <div key={item} className="flex gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0" /> {item}</div>)}</div>
+            <h2 className="text-2xl font-semibold">Your deliverable</h2>
+            <p className="mt-3 text-sm leading-6 text-white">One structured blueprint designed for execution, not a generic list of ideas.</p>
+            <div className="mt-8 space-y-3 text-sm text-white">{['Specific problem and target users', 'MVP and stretch scope', 'Architecture and milestones', 'Risks and mitigations', 'Competition demo flow and metrics'].map((item) => <div key={item} className="flex gap-2"><CheckCircle2 size={16} className="mt-0.5 shrink-0" /> {item}</div>)}</div>
           </aside>
         </div>
       ) : (
         <div className="space-y-6">
-          <article className="rounded-3xl border border-black/5 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-white/5 sm:p-8">
-            <div className="mb-8 border-b border-black/5 pb-6 dark:border-white/10"><p className="text-[10px] font-bold uppercase tracking-widest text-purple-600">Project blueprint</p><h2 className="mt-2 text-3xl font-black">{result.title}</h2><p className="mt-2 text-slate-500">{result.oneLinePitch}</p></div>
+          <article className="rounded-card border border-line bg-surface p-6 shadow-raised sm:p-8">
+            <div className="mb-8 border-b border-line pb-6 "><p className="text-meta font-bold text-primary">Project blueprint</p><h2 className="mt-2 text-3xl font-semibold">{result.title}</h2><p className="mt-2 text-ink-2">{result.oneLinePitch}</p></div>
             <div className="grid gap-6 md:grid-cols-2">
               {(['problem', 'solution', 'novelty', 'targetUsers', 'mvpScope', 'stretchFeatures', 'architecture', 'milestones', 'risks', 'competitionReadiness', 'nextActions'] as const).filter((key) => result[key] !== undefined).map((key) => (
-                <section key={key} className="rounded-2xl border border-black/5 p-5 dark:border-white/10 md:last:col-span-2"><h3 className="mb-3 text-sm font-black capitalize">{key.replace(/[A-Z]/g, ' $&')}</h3><pre className="whitespace-pre-wrap font-sans text-sm leading-6 text-slate-600 dark:text-slate-300">{typeof result[key] === 'string' ? result[key] : JSON.stringify(result[key], null, 2)}</pre></section>
+                <section key={key} className="rounded-card border border-line p-5 md:last:col-span-2"><h3 className="mb-3 text-sm font-semibold capitalize">{key.replace(/[A-Z]/g, ' $&')}</h3><pre className="whitespace-pre-wrap font-sans text-sm leading-6 text-ink-2 ">{typeof result[key] === 'string' ? result[key] : JSON.stringify(result[key], null, 2)}</pre></section>
               ))}
             </div>
           </article>
-          <button onClick={() => { setResult(null); setError(''); }} className="rounded-xl border border-black/10 px-4 py-3 text-xs font-bold uppercase tracking-widest dark:border-white/10">Start another plan</button>
+          <button onClick={() => { setResult(null); setError(''); }} className="rounded-button border border-line px-4 py-3 text-xs font-bold ">Start another plan</button>
         </div>
       )}
     </div>

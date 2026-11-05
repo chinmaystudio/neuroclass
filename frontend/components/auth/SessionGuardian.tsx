@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { isSupabaseConfigured } from '../../database/supabase';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle } from '../ui/icons-compat';
 
 interface SessionGuardianProps {
   children: React.ReactNode;
@@ -10,14 +10,14 @@ interface SessionGuardianProps {
 }
 
 const MissingConfigMessage = () => (
-  <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-black px-4 py-20 overflow-y-auto">
-    <div className="max-w-md w-full space-y-6 text-center bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800 shadow-2xl">
-      <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center mx-auto">
+  <div className="min-h-screen flex items-center justify-center bg-surface-2 px-4 py-20 overflow-y-auto">
+    <div className="max-w-md w-full space-y-6 text-center bg-surface p-8 rounded-card border border-line shadow-raised">
+      <div className="w-16 h-16 bg-warning-bg text-warning-ink rounded-card flex items-center justify-center mx-auto">
         <AlertCircle size={32} />
       </div>
       <div className="space-y-2">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Database Not Configured</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+        <h2 className="text-xl font-bold text-ink ">Database Not Configured</h2>
+        <p className="text-xs text-ink-2 leading-relaxed">
           The Supabase credentials are missing.
         </p>
       </div>
@@ -35,8 +35,8 @@ export const SessionGuardian: React.FC<SessionGuardianProps> = ({ children, allo
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-black flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      <div className="min-h-screen bg-surface-2 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary-soft border-t-primary rounded-full animate-spin" />
       </div>
     );
   }

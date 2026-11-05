@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Camera, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw, MapPin, LocateFixed } from 'lucide-react';
+import { X, Camera, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw, MapPin, LocateFixed } from '../ui/icons-compat';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { CameraService } from '../../services/ml/CameraService';
@@ -358,35 +358,35 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[100] bg-overlay flex items-center justify-center p-4">
         <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-white dark:bg-[#121212] border border-slate-200 dark:border-white/10 rounded-[36px] max-w-lg w-full p-8 shadow-2xl space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto"
+          className="bg-surface border border-line rounded-card max-w-lg w-full p-8 shadow-raised space-y-6 relative max-h-[calc(100vh-2rem)] overflow-y-auto"
         >
-          <button onClick={() => { stopCamera(); onClose(); }} className="absolute top-6 right-6 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-900 dark:hover:text-white">
+          <button onClick={() => { stopCamera(); onClose(); }} className="absolute top-6 right-6 p-2 rounded-full hover:bg-surface-2 text-ink-2 hover:text-ink ">
             <X size={20} />
           </button>
 
           <div>
-            <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-500 text-[10px] font-bold uppercase tracking-widest">NeuroClass</span>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-white mt-3">Multi-Level Attendance</h2>
-            <p className="text-slate-500 text-xs mt-1">Classroom: <span className="font-bold text-purple-500">{classroomName}</span></p>
-            {activeSession?.session_code && <p className="text-slate-400 text-[10px] mt-2 font-mono uppercase tracking-widest">Session: {activeSession.session_code}</p>}
+            <span className="px-3 py-1 rounded-full bg-primary-light text-primary text-meta font-bold ">NeuroClass</span>
+            <h2 className="text-2xl font-semibold text-ink mt-3">Multi-Level Attendance</h2>
+            <p className="text-ink-2 text-xs mt-1">Classroom: <span className="font-bold text-primary">{classroomName}</span></p>
+            {activeSession?.session_code && <p className="text-ink-2 text-meta mt-2 font-mono ">Session: {activeSession.session_code}</p>}
           </div>
 
-          <div className="rounded-2xl border border-purple-200 dark:border-purple-500/20 bg-purple-50/70 dark:bg-purple-500/5 px-4 py-3 text-xs text-purple-800 dark:text-purple-200">
-            <p className="font-bold uppercase tracking-widest">Step {locationVerified ? '2' : '1'} of 3</p>
+          <div className="rounded-card border border-primary-soft bg-primary/70 px-4 py-3 text-xs text-primary-dark ">
+            <p className="font-bold ">Step {locationVerified ? '2' : '1'} of 3</p>
             <p className="mt-1">{locationVerified ? 'Location verified. Hold your face in view while the camera captures your face match.' : 'Checking your location before Face ID.'}</p>
           </div>
 
-          <div className="relative aspect-video rounded-3xl overflow-hidden bg-black border border-slate-200 dark:border-white/10 flex items-center justify-center">
+          <div className="relative aspect-video rounded-card overflow-hidden bg-black border border-line flex items-center justify-center">
             {isCapturing && <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />}
             {faceBox && (
               <div className="absolute inset-0 z-10 pointer-events-none">
                 <div
-                  className="absolute border-4 border-emerald-400 bg-emerald-400/10 shadow-[0_0_0_2px_rgba(16,185,129,0.35)]"
+                  className="absolute border-4 border-success bg-success-bg shadow-[0_0_0_2px_rgba(16,185,129,0.35)]"
                   style={{
                     left: `${100 - (faceBox[2] / Math.max(1, videoRef.current?.videoWidth || 1)) * 100}%`,
                     top: `${(faceBox[1] / Math.max(1, videoRef.current?.videoHeight || 1)) * 100}%`,
@@ -394,41 +394,41 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
                     height: `${((faceBox[3] - faceBox[1]) / Math.max(1, videoRef.current?.videoHeight || 1)) * 100}%`,
                   }}
                 >
-                  <span className="absolute -top-8 left-0 whitespace-nowrap rounded-lg bg-emerald-500 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-white shadow-lg">
+                  <span className="absolute -top-8 left-0 whitespace-nowrap rounded-lg bg-success px-2.5 py-1.5 text-meta font-semibold text-on-primary shadow-raised">
                     Face detected{faceMatchPercent !== null ? ` · ${faceMatchPercent.toFixed(0)}% match` : ''}
                   </span>
                 </div>
               </div>
             )}
             {isSuccess && (
-              <div className="absolute inset-0 bg-emerald-600/90 backdrop-blur-md flex flex-col items-center justify-center text-white space-y-2">
+              <div className="absolute inset-0 bg-success/90 flex flex-col items-center justify-center text-white space-y-2">
                 <CheckCircle2 size={48} />
                 <p className="text-lg font-bold">Attendance Verified!</p>
-                <p className="text-xs text-emerald-100">Present · Face match and location confirmed</p>
+                <p className="text-xs text-success-ink">Present · Face match and location confirmed</p>
               </div>
             )}
             {!isCapturing && !isSuccess && (
-              <div className="text-center text-slate-400 p-4">
+              <div className="text-center text-ink-2 p-4">
                 <MapPin size={36} className="mx-auto mb-2 opacity-60" />
                 <p className="text-xs">Allow location before the camera opens.</p>
               </div>
             )}
             {isVerifying && (
-              <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white gap-3">
+              <div className="absolute inset-0 bg-overlay flex flex-col items-center justify-center text-white gap-3">
                 <RefreshCw size={28} className="animate-spin" />
-                <p className="text-[10px] font-bold uppercase tracking-widest">Verifying Face Match…</p>
+                <p className="text-meta font-bold ">Verifying Face Match…</p>
               </div>
             )}
           </div>
 
           {faceMatchPercent !== null && !isSuccess && (
-            <div className="rounded-2xl border border-emerald-300/60 bg-emerald-50/70 px-4 py-3 text-xs font-bold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-300">
+            <div className="rounded-card border border-success bg-success/70 px-4 py-3 text-xs font-bold text-success-ink ">
               Face match detected: {faceMatchPercent.toFixed(0)}%. Keep your face centered while the server verifies your identity.
             </div>
           )}
 
           {error && (
-            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-semibold flex items-center gap-2">
+            <div className="p-4 rounded-card bg-danger-bg border border-danger/30 text-danger-ink text-xs font-semibold flex items-center gap-2">
               <AlertCircle size={16} className="shrink-0" />
               <span>{error}</span>
             </div>
@@ -436,18 +436,18 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
 
           {useMultiLevel ? (
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Location Verification</h3>
-                <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
-                  <div><p className="font-bold text-slate-500">Teacher zone</p><p className="mt-1 font-mono text-sm font-black text-slate-900 dark:text-white">{formatMeters(locationCheck?.radiusMeters ?? activeSession?.radius_meters)}</p></div>
-                  <div><p className="font-bold text-slate-500">Your distance</p><p className="mt-1 font-mono text-sm font-black text-slate-900 dark:text-white">{formatMeters(locationCheck?.distanceMeters)}</p></div>
-                  <div><p className="font-bold text-slate-500">Accuracy</p><p className="mt-1 font-mono text-sm font-black text-slate-900 dark:text-white">{formatMeters(locationCheck?.accuracyMeters)}</p></div>
+              <div className="p-4 rounded-card bg-surface-2 border border-line ">
+                <h3 className="text-xs font-bold text-ink-2 mb-3">Location Verification</h3>
+                <div className="grid grid-cols-3 gap-2 text-center text-meta">
+                  <div><p className="font-bold text-ink-2">Teacher zone</p><p className="mt-1 font-mono text-sm font-semibold text-ink ">{formatMeters(locationCheck?.radiusMeters ?? activeSession?.radius_meters)}</p></div>
+                  <div><p className="font-bold text-ink-2">Your distance</p><p className="mt-1 font-mono text-sm font-semibold text-ink ">{formatMeters(locationCheck?.distanceMeters)}</p></div>
+                  <div><p className="font-bold text-ink-2">Accuracy</p><p className="mt-1 font-mono text-sm font-semibold text-ink ">{formatMeters(locationCheck?.accuracyMeters)}</p></div>
                 </div>
-                <div className={`mt-4 rounded-xl px-3 py-3 text-xs font-bold flex items-center gap-2 ${locationVerified ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-200/70 text-slate-600 dark:bg-white/10 dark:text-slate-300'}`}>
+                <div className={`mt-4 rounded-button px-3 py-3 text-xs font-bold flex items-center gap-2 ${locationVerified ? 'bg-success-bg text-success-ink' : 'bg-line-2 text-ink-2 '}`}>
                   {locationVerified ? <CheckCircle2 size={16} /> : <LocateFixed size={16} />}
                   {locationVerified ? 'WITHIN ATTENDANCE ZONE' : locationCheck ? locationCheck.status.replaceAll('_', ' ') : 'LOCATION CHECK REQUIRED'}
                 </div>
-                {locationMessage && <p className="mt-3 text-xs leading-5 text-rose-500">{locationMessage}</p>}
+                {locationMessage && <p className="mt-3 text-xs leading-5 text-danger-ink">{locationMessage}</p>}
               </div>
               <button
                 type="button"
@@ -455,27 +455,27 @@ export const StudentAttendanceModal: React.FC<StudentAttendanceModalProps> = ({
                 onClick={handleLocationAction}
                 disabled={isCheckingLocation || isVerifying || isSuccess}
                 aria-label={locationVerified ? 'Recheck location' : 'Allow location'}
-                className="relative z-50 pointer-events-auto min-h-[48px] w-full touch-manipulation select-none rounded-2xl bg-purple-600 py-3.5 text-white font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 transition-colors hover:bg-purple-500 active:bg-purple-700 disabled:opacity-50"
+                className="relative z-50 pointer-events-auto min-h-[48px] w-full touch-manipulation select-none rounded-card bg-primary py-3.5 text-on-primary font-bold text-xs flex items-center justify-center gap-2 shadow-raised transition-colors hover:bg-primary-hover active:bg-primary-hover disabled:opacity-50"
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
                 {isCheckingLocation ? <><RefreshCw size={15} className="animate-spin" /> Checking Location…</> : locationVerified ? <><RefreshCw size={15} /> Recheck Location</> : <><LocateFixed size={15} /> Allow Location</>}
               </button>
-              <p className="text-[10px] leading-4 text-slate-400">Your exact teacher coordinates are never shown. The server compares your location with the protected classroom zone.</p>
-              <button type="button" onClick={() => { stopCamera(); setUseMultiLevel(false); }} className="text-purple-500 hover:text-purple-600 text-xs font-semibold">Use Manual PIN instead</button>
+              <p className="text-meta leading-4 text-ink-2">Your exact teacher coordinates are never shown. The server compares your location with the protected classroom zone.</p>
+              <button type="button" onClick={() => { stopCamera(); setUseMultiLevel(false); }} className="text-primary hover:text-primary text-xs font-semibold">Use Manual PIN instead</button>
             </div>
           ) : (
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Instructor session PIN</label>
-                <button type="button" onClick={() => setUseMultiLevel(true)} className="text-xs text-purple-500 hover:text-purple-600 font-semibold">Use Multi-Level Attendance</button>
+                <label className="text-meta font-bold text-ink-2">Instructor session PIN</label>
+                <button type="button" onClick={() => setUseMultiLevel(true)} className="text-xs text-primary hover:text-primary font-semibold">Use Multi-Level Attendance</button>
               </div>
-              <input value={attendancePin} onChange={(event) => setAttendancePin(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="Enter 6-digit PIN" className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center font-mono tracking-[0.4em] outline-none focus:border-purple-500 dark:border-white/10 dark:bg-white/5 dark:text-white" />
+              <input value={attendancePin} onChange={(event) => setAttendancePin(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="Enter 6-digit PIN" className="w-full rounded-card border border-line bg-surface-2 px-4 py-3 text-center font-mono outline-none focus:border-primary " />
             </div>
           )}
 
           <div className="flex gap-3">
-            {!useMultiLevel && <button onClick={() => { stopCamera(); setUseMultiLevel(true); }} disabled={isVerifying || isSuccess} className="px-4 py-3.5 rounded-2xl bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-widest">Back</button>}
-            <button onClick={() => void handleVerifyAttendance()} disabled={!activeSession || isCheckingLocation || (useMultiLevel && !locationVerified) || (!useMultiLevel && attendancePin.length !== 6) || isVerifying || isSuccess} className="flex-1 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50">
+            {!useMultiLevel && <button onClick={() => { stopCamera(); setUseMultiLevel(true); }} disabled={isVerifying || isSuccess} className="px-4 py-3.5 rounded-card bg-surface-2 text-ink-2 text-xs font-bold ">Back</button>}
+            <button onClick={() => void handleVerifyAttendance()} disabled={!activeSession || isCheckingLocation || (useMultiLevel && !locationVerified) || (!useMultiLevel && attendancePin.length !== 6) || isVerifying || isSuccess} className="flex-1 py-3.5 rounded-card bg-primary hover:bg-primary-hover text-on-primary font-bold text-xs shadow-raised flex items-center justify-center gap-2 transition-all disabled:opacity-50">
               {isVerifying ? 'Verifying…' : <><ShieldCheck size={16} /> {useMultiLevel ? 'Verify Face ID' : 'Mark Present'}</>}
             </button>
           </div>

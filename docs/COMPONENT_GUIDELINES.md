@@ -95,6 +95,14 @@ Validation: validate on blur and on submit, clear the error as soon as the value
 
 `FeedbackProvider` is mounted once in `App.tsx`.
 
+### Charts
+
+Use `CHART` from `components/ui` for Recharts colours, grid, ticks and tooltips so charts follow the theme. Give each chart a `role="img"` wrapper with an `aria-label` that states the values.
+
+### Page frame
+
+Signed-in pages render inside `RoleShell` (`features/shell/RoleShell.tsx`) and wrap their content in `PageBody`. Each section has its own URL (`/teacher/classrooms/:id/tests`, `/student/history`), so Back, refresh and links work.
+
 ## Writing
 
 - Sentence case for everything, including buttons, tabs and headings.
@@ -116,6 +124,6 @@ Validation: validate on blur and on submit, clear the error as soon as the value
 
 1. Replace layout chrome with `PageHeader`, `Card` and the grid rules.
 2. Replace inline buttons, badges and inputs with kit components; delete `uppercase tracking-widest text-[10px]` patterns.
-3. Replace Lucide icons with kit icons where an icon is still needed.
+3. Import icons from `components/ui` (or `icons-compat` for an icon the kit set doesn’t have yet).
 4. Remove the screen's reliance on the legacy global shadow rules (kit elements already opt out with `data-ui`).
 5. Re-shoot with `scripts/ui-audit` and compare with `docs/ui-audit/before/`.

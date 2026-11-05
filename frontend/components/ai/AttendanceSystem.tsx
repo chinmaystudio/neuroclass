@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, Users, CheckCircle2, AlertCircle, Loader2, MapPin, LocateFixed, Copy, Download } from 'lucide-react';
-import { motion } from 'motion/react';
+import { AlertCircle, Camera, Copy, Download, Loader2, LocateFixed } from '../ui/icons-compat';
+import { Avatar, Badge, Button, Card, CardFooter, CardHeader, EmptyState, Field, InfoCard, Input, RadioGroup, Select, TabPanel, Tabs } from '../ui';
 import { CameraService } from '../../services/ml/CameraService';
 import { supabase } from '../../database/supabase';
 import { logEvent } from '../../database/analytics';
@@ -542,300 +542,195 @@ export const AttendanceSystem: React.FC<AttendanceSystemProps> = ({ classId, cla
     }
   };
 
-  return (
-    <div className="relative z-20 pointer-events-auto grid grid-cols-1 md:grid-cols-2 gap-8 p-6 bg-slate-50 dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800">
-      <div className="space-y-6">
-        <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-500">Teacher authorization</p>
-            <p className="text-xs text-slate-500">{activeSession ? `Session open until ${new Date(activeSession.ends_at).toLocaleTimeString()}` : 'Initiate attendance before any attendance can be recorded.'}</p>
-          </div>
-          {activeSession ? (
-            <button onClick={closeAttendanceSession} disabled={sessionBusy} className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-600 text-[10px] font-bold uppercase tracking-widest disabled:opacity-40">{sessionBusy ? 'Closing…' : 'Close session'}</button>
-          ) : (
-            <button onClick={openAttendanceSession} disabled={sessionBusy} className="px-4 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-bold uppercase tracking-widest disabled:opacity-40">{sessionBusy ? 'Initiating…' : 'Initiate Attendance'}</button>
-          )}
-        </div>
-        <div className="relative z-30 pointer-events-auto flex gap-4 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit">
-          <button 
-            type="button"
-            onClick={() => switchMode('single')}
-            className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'single' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
-          >
-            Multi-Level Attendance
-          </button>
-          <button 
-            type="button"
-            onClick={() => switchMode('group')}
-            className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'group' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
-          >
-            Manual Mode
-          </button>
-          <button 
-            type="button"
-            onClick={() => switchMode('register')}
-            className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${mode === 'register' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'opacity-40'}`}
-          >
-            Register Face
-          </button>
-        </div>
+  const verifiedCount = verificationRows.filter((row) => row.verification_status === 'VERIFIED').length;
+  const statusLine = mode === 'register'
+    ? (isCameraActive ? 'Choose a student, then capture five samples. No attendance session is needed.' : 'Turn on the camera to register a student’s face.')
+    : mode === 'group' && isLiveScanning
+      ? 'Live preview is on. Students outlined in green are confirmed present.'
+      : activeSession
+        ? (mode === 'group' ? (isCameraActive ? 'Capture a photo or start the live preview to mark students present.' : 'Turn on the camera to scan the classroom.') : 'Waiting for students to confirm from their own devices.')
+        : 'Start a session to begin taking attendance.';
 
-        {mode === 'single' && !activeSession && (
-          <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 text-slate-700 dark:text-slate-200">
-            <div className="flex items-start gap-3">
-              <MapPin size={20} className="mt-0.5 shrink-0 text-blue-500" />
-              <div className="flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Location Access</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">NeuroClass needs your location to establish the classroom attendance zone. No Wi-Fi, hotspot, BLE, or teacher camera is required.</p>
-                {teacherLocation ? (
-                  <div className="mt-3 space-y-3">
-                    <div className="grid grid-cols-3 gap-2 rounded-xl bg-white/60 p-3 text-[10px] dark:bg-black/10">
-                      <div><p className="font-bold uppercase tracking-wide opacity-60">Latitude</p><p className="mt-1 font-mono">{teacherLocation.latitude.toFixed(6)}</p></div>
-                      <div><p className="font-bold uppercase tracking-wide opacity-60">Longitude</p><p className="mt-1 font-mono">{teacherLocation.longitude.toFixed(6)}</p></div>
-                      <div><p className="font-bold uppercase tracking-wide opacity-60">Accuracy</p><p className="mt-1 font-mono">±{Math.round(teacherLocation.accuracy)} m</p></div>
-                    </div>
-                    <div>
-                      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest opacity-60">Attendance Radius</p>
-                      <div className="grid grid-cols-5 gap-2">
-                        {[50, 100, 150, 250].map((radius) => (
-                          <button key={radius} type="button" onClick={() => setRadiusMeters(radius)} className={`rounded-lg border px-2 py-2 text-[10px] font-bold ${radiusMeters === radius ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-200 bg-white/60 dark:border-white/10 dark:bg-white/5'}`}>{radius} m</button>
-                        ))}
-                        <input type="number" min={25} max={1000} value={![50, 100, 150, 250].includes(radiusMeters) ? radiusMeters : ''} placeholder="Custom" onChange={(event) => setRadiusMeters(Math.max(25, Math.min(1000, Number(event.target.value) || 100)))} className="w-full rounded-lg border border-slate-200 bg-white/60 px-2 py-2 text-center text-[10px] font-bold outline-none focus:border-blue-500 dark:border-white/10 dark:bg-white/5" />
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="flex min-w-0 flex-col gap-4">
+        <Card as="section" aria-labelledby="att-session">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 id="att-session" className="text-card text-ink">Attendance session</h2>
+              <p className="text-support text-ink-2">{activeSession ? `Open until ${new Date(activeSession.ends_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Students are notified automatically.` : 'Attendance can only be recorded while you have a session open.'}</p>
+            </div>
+            {activeSession ? (
+              <Button variant="outline" loading={sessionBusy} onClick={() => void closeAttendanceSession()}>End session</Button>
+            ) : (
+              <Button loading={sessionBusy} onClick={() => void openAttendanceSession()}>Start session</Button>
+            )}
+          </div>
+
+          {activeSession && (
+            <>
+              <dl className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-control border border-line-2 bg-line-2">
+                <div className="bg-surface px-3 py-2"><dt className="text-meta text-ink-2">Verified</dt><dd className="text-body font-semibold tabular-nums text-ink">{verifiedCount} of {students.length}</dd></div>
+                <div className="bg-surface px-3 py-2"><dt className="text-meta text-ink-2">Pending</dt><dd className="text-body font-semibold tabular-nums text-ink">{Math.max(0, students.length - verifiedCount)}</dd></div>
+                <div className="bg-surface px-3 py-2"><dt className="text-meta text-ink-2">Radius</dt><dd className="text-body font-semibold tabular-nums text-ink">{activeSession.radius_meters || activeSession.radiusMeters || radiusMeters} m</dd></div>
+              </dl>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-support text-ink-2">Session code <span className="font-mono font-semibold text-ink">{activeSession.session_code || activeSession.sessionCode || '—'}</span></p>
+                <Button variant="text" size="sm" iconLeft={<Copy size={16} />} onClick={() => void copySessionCode()}>{copiedSessionCode ? 'Copied' : 'Copy code'}</Button>
+              </div>
+            </>
+          )}
+        </Card>
+
+        <Tabs
+          items={[{ id: 'single', label: 'Student devices' }, { id: 'group', label: 'Classroom camera' }, { id: 'register', label: 'Register faces' }]}
+          value={mode}
+          onChange={(id) => switchMode(id as 'single' | 'group' | 'register')}
+          label="Attendance method"
+          idPrefix="attmode"
+        />
+
+        <TabPanel tabId={mode} idPrefix="attmode" className="flex flex-col gap-4">
+          {mode === 'single' && (
+            <Card>
+              <CardHeader title="Students confirm on their own devices" subtitle="Each student signs in, is checked against your classroom area, and confirms with Face ID and a liveness check. Your camera isn’t used." />
+              {!activeSession && (
+                <div className="mt-4 border-t border-line-2 pt-4">
+                  <p className="text-body font-medium text-ink">Classroom area</p>
+                  <p className="text-support text-ink-2">Your current location sets the centre of the area students must be inside.</p>
+                  {teacherLocation ? (
+                    <div className="mt-3 flex flex-col gap-4">
+                      <p className="text-support text-ink-2">Location set, accurate to about {Math.round(teacherLocation.accuracy)} m. <button type="button" className="focus-ring rounded-control font-medium text-primary hover:underline" disabled={locationState === 'requesting' || sessionBusy} onClick={() => void requestTeacherLocation()}>{locationState === 'requesting' ? 'Updating…' : 'Update location'}</button></p>
+                      <RadioGroup
+                        inline
+                        legend="Radius"
+                        name="att-radius"
+                        value={String([50, 100, 150, 250].includes(radiusMeters) ? radiusMeters : 'custom')}
+                        onChange={(v) => setRadiusMeters(v === 'custom' ? 300 : Number(v))}
+                        options={[...[50, 100, 150, 250].map((r) => ({ value: String(r), label: `${r} m` })), { value: 'custom', label: 'Custom' }]}
+                      />
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {![50, 100, 150, 250].includes(radiusMeters) && (
+                          <Field label="Custom radius" hint="Between 25 and 1000 metres.">
+                            <Input type="number" min={25} max={1000} value={radiusMeters} onChange={(event) => setRadiusMeters(Math.max(25, Math.min(1000, Number(event.target.value) || 100)))} trailing={<span className="text-support text-ink-2">m</span>} />
+                          </Field>
+                        )}
+                        <Field label="Session length">
+                          <Select value={durationMinutes} onChange={(event) => setDurationMinutes(Number(event.target.value))}>
+                            {[10, 15, 20, 30].map((d) => <option key={d} value={d}>{d} minutes</option>)}
+                          </Select>
+                        </Field>
                       </div>
                     </div>
-                    <div>
-                      <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest opacity-60" htmlFor="attendance-duration">Attendance Duration</label>
-                      <select id="attendance-duration" value={durationMinutes} onChange={(event) => setDurationMinutes(Number(event.target.value))} className="w-full rounded-lg border border-slate-200 bg-white/60 px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-white/5">
-                        {[10, 15, 20, 30].map((duration) => <option key={duration} value={duration}>{duration} minutes</option>)}
-                      </select>
-                    </div>
-                    <button type="button" onClick={() => void requestTeacherLocation()} disabled={locationState === 'requesting' || sessionBusy} className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">{locationState === 'requesting' ? 'Updating location…' : 'Adjust location'}</button>
+                  ) : (
+                    <Button className="mt-3" variant="outline" iconLeft={<LocateFixed size={16} />} loading={locationState === 'requesting'} onClick={() => void requestTeacherLocation()}>Use my location</Button>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {mode !== 'single' && (
+            <Card padding="none" className="overflow-hidden">
+              <div className="relative aspect-video bg-black">
+                <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                {!isCameraActive && (
+                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 p-6 text-center text-white">
+                    {cameraError ? (
+                      <><AlertCircle size={32} /><p className="text-body">The camera couldn’t be started.</p><Button variant="outline" className="border-white/60 bg-transparent text-white hover:bg-white/10" onClick={() => void toggleCamera()}>Try again</Button></>
+                    ) : (
+                      <><Camera size={32} /><p className="text-body">Camera is off</p><Button onClick={() => void toggleCamera()}>Turn on camera</Button></>
+                    )}
+                  </div>
+                )}
+                {sessionNotice && !isAnalyzing && <p role="status" className="absolute inset-x-4 bottom-4 z-20 rounded-control bg-black/75 px-3 py-2 text-support text-white">{sessionNotice}</p>}
+                {liveBoxes.length > 0 && (
+                  <div className="pointer-events-none absolute inset-0 z-20">
+                    {liveBoxes.map((box) => {
+                      const [x1, y1, x2, y2] = box.bbox;
+                      const vw = Math.max(1, videoRef.current?.videoWidth || 1);
+                      const vh = Math.max(1, videoRef.current?.videoHeight || 1);
+                      return (
+                        <div key={box.trackId} className="absolute border-2 border-[#34a853]" style={{ left: `${x1 / vw * 100}%`, top: `${y1 / vh * 100}%`, width: `${Math.max(0, x2 - x1) / vw * 100}%`, height: `${Math.max(0, y2 - y1) / vh * 100}%` }}>
+                          <span className="absolute -top-6 left-0 whitespace-nowrap rounded-control bg-[#137333] px-2 py-0.5 text-meta font-medium text-white">{box.name} · {box.confidence.toFixed(0)}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {isAnalyzing && (
+                  <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/60 text-white">
+                    <Loader2 size={28} /><p className="text-body">Analysing…</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-3 p-4">
+                <p className="text-support text-ink-2" role="status">{statusLine}</p>
+                {cameraError && <InfoCard tone="danger">{cameraError}</InfoCard>}
+                {mode === 'register' ? (
+                  <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <Field label="Student">
+                      <Select value={selectedStudentForReg} onChange={(e) => setSelectedStudentForReg(e.target.value)} placeholder="Choose a student">
+                        {students.map((st) => <option key={st.id} value={st.id}>{st.name}{st.face_registration_status === 'REGISTERED' ? ' (registered)' : ''}</option>)}
+                      </Select>
+                    </Field>
+                    <Button disabled={!isCameraActive || !selectedStudentForReg || isAnalyzing} onClick={() => void registerFace()}>
+                      {registrationSamples.length < 5 ? `Capture sample ${registrationSamples.length + 1} of 5` : 'Save face samples'}
+                    </Button>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => void requestTeacherLocation()} disabled={locationState === 'requesting'} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-50">
-                    <LocateFixed size={14} /> {locationState === 'requesting' ? 'Requesting location…' : 'Allow Location'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeSession && (
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-4 text-emerald-700 dark:text-emerald-300">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest">AI Multi-Level Attendance</p>
-                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-80">Students are notified automatically. Each student must pass authentication, classroom membership, session, geofence, Face ID, and liveness checks.</p>
-              </div>
-              <MapPin size={18} className="shrink-0" />
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
-              <div className="rounded-xl border border-emerald-500/20 bg-white/50 px-2 py-2 dark:bg-black/10"><p className="font-bold uppercase tracking-wide opacity-60">Radius</p><p className="mt-1 font-mono text-sm font-black">{activeSession.radius_meters || activeSession.radiusMeters || radiusMeters} m</p></div>
-              <div className="rounded-xl border border-emerald-500/20 bg-white/50 px-2 py-2 dark:bg-black/10"><p className="font-bold uppercase tracking-wide opacity-60">Verified</p><p className="mt-1 font-mono text-sm font-black">{verificationRows.filter((row) => row.verification_status === 'VERIFIED').length} / {students.length}</p></div>
-              <div className="rounded-xl border border-emerald-500/20 bg-white/50 px-2 py-2 dark:bg-black/10"><p className="font-bold uppercase tracking-wide opacity-60">Pending</p><p className="mt-1 font-mono text-sm font-black">{Math.max(0, students.length - verificationRows.filter((row) => row.verification_status === 'VERIFIED').length)}</p></div>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-white/50 px-3 py-2 dark:bg-black/10">
-              <div><p className="text-[9px] font-bold uppercase tracking-widest opacity-60">Session code</p><p className="font-mono text-sm font-black tracking-widest">{activeSession.session_code || activeSession.sessionCode || 'Active'}</p></div>
-              <button type="button" onClick={copySessionCode} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-white"><Copy size={13} /> {copiedSessionCode ? 'Copied' : 'Copy code'}</button>
-            </div>
-          </div>
-        )}
-
-        {mode === 'single' ? (
-          <div className="relative aspect-video rounded-[24px] overflow-hidden border border-emerald-500/20 bg-gradient-to-br from-emerald-950 via-slate-900 to-blue-950 p-6 text-white">
-            <div className="flex h-full flex-col justify-between gap-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">Teacher camera disabled</p>
-                  <h3 className="mt-2 text-xl font-black tracking-tight">Student Face-ID Portal</h3>
-                  <p className="mt-2 max-w-md text-xs leading-5 text-slate-300">Multi-Level Attendance does not scan faces or request location from the teacher device after setup. Students verify themselves from their own devices.</p>
-                </div>
-                <MapPin size={28} className="shrink-0 text-emerald-300" />
-              </div>
-              <div className="grid gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-200 sm:grid-cols-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">1.</span> Teacher location set</div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">2.</span> Student popup opens</div>
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3"><span className="text-emerald-300">3.</span> Complete Face ID</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="relative aspect-video bg-black rounded-[24px] overflow-hidden group">
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-
-            {!isCameraActive && (
-              <div className="absolute inset-0 z-20 pointer-events-auto flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-md text-white gap-4 p-6 text-center">
-                {cameraError ? (
-                  <>
-                    <AlertCircle size={48} className="text-rose-500 mb-2" />
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500">Permission Error</p>
-                    <button onClick={toggleCamera} className="mt-2 px-6 py-2 bg-white/10 rounded-full text-[8px]">Try Again</button>
-                  </>
-                ) : (
-                  <>
-                    <Camera size={48} className="opacity-20" />
-                    <button onClick={toggleCamera} className="px-8 py-3 bg-blue-600 rounded-full text-[10px]">Activate Camera</button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {sessionNotice && !isAnalyzing && (
-              <div className="absolute left-4 right-4 bottom-4 z-25 rounded-xl bg-blue-950/85 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-blue-100">
-                {sessionNotice}
-              </div>
-            )}
-
-            {liveBoxes.length > 0 && (
-              <div className="absolute inset-0 z-20 pointer-events-none">
-                {liveBoxes.map((box) => {
-                  const [x1, y1, x2, y2] = box.bbox;
-                  const width = Math.max(0, x2 - x1);
-                  const height = Math.max(0, y2 - y1);
-                  return (
-                    <div
-                      key={box.trackId}
-                      className="absolute border-2 border-emerald-400 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(16,185,129,0.45)]"
-                      style={{ left: `${x1 / Math.max(1, videoRef.current?.videoWidth || 1) * 100}%`, top: `${y1 / Math.max(1, videoRef.current?.videoHeight || 1) * 100}%`, width: `${width / Math.max(1, videoRef.current?.videoWidth || 1) * 100}%`, height: `${height / Math.max(1, videoRef.current?.videoHeight || 1) * 100}%` }}
+                  <div className="flex flex-wrap gap-2">
+                    <Button disabled={!activeSession || !isCameraActive || isAnalyzing} loading={isAnalyzing} onClick={() => void captureAndProcessGroupPhoto()}>Capture and check photo</Button>
+                    <Button
+                      variant="outline"
+                      disabled={sessionBusy || !activeSession || !isCameraActive}
+                      onClick={isLiveScanning ? () => stopLiveGroupScan('Live preview paused. Capture a photo when you’re ready.') : () => void startLiveGroupScan()}
                     >
-                      <span className="absolute -top-6 left-0 whitespace-nowrap rounded bg-emerald-500 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-white">
-                        {box.name} · {box.confidence.toFixed(0)}%
-                      </span>
-                    </div>
-                  );
-                })}
+                      {isLiveScanning ? 'Pause live preview' : 'Start live preview'}
+                    </Button>
+                    {isCameraActive && <Button variant="text" onClick={() => void toggleCamera()}>Turn off camera</Button>}
+                  </div>
+                )}
               </div>
-            )}
-
-            {isAnalyzing && (
-              <div className="absolute inset-0 z-30 pointer-events-auto flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                <div className="flex flex-col items-center gap-4 text-white">
-                  <Loader2 className="animate-spin" size={32} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Local Neural Engine Active...</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-                  <div className="relative z-30 pointer-events-auto flex flex-col gap-4">
-            <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-slate-800/60 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">
-              {mode === 'register'
-                ? (isCameraActive ? 'Registration ready: capture five samples. No attendance session is required.' : 'Next step: activate the camera.')
-                : mode === 'group' && isLiveScanning
-                  ? 'LIVE SCAN ACTIVE: green boxes are confirmed present students.'
-                  : (activeSession ? (isCameraActive ? 'Ready: click Start Live Face Preview to continuously analyze the classroom.' : 'Next step: activate the camera.') : 'Ready to start: click Initiate Attendance to open a multi-level session.')}
-            </div>
-            {cameraError && <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-rose-600">{cameraError}</div>}
-
-          {mode === 'register' ? (
-            <div className="flex flex-col gap-3">
-              <select 
-                value={selectedStudentForReg} 
-                onChange={(e) => setSelectedStudentForReg(e.target.value)}
-                className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-xs font-bold font-sans"
-              >
-                <option value="">Select Student to Register</option>
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} {s.face_registration_status === 'REGISTERED' ? '(Registered)' : ''}</option>
-                ))}
-              </select>
-              <button 
-                type="button"
-                disabled={!isCameraActive || !selectedStudentForReg || isAnalyzing}
-                onClick={registerFace}
-                className="w-full py-4 bg-emerald-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px]"
-              >
-                {registrationSamples.length < 5 ? `Capture Sample (${registrationSamples.length}/5)` : 'Upload Face Samples'}
-              </button>
-            </div>
-          ) : mode === 'group' ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  disabled={!activeSession || !isCameraActive || isAnalyzing}
-                  title="Capture one photo, send it to the secure ML service, and mark confirmed present students in the Attendance Log."
-                  onClick={captureAndProcessGroupPhoto}
-                  className="flex-1 py-4 bg-blue-600 text-white rounded-[20px] font-bold uppercase tracking-widest text-[10px] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isAnalyzing ? 'Analyzing Photo…' : 'Capture Photo & Analyze'}
-                </button>
-                <button type="button" onClick={toggleCamera} className="px-6 py-4 bg-rose-500/10 text-rose-500 rounded-[20px]">
-                  <Camera size={20} />
-                </button>
-              </div>
-              <button
-                type="button"
-                disabled={sessionBusy || !activeSession || !isCameraActive}
-                onClick={isLiveScanning ? () => stopLiveGroupScan('Live face preview paused. Capture a photo when ready.') : startLiveGroupScan}
-                className={`w-full py-3 rounded-[18px] font-bold uppercase tracking-widest text-[9px] disabled:cursor-not-allowed disabled:opacity-50 ${isLiveScanning ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}
-              >
-                {isLiveScanning ? 'Pause Live Face Preview' : 'Start Live Face Preview'}
-              </button>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
-              <div className="flex items-center gap-3">
-                <MapPin size={18} className="text-blue-500" />
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Waiting for student verifications</p>
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">The teacher device does not capture faces in Multi-Level Attendance. Students complete Face ID from the student portal.</p>
-                </div>
-              </div>
-            </div>
+            </Card>
           )}
-        </div>
+          {mode === 'single' && <p className="text-support text-ink-2" role="status">{statusLine}</p>}
+        </TabPanel>
       </div>
 
-      <div className="bg-white dark:bg-slate-800/40 rounded-[24px] border border-slate-200 dark:border-slate-800 p-6 flex flex-col">
+      <div className="flex min-w-0 flex-col gap-4">
         {finalReport && (
-          <div className="mb-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Final attendance report</p>
-            <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-              <div><p className="text-lg font-bold text-emerald-600">{finalReport.presentCount}</p><p className="text-[8px] uppercase tracking-wide opacity-60">Present</p></div>
-              <div><p className="text-lg font-bold">{finalReport.absentCount}</p><p className="text-[8px] uppercase tracking-wide opacity-60">Absent</p></div>
-              <div><p className="text-lg font-bold">{finalReport.attendanceRate}%</p><p className="text-[8px] uppercase tracking-wide opacity-60">Rate</p></div>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" onClick={downloadAttendanceCsv} className="inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-white"><Download size={12} /> Download CSV</button>
-              <button type="button" onClick={downloadFinalReport} className="rounded-xl border border-emerald-500/30 px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Download JSON</button>
-            </div>
-          </div>
+          <Card as="section" aria-labelledby="att-report">
+            <CardHeader title={<span id="att-report">Session report</span>} />
+            <dl className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-control border border-line-2 bg-line-2">
+              <div className="bg-surface px-3 py-2"><dt className="text-meta text-ink-2">Present</dt><dd className="text-body font-semibold tabular-nums text-ink">{finalReport.presentCount}</dd></div>
+              <div className="bg-surface px-3 py-2"><dt className="text-meta text-ink-2">Absent</dt><dd className="text-body font-semibold tabular-nums text-ink">{finalReport.absentCount}</dd></div>
+              <div className="bg-surface px-3 py-2"><dt className="text-meta text-ink-2">Rate</dt><dd className="text-body font-semibold tabular-nums text-ink">{finalReport.attendanceRate}%</dd></div>
+            </dl>
+            <CardFooter>
+              <Button variant="text" onClick={downloadFinalReport}>Download JSON</Button>
+              <Button variant="outline" iconLeft={<Download size={16} />} onClick={downloadAttendanceCsv}>Download CSV</Button>
+            </CardFooter>
+          </Card>
         )}
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xs font-bold uppercase tracking-widest opacity-40">Attendance Log</h3>
-          <span className="text-[10px] font-bold text-blue-500">{identified.length} Identified</span>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar">
-          {identified.map((match, i) => (
-            <motion.div 
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              key={`${match.studentId}-${i}`}
-              className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl flex items-center justify-between group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-[10px] font-bold">
-                  {match.name.charAt(0)}
-                </div>
-                <div>
-                  <p className="text-xs font-bold">{match.name}</p>
-                  <p className="text-[8px] opacity-40 uppercase tracking-widest">Conf: {match.confidence.toFixed(1)}%</p>
-                </div>
-              </div>
-              <CheckCircle2 size={16} className="text-emerald-500" />
-            </motion.div>
-          ))}
-          {identified.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center opacity-10 gap-2">
-              <Users size={32} />
-              <p className="text-[10px] font-bold uppercase tracking-widest">No entries yet</p>
-            </div>
+        <Card as="section" padding="none" aria-labelledby="att-log" className="flex min-h-[320px] flex-col">
+          <div className="flex items-center justify-between gap-3 border-b border-line-2 px-5 py-4">
+            <h2 id="att-log" className="text-card text-ink">Present</h2>
+            <Badge tone={identified.length ? 'success' : 'neutral'}>{identified.length} confirmed</Badge>
+          </div>
+          {identified.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center p-4"><EmptyState compact className="w-full" title="No one confirmed yet" body="Students appear here as they’re verified." /></div>
+          ) : (
+            <ul className="max-h-[480px] divide-y divide-line-2 overflow-y-auto">
+              {identified.map((match, i) => (
+                <li key={`${match.studentId}-${i}`} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <span className="flex min-w-0 items-center gap-3"><Avatar name={match.name} size="sm" /><span className="truncate text-body text-ink">{match.name}</span></span>
+                  <span className="shrink-0 text-meta tabular-nums text-ink-2">{match.confidence.toFixed(0)}% match</span>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

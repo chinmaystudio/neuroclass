@@ -13,3 +13,4 @@ export * from './Table';
 export * from './Overlay';
 export * from './Feedback';
 export * from './Navigation';
+export * from './chart';

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  BarChart3, Award, TrendingUp, Sparkles, BookOpen, Hourglass
-} from 'lucide-react';
+import { Card, CardHeader, CHART, EmptyState, ErrorState, PageHeader, Skeleton, SkeletonText, StatCard } from '../ui';
+import { PageBody } from '../../features/shell/RoleShell';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../features/lms/api';
@@ -59,97 +58,44 @@ export const StudentPerformance: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-8 h-full flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageBody>
+        <SkeletonText lines={2} />
+        <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map((n) => <Skeleton key={n} className="h-28" rounded="card" />)}</div>
+        <Skeleton className="mt-6 h-80" rounded="card" />
+      </PageBody>
     );
   }
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-          <BarChart3 className="text-purple-500" size={32} />
-          Performance & Analytics
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">
-          Your released exam results across all classrooms.
-        </p>
-        {error && <p className="mt-3 text-sm text-red-500">{error} <button type="button" className="underline" onClick={fetchPerformanceData}>Retry</button></p>}
-      </div>
+    <PageBody>
+      <PageHeader title="Performance" description="Results your teachers have released, across all your classes." />
+      {error && <ErrorState className="mt-6" title="Couldn’t load your results" message={error} onRetry={() => void fetchPerformanceData()} />}
 
-      {/* Summary Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Exams</span>
-            <BookOpen className="text-purple-500" size={20} />
-          </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{summary.totalExams}</p>
-          <p className="text-xs text-slate-500 mt-1">Submitted Assessments</p>
-        </div>
+      <section aria-label="Summary" className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Tests submitted" value={summary.totalExams} />
+        <StatCard label="Average score" value={chartData.length ? `${summary.averagePercent}%` : '—'} tone="info" hint={chartData.length ? 'Released results' : 'No results yet'} />
+        <StatCard label="Best score" value={chartData.length ? `${summary.highestPercent}%` : '—'} tone="success" />
+        <StatCard label="Waiting for results" value={summary.awaiting} tone="warning" hint="Submitted, not yet released" />
+      </section>
 
-        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Average Grade</span>
-            <TrendingUp className="text-indigo-500" size={20} />
-          </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{summary.averagePercent}%</p>
-          <p className="text-xs text-slate-500 mt-1">Mean of released results</p>
-        </div>
-
-        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Peak Performance</span>
-            <Award className="text-amber-500" size={20} />
-          </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{summary.highestPercent}%</p>
-          <p className="text-xs text-slate-500 mt-1">Highest Score Achieved</p>
-        </div>
-
-        <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Awaiting Results</span>
-            <Hourglass className="text-amber-500" size={20} />
-          </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{summary.awaiting}</p>
-          <p className="text-xs text-slate-500 mt-1">Submitted, not yet released</p>
-        </div>
-      </div>
-
-      {/* Main Bar Chart */}
-      <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[32px] p-8 shadow-xl">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Sparkles className="text-purple-500" size={20} /> Exam Performance Progression
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">Percentage scores across all completed assessments</p>
-          </div>
-        </div>
-
+      <Card as="section" className="mt-6" aria-labelledby="scores-heading">
+        <CardHeader title={<span id="scores-heading">Scores by test</span>} subtitle="Percentage score for each released result." />
         {chartData.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center border border-dashed border-black/10 dark:border-white/10 rounded-2xl text-slate-400 text-sm">
-            <BarChart3 size={40} className="mb-2 opacity-50" />
-            No released results yet. Results appear here once your teacher publishes them.
-          </div>
+          <div className="mt-4"><EmptyState compact title="No released results yet" body="Your scores appear here once your teacher releases them." /></div>
         ) : (
-          <div className="h-72 w-full">
+          <div className="mt-6 h-72 w-full" role="img" aria-label={`Bar chart of your scores: ${chartData.map((d: any) => `${d.name} ${d.percentage}%`).join(', ')}`}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#888888" />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} stroke="#888888" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#111', borderRadius: '12px', border: '1px solid #333', color: '#fff' }}
-                  formatter={(value: any) => [`${value}%`, 'Score Percentage']}
-                />
-                <Bar dataKey="percentage" fill="#a855f7" radius={[12, 12, 0, 0]} />
+              <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke={CHART.grid} />
+                <XAxis dataKey="name" tick={CHART.tick} stroke={CHART.grid} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={CHART.tick} stroke={CHART.grid} tickLine={false} unit="%" />
+                <Tooltip {...CHART.tooltip} formatter={(value: any) => [`${value}%`, 'Score']} />
+                <Bar dataKey="percentage" fill={CHART.primary} radius={[4, 4, 0, 0]} maxBarSize={56} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         )}
-      </div>
-    </div>
+      </Card>
+    </PageBody>
   );
 };

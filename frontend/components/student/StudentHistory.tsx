@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
-import { Clock, CheckCircle2, FileText, Hourglass } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api, formatDateTime } from '../../features/lms/api';
 import type { StudentTest } from '../../features/lms/types';
-import { useAsync, Spinner, ErrorNote } from '../../features/lms/ui';
+import { useAsync } from '../../features/lms/ui';
+import { Card, DataTable, EmptyState, ErrorState, PageHeader, SkeletonText, StatusBadge } from '../ui';
+import { PageBody } from '../../features/shell/RoleShell';
 import { ResultModal } from '../../features/tests/StudentTestsPanel';
 
 /**
@@ -23,54 +23,35 @@ export const StudentHistory: React.FC = () => {
     [tests.data],
   );
 
-  if (tests.loading && !tests.data) return <div className="p-8"><Spinner label="Loading your exam history…" /></div>;
+  if (tests.loading && !tests.data) return <PageBody><SkeletonText lines={2} /><div className="mt-6"><SkeletonText lines={6} /></div></PageBody>;
 
   return (
-    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-          <Clock className="text-purple-500" size={30} /> Exam History
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">Every test you have submitted. Scores appear once your teacher releases them.</p>
+    <PageBody className="max-w-5xl">
+      <PageHeader title="History" description="Every test you’ve submitted. Scores appear once your teacher releases them." />
+      {tests.error && <ErrorState className="mt-6" message={tests.error} onRetry={tests.reload} />}
+      <div className="mt-6">
+        {items.length === 0 && !tests.error ? (
+          <EmptyState title="No submitted tests yet" body="Tests you submit will be listed here with their results." />
+        ) : (
+          <Card padding="none">
+            <DataTable
+              caption="Submitted tests"
+              rows={items}
+              rowKey={(item) => item.id}
+              primaryColumn="title"
+              onRowClick={(item) => setResultFor(item.lastAttemptId!)}
+              columns={[
+                { key: 'title', header: 'Test', cell: (item) => <span className="min-w-0"><span className="block truncate font-medium text-ink">{item.title}</span><span className="block truncate text-support text-ink-2">{item.classroomName ?? 'Class'}</span></span> },
+                { key: 'submitted', header: 'Submitted', cell: (item) => formatDateTime(item.submittedAt), hideOnMobile: true },
+                { key: 'result', header: 'Result', align: 'right', cell: (item) => item.result
+                  ? <span className="tabular-nums"><span className="font-semibold text-ink">{item.result.score} / {item.result.maxScore}</span> <span className="text-ink-2">· {item.result.percentage}%</span></span>
+                  : <StatusBadge status="pending" label="Waiting for results" /> },
+              ]}
+            />
+          </Card>
+        )}
       </div>
-
-      <ErrorNote message={tests.error} onRetry={tests.reload} />
-
-      {items.length === 0 && !tests.error ? (
-        <div className="py-16 flex flex-col items-center justify-center border border-dashed border-black/10 dark:border-white/10 rounded-3xl text-slate-400 text-sm">
-          <FileText size={40} className="mb-2 opacity-50" />
-          You haven’t submitted any tests yet.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {items.map((item) => (
-            <motion.button
-              key={item.id}
-              type="button"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              onClick={() => setResultFor(item.lastAttemptId!)}
-              className="w-full text-left bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-purple-400 transition-colors"
-            >
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-purple-500">{item.classroomName ?? 'Classroom'}</p>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate">{item.title}</h3>
-                <p className="text-xs text-slate-400">Submitted {formatDateTime(item.submittedAt)}</p>
-              </div>
-              {item.result ? (
-                <div className="text-right shrink-0">
-                  <p className="text-2xl font-black text-slate-900 dark:text-white">{item.result.score} / {item.result.maxScore}</p>
-                  <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1 justify-end"><CheckCircle2 size={14} /> {item.result.percentage}%</p>
-                </div>
-              ) : (
-                <p className="text-sm font-semibold text-amber-600 flex items-center gap-1.5 shrink-0"><Hourglass size={16} /> Awaiting results</p>
-              )}
-            </motion.button>
-          ))}
-        </div>
-      )}
-
       {resultFor && <ResultModal attemptId={resultFor} onClose={() => setResultFor(null)} />}
-    </div>
+    </PageBody>
   );
 };

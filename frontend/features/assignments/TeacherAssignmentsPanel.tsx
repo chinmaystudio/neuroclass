@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState } from 'react';
-import { ArrowLeft, Archive, CalendarClock, ClipboardList, Code2, Download, Eye, EyeOff, FileUp, Paperclip, Pencil, Plus, Rocket, Save, Square, Trash2, Undo2, FlaskConical } from 'lucide-react';
+import { ArrowLeft, Archive, CalendarClock, ClipboardList, Code2, Download, Eye, EyeOff, FileUp, Paperclip, Pencil, Plus, Rocket, Save, Square, Trash2, Undo2, FlaskConical } from '../../components/ui/icons-compat';
 import { api, formatDateTime, fromLocalInput, openDownload, toLocalInput } from '../lms/api';
 import type { Assignment, LanguageId, Submission, TestCase } from '../lms/types';
 import { AVAILABILITY_BADGE, Badge, Button, Card, EmptyState, ErrorNote, Field, inputClass, Modal, Spinner, Toggle, useAsync } from '../lms/ui';
@@ -37,20 +37,20 @@ export const TeacherAssignmentsPanel: React.FC<{ classroomId: string; classroomN
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h3 className="text-xl font-bold">Assignments</h3><p className="text-sm text-slate-500">Homework and projects for {classroomName}. Only enrolled students can see published assignments.</p></div>
+        <div><h3 className="text-xl font-bold">Assignments</h3><p className="text-sm text-ink-2">Homework and projects for {classroomName}. Only enrolled students can see published assignments.</p></div>
         <Button onClick={() => setEditing('new')} icon={<Plus size={14} />}>New assignment</Button>
       </div>
       <ErrorNote message={error || list.error} onRetry={list.error ? list.reload : undefined} />
       {list.loading && !list.data ? <Spinner /> : items.length === 0 ? (
         <EmptyState icon={<ClipboardList size={36} />} title="No assignments yet" body="Create text, file, document, programming or mixed assignments with deadlines and late policies." action={<Button onClick={() => setEditing('new')} icon={<Plus size={14} />}>Create assignment</Button>} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {items.map((a) => (
             <Card key={a.id} className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2"><Badge tone={AVAILABILITY_BADGE[a.status]?.tone}>{AVAILABILITY_BADGE[a.status]?.label ?? a.status}</Badge><Badge tone="purple">{TYPES.find((t) => t.id === a.assignmentType)?.label}</Badge></div>
               <h4 className="text-lg font-bold">{a.title}</h4>
-              <p className="flex items-center gap-1.5 text-xs text-slate-500"><CalendarClock size={12} /> {a.dueAt ? `Due ${formatDateTime(a.dueAt)}` : 'No deadline'} · {a.totalMarks} marks</p>
-              {a.stats && <div className="grid grid-cols-4 gap-1 text-center text-[11px]"><Mini label="Submitted" value={a.stats.submitted} /><Mini label="Pending" value={a.stats.pending} /><Mini label="Late" value={a.stats.late} /><Mini label="Graded" value={a.stats.evaluated} /></div>}
+              <p className="flex items-center gap-1.5 text-xs text-ink-2"><CalendarClock size={12} /> {a.dueAt ? `Due ${formatDateTime(a.dueAt)}` : 'No deadline'} · {a.totalMarks} marks</p>
+              {a.stats && <div className="grid grid-cols-4 gap-1 text-center text-meta"><Mini label="Submitted" value={a.stats.submitted} /><Mini label="Pending" value={a.stats.pending} /><Mini label="Late" value={a.stats.late} /><Mini label="Graded" value={a.stats.evaluated} /></div>}
               <div className="mt-auto flex flex-wrap gap-2">
                 <Button size="sm" variant="secondary" onClick={() => setEditing(a.id)} icon={<Pencil size={13} />}>Edit</Button>
                 {a.status !== 'draft' && <Button size="sm" variant="secondary" onClick={() => setReviewing(a.id)} icon={<Eye size={13} />}>Submissions</Button>}
@@ -67,7 +67,7 @@ export const TeacherAssignmentsPanel: React.FC<{ classroomId: string; classroomN
   );
 };
 
-const Mini: React.FC<{ label: string; value: number }> = ({ label, value }) => <div className="rounded-xl bg-slate-100 py-1.5 dark:bg-white/5"><p className="font-black">{value}</p><p className="text-[9px] uppercase tracking-widest text-slate-500">{label}</p></div>;
+const Mini: React.FC<{ label: string; value: number }> = ({ label, value }) => <div className="rounded-button bg-surface-2 py-1.5 "><p className="font-semibold">{value}</p><p className="text-meta text-ink-2">{label}</p></div>;
 
 /* ------------------------------ Editor ------------------------------ */
 type Form = { title: string; description: string; instructions: string; assignmentType: Assignment['assignmentType']; availableFrom: string; dueAt: string; totalMarks: number; latePolicy: Assignment['latePolicy']; acceptedFileTypes: string[]; maxFileSizeMb: number; maxFiles: number; allowResubmission: boolean; languages: LanguageId[]; testCases: TestCase[] };
@@ -119,16 +119,16 @@ const AssignmentEditor: React.FC<{ classroomId: string; assignmentId: string | n
   if (loading) return <Spinner />;
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3"><Button variant="ghost" onClick={onClose} icon={<ArrowLeft size={14} />}>Assignments</Button><h3 className="text-xl font-black">{id ? form.title || 'Assignment' : 'New assignment'}</h3>{detail && <Badge tone={AVAILABILITY_BADGE[detail.status]?.tone}>{detail.status}</Badge>}</div>
+      <div className="flex flex-wrap items-center gap-3"><Button variant="ghost" onClick={onClose} icon={<ArrowLeft size={14} />}>Assignments</Button><h3 className="text-xl font-semibold">{id ? form.title || 'Assignment' : 'New assignment'}</h3>{detail && <Badge tone={AVAILABILITY_BADGE[detail.status]?.tone}>{detail.status}</Badge>}</div>
       <ErrorNote message={error} />
-      {notice && <p role="status" className="rounded-2xl bg-emerald-500/10 p-3 text-xs font-semibold text-emerald-600">{notice}</p>}
+      {notice && <p role="status" className="rounded-card bg-success-bg p-3 text-xs font-semibold text-success-ink">{notice}</p>}
       <Card className="space-y-4">
         <Field label="Title"><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={inputClass} maxLength={250} /></Field>
         <Field label="Short description"><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} /></Field>
         <Field label="Instructions"><textarea rows={6} value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} className={inputClass} placeholder="What students must do, how it will be marked, resources to use…" /></Field>
         <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-500">Submission type</p>
-          <div className="grid gap-2 sm:grid-cols-5">{TYPES.map((t) => <button key={t.id} type="button" onClick={() => setForm({ ...form, assignmentType: t.id })} className={cn('rounded-2xl border p-3 text-left', form.assignmentType === t.id ? 'border-blue-500 bg-blue-500/10' : 'border-black/10 dark:border-white/10')}><p className="text-sm font-bold">{t.label}</p><p className="text-[11px] text-slate-500">{t.hint}</p></button>)}</div>
+          <p className="mb-2 text-meta font-bold text-ink-2">Submission type</p>
+          <div className="grid gap-2 sm:grid-cols-5">{TYPES.map((t) => <button key={t.id} type="button" onClick={() => setForm({ ...form, assignmentType: t.id })} className={cn('rounded-card border p-3 text-left', form.assignmentType === t.id ? 'border-primary bg-primary-light' : 'border-line ')}><p className="text-sm font-bold">{t.label}</p><p className="text-meta text-ink-2">{t.hint}</p></button>)}</div>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Available from" hint="Optional"><input type="datetime-local" value={form.availableFrom} onChange={(e) => setForm({ ...form, availableFrom: e.target.value })} className={inputClass} /></Field>
@@ -144,9 +144,9 @@ const AssignmentEditor: React.FC<{ classroomId: string; assignmentId: string | n
           </>}
         </div>
         {files && (
-          <div className="space-y-3 rounded-2xl border border-black/5 p-4 dark:border-white/10">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Accepted files</p>
-            <div className="flex flex-wrap gap-1.5">{FILE_TYPES.map((ext) => { const on = form.acceptedFileTypes.includes(ext); return <button key={ext} type="button" onClick={() => setForm({ ...form, acceptedFileTypes: on ? form.acceptedFileTypes.filter((x) => x !== ext) : [...form.acceptedFileTypes, ext] })} className={cn('rounded-full border px-2.5 py-1 font-mono text-[11px]', on ? 'border-blue-500 bg-blue-500/10 text-blue-600' : 'border-black/10 text-slate-500 dark:border-white/10')}>.{ext}</button>; })}</div>
+          <div className="space-y-3 rounded-card border border-line p-4 ">
+            <p className="text-meta font-bold text-ink-2">Accepted files</p>
+            <div className="flex flex-wrap gap-1.5">{FILE_TYPES.map((ext) => { const on = form.acceptedFileTypes.includes(ext); return <button key={ext} type="button" onClick={() => setForm({ ...form, acceptedFileTypes: on ? form.acceptedFileTypes.filter((x) => x !== ext) : [...form.acceptedFileTypes, ext] })} className={cn('rounded-full border px-2.5 py-1 font-mono text-meta', on ? 'border-primary bg-primary-light text-primary' : 'border-line text-ink-2 ')}>.{ext}</button>; })}</div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Max size per file (MB)"><input type="number" min={1} max={50} value={form.maxFileSizeMb} onChange={(e) => setForm({ ...form, maxFileSizeMb: Number(e.target.value) })} className={inputClass} /></Field>
               <Field label="Max files"><input type="number" min={1} max={20} value={form.maxFiles} onChange={(e) => setForm({ ...form, maxFiles: Number(e.target.value) })} className={inputClass} /></Field>
@@ -154,17 +154,17 @@ const AssignmentEditor: React.FC<{ classroomId: string; assignmentId: string | n
           </div>
         )}
         {coding && (
-          <div className="space-y-3 rounded-2xl border border-black/5 p-4 dark:border-white/10">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Languages</p>
-            <div className="flex flex-wrap gap-2">{ALL_LANGUAGES.map((l) => { const on = form.languages.includes(l.id); return <button key={l.id} type="button" onClick={() => setForm({ ...form, languages: on ? form.languages.filter((x) => x !== l.id) : [...form.languages, l.id] })} className={cn('rounded-full border px-3 py-1 text-xs font-bold', on ? 'border-blue-500 bg-blue-500/10 text-blue-600' : 'border-black/10 text-slate-500 dark:border-white/10')}>{l.label}</button>; })}</div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Test cases <span className="normal-case tracking-normal text-slate-400">(samples are visible to students; hidden ones are used when you evaluate)</span></p>
+          <div className="space-y-3 rounded-card border border-line p-4 ">
+            <p className="text-meta font-bold text-ink-2">Languages</p>
+            <div className="flex flex-wrap gap-2">{ALL_LANGUAGES.map((l) => { const on = form.languages.includes(l.id); return <button key={l.id} type="button" onClick={() => setForm({ ...form, languages: on ? form.languages.filter((x) => x !== l.id) : [...form.languages, l.id] })} className={cn('rounded-full border px-3 py-1 text-xs font-bold', on ? 'border-primary bg-primary-light text-primary' : 'border-line text-ink-2 ')}>{l.label}</button>; })}</div>
+            <p className="text-meta font-bold text-ink-2">Test cases <span className="normal-case tracking-normal text-ink-2">(samples are visible to students; hidden ones are used when you evaluate)</span></p>
             {form.testCases.map((tc, i) => (
               <div key={i} className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
                 <textarea rows={2} aria-label="Input" value={tc.input} onChange={(e) => setForm({ ...form, testCases: form.testCases.map((t, j) => (j === i ? { ...t, input: e.target.value } : t)) })} placeholder="stdin" className={cn(inputClass, 'font-mono text-xs')} />
                 <textarea rows={2} aria-label="Expected output" value={tc.expectedOutput} onChange={(e) => setForm({ ...form, testCases: form.testCases.map((t, j) => (j === i ? { ...t, expectedOutput: e.target.value } : t)) })} placeholder="expected stdout" className={cn(inputClass, 'font-mono text-xs')} />
                 <div className="flex gap-1">
-                  <button type="button" onClick={() => setForm({ ...form, testCases: form.testCases.map((t, j) => (j === i ? { ...t, isHidden: !t.isHidden } : t)) })} className={cn('inline-flex items-center gap-1 rounded-lg px-2 text-[10px] font-bold uppercase', tc.isHidden ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'bg-emerald-500/15 text-emerald-600')}>{tc.isHidden ? <><EyeOff size={12} />Hidden</> : <><Eye size={12} />Sample</>}</button>
-                  <button type="button" aria-label="Remove" onClick={() => setForm({ ...form, testCases: form.testCases.filter((_, j) => j !== i) })} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"><Trash2 size={13} /></button>
+                  <button type="button" onClick={() => setForm({ ...form, testCases: form.testCases.map((t, j) => (j === i ? { ...t, isHidden: !t.isHidden } : t)) })} className={cn('inline-flex items-center gap-1 rounded-lg px-2 text-meta font-bold ', tc.isHidden ? 'bg-ink text-on-primary ' : 'bg-success-bg text-success-ink')}>{tc.isHidden ? <><EyeOff size={12} />Hidden</> : <><Eye size={12} />Sample</>}</button>
+                  <button type="button" aria-label="Remove" onClick={() => setForm({ ...form, testCases: form.testCases.filter((_, j) => j !== i) })} className="rounded-lg p-2 text-ink-2 hover:bg-surface-2 "><Trash2 size={13} /></button>
                 </div>
               </div>
             ))}
@@ -172,15 +172,15 @@ const AssignmentEditor: React.FC<{ classroomId: string; assignmentId: string | n
           </div>
         )}
         {id && (
-          <div className="space-y-2 rounded-2xl border border-black/5 p-4 dark:border-white/10">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Attachments & resources</p>
+          <div className="space-y-2 rounded-card border border-line p-4 ">
+            <p className="text-meta font-bold text-ink-2">Attachments & resources</p>
             {(detail?.attachments ?? []).map((f) => (
-              <div key={f.id} className="flex items-center gap-2 text-sm"><Paperclip size={13} className="text-slate-400" /><span className="flex-1 truncate">{f.name}</span><span className="text-xs text-slate-400">{Math.round(f.size / 1024)} KB</span>
-                <button type="button" onClick={() => void openDownload(`assignments/${id}/attachments/${f.id}/download`)} className="rounded p-1 text-slate-400 hover:text-blue-600" aria-label="Download"><Download size={14} /></button>
-                <button type="button" onClick={async () => { await api.del(`assignments/${id}/attachments/${f.id}`); hydrate(await api.get<Assignment>(`assignments/${id}`)); }} className="rounded p-1 text-slate-400 hover:text-rose-600" aria-label="Remove"><Trash2 size={14} /></button>
+              <div key={f.id} className="flex items-center gap-2 text-sm"><Paperclip size={13} className="text-ink-2" /><span className="flex-1 truncate">{f.name}</span><span className="text-xs text-ink-2">{Math.round(f.size / 1024)} KB</span>
+                <button type="button" onClick={() => void openDownload(`assignments/${id}/attachments/${f.id}/download`)} className="rounded p-1 text-ink-2 hover:text-primary" aria-label="Download"><Download size={14} /></button>
+                <button type="button" onClick={async () => { await api.del(`assignments/${id}/attachments/${f.id}`); hydrate(await api.get<Assignment>(`assignments/${id}`)); }} className="rounded p-1 text-ink-2 hover:text-danger-ink" aria-label="Remove"><Trash2 size={14} /></button>
               </div>
             ))}
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-black/20 px-3 py-2 text-xs font-bold text-slate-500 dark:border-white/20"><FileUp size={14} /> Attach a file<input type="file" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} /></label>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-button border border-dashed border-line px-3 py-2 text-xs font-bold text-ink-2 "><FileUp size={14} /> Attach a file<input type="file" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }} /></label>
           </div>
         )}
         <div className="flex flex-wrap justify-end gap-2">
@@ -204,19 +204,19 @@ const SubmissionsDashboard: React.FC<{ assignmentId: string; onBack: () => void 
   const filtered = rows.filter((r) => filter === 'all' || (filter === 'pending' ? !r.submission || r.submission.status === 'draft' : filter === 'late' ? r.submission?.isLate : filter === 'graded' ? ['evaluated', 'returned'].includes(r.submission?.status ?? '') : ['submitted', 'late'].includes(r.submission?.status ?? '')));
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3"><Button variant="ghost" onClick={onBack} icon={<ArrowLeft size={14} />}>Assignments</Button><h3 className="text-xl font-black">{data.data?.assignment.title}</h3><span className="text-xs text-slate-500">{data.data?.assignment.dueAt ? `Due ${formatDateTime(data.data.assignment.dueAt)}` : ''}</span></div>
+      <div className="flex flex-wrap items-center gap-3"><Button variant="ghost" onClick={onBack} icon={<ArrowLeft size={14} />}>Assignments</Button><h3 className="text-xl font-semibold">{data.data?.assignment.title}</h3><span className="text-xs text-ink-2">{data.data?.assignment.dueAt ? `Due ${formatDateTime(data.data.assignment.dueAt)}` : ''}</span></div>
       <ErrorNote message={data.error} onRetry={data.reload} />
-      <div className="flex flex-wrap gap-2">{(['all', 'submitted', 'pending', 'late', 'graded'] as const).map((f) => <button key={f} type="button" onClick={() => setFilter(f)} className={cn('rounded-xl px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest', filter === f ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 dark:bg-white/5')}>{f}</button>)}</div>
+      <div className="flex flex-wrap gap-2">{(['all', 'submitted', 'pending', 'late', 'graded'] as const).map((f) => <button key={f} type="button" onClick={() => setFilter(f)} className={cn('rounded-button px-3 py-1.5 text-meta font-bold ', filter === f ? 'bg-primary text-on-primary' : 'bg-surface-2 text-ink-2 ')}>{f}</button>)}</div>
       {rows.length === 0 ? <EmptyState icon={<ClipboardList size={32} />} title="No students enrolled" /> : (
         <Card className="overflow-x-auto p-0 sm:p-0">
           <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="text-[10px] uppercase tracking-widest text-slate-500"><tr className="border-b border-black/5 dark:border-white/10"><th className="px-5 py-3">Student</th><th>Status</th><th>Submitted</th><th>Files</th><th>Marks</th><th /></tr></thead>
+            <thead className="text-meta text-ink-2"><tr className="border-b border-line "><th className="px-5 py-3">Student</th><th>Status</th><th>Submitted</th><th>Files</th><th>Marks</th><th /></tr></thead>
             <tbody>
               {filtered.map((r) => (
-                <tr key={r.student.id} className="border-b border-black/5 last:border-0 dark:border-white/5">
-                  <td className="px-5 py-3"><p className="font-bold">{r.student.name}</p><p className="text-xs text-slate-500">{r.student.rollNumber ? `Roll ${r.student.rollNumber}` : r.student.email}</p></td>
+                <tr key={r.student.id} className="border-b border-line last:border-0 ">
+                  <td className="px-5 py-3"><p className="font-bold">{r.student.name}</p><p className="text-xs text-ink-2">{r.student.rollNumber ? `Roll ${r.student.rollNumber}` : r.student.email}</p></td>
                   <td>{r.submission && r.submission.status !== 'draft' ? <Badge tone={STATUS_TONE[r.submission.status]}>{r.submission.status}</Badge> : <Badge tone="slate">{r.submission ? 'working' : 'not started'}</Badge>}</td>
-                  <td className="text-xs text-slate-500">{r.submission?.submittedAt ? formatDateTime(r.submission.submittedAt) : '—'}{r.submission?.isLate ? ` · ${r.submission.lateDays}d late` : ''}</td>
+                  <td className="text-xs text-ink-2">{r.submission?.submittedAt ? formatDateTime(r.submission.submittedAt) : '—'}{r.submission?.isLate ? ` · ${r.submission.lateDays}d late` : ''}</td>
                   <td>{r.submission?.files.length ?? 0}</td>
                   <td className="font-bold">{r.submission?.finalScore ?? '—'}</td>
                   <td className="pr-5 text-right">{r.submission && r.submission.status !== 'draft' && <Button size="sm" variant="secondary" onClick={() => setGrading({ submission: r.submission!, student: r.student })}>{['evaluated', 'returned'].includes(r.submission.status) ? 'View' : 'Grade'}</Button>}</td>
@@ -256,12 +256,12 @@ const GradeModal: React.FC<{ assignment: Assignment; submissionId: string; stude
     <Modal title={`${studentName} — ${assignment.title}`} onClose={() => onClose(false)} wide>
       {detail.loading && !s ? <Spinner /> : s && (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-2 text-xs"><Badge tone={STATUS_TONE[s.status]}>{s.status}</Badge><span className="text-slate-500">Submitted {formatDateTime(s.submittedAt)} · revision {s.revision}</span>{s.isLate && <Badge tone="amber">{s.lateDays} day(s) late · −{s.penaltyPercent}%</Badge>}</div>
-          {s.textResponse && <div><p className="mb-1 text-[11px] font-bold uppercase tracking-widest text-slate-500">Written answer</p><p className="max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl bg-slate-100 p-4 text-sm dark:bg-white/5">{s.textResponse}</p></div>}
-          {s.files.length > 0 && <div className="space-y-1"><p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Files</p>{s.files.map((f) => <button key={f.id} type="button" onClick={() => void openDownload(`submissions/${submissionId}/files/${f.id}/download`)} className="flex w-full items-center gap-2 rounded-xl border border-black/5 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"><Download size={14} /> {f.name} <span className="ml-auto text-xs text-slate-400">{Math.round(f.size / 1024)} KB</span></button>)}</div>}
+          <div className="flex flex-wrap gap-2 text-xs"><Badge tone={STATUS_TONE[s.status]}>{s.status}</Badge><span className="text-ink-2">Submitted {formatDateTime(s.submittedAt)} · revision {s.revision}</span>{s.isLate && <Badge tone="amber">{s.lateDays} day(s) late · −{s.penaltyPercent}%</Badge>}</div>
+          {s.textResponse && <div><p className="mb-1 text-meta font-bold text-ink-2">Written answer</p><p className="max-h-72 overflow-auto whitespace-pre-wrap rounded-card bg-surface-2 p-4 text-sm ">{s.textResponse}</p></div>}
+          {s.files.length > 0 && <div className="space-y-1"><p className="text-meta font-bold text-ink-2">Files</p>{s.files.map((f) => <button key={f.id} type="button" onClick={() => void openDownload(`submissions/${submissionId}/files/${f.id}/download`)} className="flex w-full items-center gap-2 rounded-button border border-line px-3 py-2 text-left text-sm hover:bg-surface-2 "><Download size={14} /> {f.name} <span className="ml-auto text-xs text-ink-2">{Math.round(f.size / 1024)} KB</span></button>)}</div>}
           {s.code?.source && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between"><p className="text-[11px] font-bold uppercase tracking-widest text-slate-500"><Code2 size={12} className="inline" /> Source code ({s.code.language})</p><Button size="sm" variant="secondary" loading={busy === 'eval'} onClick={() => void evaluate()} icon={<FlaskConical size={13} />}>Run all test cases</Button></div>
+              <div className="flex items-center justify-between"><p className="text-meta font-bold text-ink-2"><Code2 size={12} className="inline" /> Source code ({s.code.language})</p><Button size="sm" variant="secondary" loading={busy === 'eval'} onClick={() => void evaluate()} icon={<FlaskConical size={13} />}>Run all test cases</Button></div>
               <div className="h-80"><Suspense fallback={<p className="text-xs">Loading…</p>}><CodingWorkspace mode="teacher" readOnly languages={[s.code.language]} value={s.code} onChange={() => undefined} runContext={{ contextType: 'teacher_assignment', contextId: assignment.id }} /></Suspense></div>
               {evaluation && <p className="text-sm font-bold">{evaluation.compileError ? 'Compilation failed' : `${evaluation.passed}/${evaluation.total} test cases passed`} · suggested {evaluation.suggestedScore}/{assignment.totalMarks}</p>}
             </div>
@@ -272,7 +272,7 @@ const GradeModal: React.FC<{ assignment: Assignment; submissionId: string; stude
             <Field label="Feedback"><textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} className={inputClass} /></Field>
           </div>
           {s.isLate && <Toggle checked={waive} onChange={setWaive} label="Waive late penalty" />}
-          {detail.data?.history?.length ? <details className="text-xs"><summary className="cursor-pointer font-bold uppercase tracking-widest text-slate-500">History ({detail.data.history.length})</summary><ul className="mt-2 space-y-1">{detail.data.history.map((h, i) => <li key={i} className="text-slate-500">{formatDateTime(h.created_at)} · {h.action} (rev {h.revision})</li>)}</ul></details> : null}
+          {detail.data?.history?.length ? <details className="text-xs"><summary className="cursor-pointer font-bold text-ink-2">History ({detail.data.history.length})</summary><ul className="mt-2 space-y-1">{detail.data.history.map((h, i) => <li key={i} className="text-ink-2">{formatDateTime(h.created_at)} · {h.action} (rev {h.revision})</li>)}</ul></details> : null}
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="secondary" loading={busy === 'grade'} disabled={score === ''} onClick={() => void grade(false)}>Save grade (hidden)</Button>
             <Button loading={busy === 'grade'} disabled={score === ''} onClick={() => void grade(true)}>Return to student</Button>

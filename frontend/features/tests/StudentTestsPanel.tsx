@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState } from 'react';
-import { CalendarClock, CheckCircle2, Clock3, Code2, FileText, Lock, PlayCircle, ShieldCheck } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Clock3, Code2, FileText, Lock, PlayCircle, ShieldCheck } from '../../components/ui/icons-compat';
 import { api, formatDateTime } from '../lms/api';
 import type { StudentTest } from '../lms/types';
 import { Badge, Button, Card, EmptyState, ErrorNote, inputClass, Modal, Spinner, useAsync } from '../lms/ui';
@@ -43,25 +43,25 @@ export const StudentTestsPanel: React.FC<{ classroomId?: string; onCountChange?:
       <ErrorNote message={list.error} onRetry={list.reload} />
       {tests.length === 0 ? <EmptyState icon={<FileText size={36} />} title="No tests yet" body="Tests your teacher publishes for your classroom will appear here." /> : groups.map((g) => (
         <section key={g.title} className="space-y-3">
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{g.title}</h3>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <h3 className="text-meta font-bold text-ink-2">{g.title}</h3>
+          <div className="grid gap-4 md:grid-cols-2">
             {g.items.map((t) => (
               <Card key={t.id} className="flex flex-col gap-4">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2"><Badge tone={STATUS[t.myStatus].tone}>{STATUS[t.myStatus].label}</Badge>{t.examMode === 'coding' && <Badge tone="purple"><Code2 size={11} /> Coding</Badge>}{t.proctored && <Badge tone="blue"><ShieldCheck size={11} /> Proctored</Badge>}</div>
                   <h4 className="text-lg font-bold">{t.title}</h4>
-                  {t.classroomName && <p className="text-xs font-semibold text-purple-500">{t.classroomName}</p>}
-                  {t.description && <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">{t.description}</p>}
+                  {t.classroomName && <p className="text-xs font-semibold text-primary">{t.classroomName}</p>}
+                  {t.description && <p className="line-clamp-2 text-xs leading-relaxed text-ink-2">{t.description}</p>}
                 </div>
-                <div className="grid grid-cols-2 gap-2 border-y border-black/5 py-3 text-xs text-slate-500 dark:border-white/5">
+                <div className="grid grid-cols-2 gap-2 border-y border-line py-3 text-xs text-ink-2 ">
                   <span className="flex items-center gap-1.5"><Clock3 size={12} /> {t.durationMinutes} min</span>
                   <span className="flex items-center gap-1.5"><CheckCircle2 size={12} /> {t.totalMarks} marks</span>
                   {t.scheduledStart && <span className="col-span-2 flex items-center gap-1.5"><CalendarClock size={12} /> Opens {formatDateTime(t.scheduledStart)}</span>}
                   {t.scheduledEnd && <span className="col-span-2 flex items-center gap-1.5"><CalendarClock size={12} /> Closes {formatDateTime(t.scheduledEnd)}</span>}
                   {t.attemptLimit > 1 && <span className="col-span-2">Attempts: {t.attemptsUsed}/{t.attemptLimit}</span>}
-                  {(t.requirements.camera || t.requirements.identity) && <span className="col-span-2 text-[11px]">Needs: {[t.requirements.camera && 'camera', t.requirements.identity && 'Face ID', t.requirements.fullscreen && 'full screen'].filter(Boolean).join(', ')}</span>}
+                  {(t.requirements.camera || t.requirements.identity) && <span className="col-span-2 text-meta">Needs: {[t.requirements.camera && 'camera', t.requirements.identity && 'Face ID', t.requirements.fullscreen && 'full screen'].filter(Boolean).join(', ')}</span>}
                 </div>
-                {t.result && <p className="text-sm font-bold">Score: {t.result.score} / {t.result.maxScore} <span className="font-normal text-slate-400">({t.result.percentage}%)</span></p>}
+                {t.result && <p className="text-sm font-bold">Score: {t.result.score} / {t.result.maxScore} <span className="font-normal text-ink-2">({t.result.percentage}%)</span></p>}
                 <div className="mt-auto flex flex-wrap gap-2">
                   {t.openAttemptId ? <Button variant="student" className="flex-1" onClick={() => setTaking(t.id)} icon={<PlayCircle size={14} />}>Resume</Button>
                     : t.canStart ? <Button variant="student" className="flex-1" onClick={() => setTaking(t.id)} icon={<PlayCircle size={14} />}>{t.attemptsUsed ? 'Start new attempt' : 'Start test'}</Button>
@@ -97,29 +97,29 @@ export const ResultModal: React.FC<{ attemptId: string; onClose: () => void }> =
     <Modal title={r?.test?.title ?? 'Result'} onClose={onClose} wide>
       {result.loading && !r ? <Spinner /> : result.error ? <ErrorNote message={result.error} /> : r && (
         <div className="space-y-5">
-          {!r.resultsReleased ? <p className="rounded-2xl bg-purple-500/10 p-4 text-sm text-purple-700 dark:text-purple-200">Your exam was submitted on {formatDateTime(r.submittedAt)}. Your teacher hasn’t released the results yet.</p> : (
+          {!r.resultsReleased ? <p className="rounded-card bg-primary-light p-4 text-sm text-primary-dark ">Your exam was submitted on {formatDateTime(r.submittedAt)}. Your teacher hasn’t released the results yet.</p> : (
             <>
-              <div className="rounded-3xl bg-gradient-to-r from-purple-700 to-indigo-700 p-6 text-white"><p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Your score</p><p className="text-4xl font-black">{r.score} <span className="text-xl text-white/70">/ {r.maxScore}</span></p><p className="text-sm text-white/80">{r.percentage}%{r.passingMarks !== null ? ` · ${r.score >= r.passingMarks ? 'Passed' : 'Below passing marks'}` : ''}</p></div>
+              <div className="rounded-card bg-brand-gradient p-6 text-white"><p className="text-meta font-bold text-white">Your score</p><p className="text-4xl font-semibold">{r.score} <span className="text-xl text-white">/ {r.maxScore}</span></p><p className="text-sm text-white">{r.percentage}%{r.passingMarks !== null ? ` · ${r.score >= r.passingMarks ? 'Passed' : 'Below passing marks'}` : ''}</p></div>
               <div className="space-y-3">
                 {r.breakdown?.map((q: any, i: number) => (
-                  <div key={q.questionId} className="rounded-2xl border border-black/5 p-4 text-sm dark:border-white/10">
-                    <div className="flex items-center gap-2"><span className="font-black">Q{i + 1}</span><span className="ml-auto font-bold">{q.awardedMarks ?? 0} / {q.marks}</span></div>
+                  <div key={q.questionId} className="rounded-card border border-line p-4 text-sm ">
+                    <div className="flex items-center gap-2"><span className="font-semibold">Q{i + 1}</span><span className="ml-auto font-bold">{q.awardedMarks ?? 0} / {q.marks}</span></div>
                     <p className="mt-1 whitespace-pre-wrap">{q.prompt}</p>
-                    {q.options?.length > 0 && <ul className="mt-2 space-y-1">{q.options.map((o: any) => <li key={o.id} className={cn('rounded-lg px-2 py-1', q.response?.optionIds?.includes(o.id) && 'bg-purple-500/10 font-semibold', q.correctOptionIds?.includes(o.id) && 'text-emerald-600')}>{o.text}{q.correctOptionIds?.includes(o.id) ? ' ✓' : ''}</li>)}</ul>}
-                    {q.response?.text && <p className="mt-2 whitespace-pre-wrap rounded-xl bg-slate-100 p-2 dark:bg-white/5">{q.response.text}</p>}
+                    {q.options?.length > 0 && <ul className="mt-2 space-y-1">{q.options.map((o: any) => <li key={o.id} className={cn('rounded-lg px-2 py-1', q.response?.optionIds?.includes(o.id) && 'bg-primary-light font-semibold', q.correctOptionIds?.includes(o.id) && 'text-success-ink')}>{o.text}{q.correctOptionIds?.includes(o.id) ? ' ✓' : ''}</li>)}</ul>}
+                    {q.response?.text && <p className="mt-2 whitespace-pre-wrap rounded-button bg-surface-2 p-2 ">{q.response.text}</p>}
                     {q.coding && <p className="mt-2 text-xs">{q.coding.passed}/{q.coding.total} test cases passed</p>}
-                    {q.modelAnswer !== null && q.modelAnswer !== undefined && <p className="mt-2 text-xs text-emerald-600">Answer: {String(q.modelAnswer)}</p>}
-                    {q.explanation && <p className="mt-1 text-xs text-slate-500">{q.explanation}</p>}
-                    {q.feedback && <p className="mt-2 rounded-xl bg-blue-500/10 p-2 text-xs text-blue-700 dark:text-blue-200">Teacher: {q.feedback}</p>}
+                    {q.modelAnswer !== null && q.modelAnswer !== undefined && <p className="mt-2 text-xs text-success-ink">Answer: {String(q.modelAnswer)}</p>}
+                    {q.explanation && <p className="mt-1 text-xs text-ink-2">{q.explanation}</p>}
+                    {q.feedback && <p className="mt-2 rounded-button bg-primary-light p-2 text-xs text-primary-dark ">Teacher: {q.feedback}</p>}
                   </div>
                 ))}
               </div>
             </>
           )}
-          <div className="space-y-2 rounded-2xl border border-black/5 p-4 dark:border-white/10">
+          <div className="space-y-2 rounded-card border border-line p-4 ">
             <p className="text-sm font-bold">Disagree with a mark or a proctoring flag?</p>
             <textarea value={appeal} onChange={(e) => setAppeal(e.target.value)} rows={3} className={inputClass} placeholder="Explain what you would like your teacher to review." />
-            {appealState.message && <p className="text-xs text-emerald-600">{appealState.message}</p>}
+            {appealState.message && <p className="text-xs text-success-ink">{appealState.message}</p>}
             <ErrorNote message={appealState.error} />
             <Button variant="student" size="sm" loading={appealState.sending} disabled={appeal.trim().length < 5} onClick={() => void sendAppeal()}>Send appeal</Button>
           </div>

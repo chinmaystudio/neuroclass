@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Camera, ArrowRight, CheckCircle2, RotateCcw, ShieldCheck, ArrowLeft, Trash2 } from 'lucide-react';
+import { X, Camera, ArrowRight, CheckCircle2, RotateCcw, ShieldCheck, ArrowLeft, Trash2 } from '../ui/icons-compat';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { CameraService } from '../../services/ml/CameraService';
@@ -142,28 +142,28 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay p-4">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="w-full max-w-xl bg-white dark:bg-[#0a0a0a] rounded-[36px] border border-slate-200 dark:border-white/10 p-8 md:p-10 shadow-2xl overflow-hidden relative"
+        className="w-full max-w-xl bg-surface rounded-card border border-line p-8 md:p-10 shadow-raised overflow-hidden relative"
       >
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             {step > 1 && (
               <button 
                 onClick={() => { setError(null); setStep(step - 1); }}
-                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+                className="p-2 rounded-full hover:bg-surface-2 text-ink-2 hover:text-ink transition-colors"
                 title="Go Back"
               >
                 <ArrowLeft size={18} />
               </button>
             )}
-            <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Join Classroom</h3>
+            <h3 className="text-2xl font-bold tracking-tight text-ink ">Join Classroom</h3>
           </div>
 
-          <button onClick={() => { stopCamera(); onClose(); }} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+          <button onClick={() => { stopCamera(); onClose(); }} className="text-ink-2 hover:text-ink transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -171,9 +171,9 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
         {/* Step Progress Bar */}
         <div className="flex items-center gap-2 mb-6">
           {[1, 2, 3].map(i => (
-            <div key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-slate-100 dark:bg-white/10">
+            <div key={i} className="flex-1 h-1.5 rounded-full overflow-hidden bg-surface-2 ">
               <motion.div 
-                className="h-full bg-purple-600"
+                className="h-full bg-primary"
                 initial={{ width: 0 }}
                 animate={{ width: step >= i ? '100%' : '0%' }}
                 transition={{ duration: 0.3 }}
@@ -183,7 +183,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+          <div className="mb-6 p-4 rounded-card bg-danger-bg border border-danger/30 text-danger-ink text-xs font-semibold">
             {error}
           </div>
         )}
@@ -193,7 +193,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-6">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Classroom Code</label>
+                  <label className="text-meta font-bold text-ink-2">Classroom Code</label>
                   <input 
                     autoFocus
                     type="text" 
@@ -201,12 +201,12 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                     onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                     placeholder="e.g. A1B2C3" 
                     maxLength={6}
-                    className="w-full mt-2 px-6 py-5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-purple-500/50 font-mono tracking-widest text-center text-xl"
+                    className="w-full mt-2 px-6 py-5 rounded-card bg-surface-2 border border-line text-ink outline-none focus:ring-2 focus:ring-primary font-mono text-center text-xl"
                   />
                 </div>
 
                 {false && (
-                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                  <div className="p-4 rounded-card bg-success-bg border border-success/30 flex items-center gap-3 text-success-ink text-xs font-semibold">
                     <ShieldCheck size={18} className="shrink-0" />
                     <span>Registered Face-ID Detected — Will automatically apply your Face-ID profile across this class.</span>
                   </div>
@@ -214,7 +214,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
 
                 <button 
                   onClick={() => { setError(null); if (joinCode.length === 6) setStep(2); else setError('Enter a valid 6-character code.'); }}
-                  className="w-full py-4 rounded-2xl bg-purple-600 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 hover:bg-purple-500 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-4 rounded-card bg-primary text-on-primary font-bold text-xs shadow-raised hover:bg-primary-hover transition-all flex items-center justify-center gap-2"
                 >
                   Next Step <ArrowRight size={14} />
                 </button>
@@ -226,43 +226,43 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
             <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Full Name</label>
+                  <label className="text-meta font-bold text-ink-2">Full Name</label>
                   <input 
                     type="text" 
                     value={studentDetails.name}
                     onChange={(e) => setStudentDetails({...studentDetails, name: e.target.value})}
-                    className="w-full mt-2 px-6 py-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-transparent outline-none focus:border-purple-500/50 text-sm font-medium"
+                    className="w-full mt-2 px-6 py-4 rounded-card bg-surface-2 border border-transparent outline-none focus:border-primary text-sm font-medium"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Roll Number / Student ID</label>
+                  <label className="text-meta font-bold text-ink-2">Roll Number / Student ID</label>
                   <input 
                     type="text" 
                     value={studentDetails.rollNumber}
                     onChange={(e) => setStudentDetails({...studentDetails, rollNumber: e.target.value})}
-                    className="w-full mt-2 px-6 py-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-transparent outline-none focus:border-purple-500/50 text-sm font-medium"
+                    className="w-full mt-2 px-6 py-4 rounded-card bg-surface-2 border border-transparent outline-none focus:border-primary text-sm font-medium"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Phone Number (Optional)</label>
+                  <label className="text-meta font-bold text-ink-2">Phone Number (Optional)</label>
                   <input 
                     type="tel" 
                     value={studentDetails.phoneNumber}
                     onChange={(e) => setStudentDetails({...studentDetails, phoneNumber: e.target.value})}
-                    className="w-full mt-2 px-6 py-4 rounded-2xl bg-black/5 dark:bg-white/5 border border-transparent outline-none focus:border-purple-500/50 text-sm font-medium"
+                    className="w-full mt-2 px-6 py-4 rounded-card bg-surface-2 border border-transparent outline-none focus:border-primary text-sm font-medium"
                   />
                 </div>
 
                 <div className="flex gap-4 pt-4">
                   <button 
                     onClick={() => setStep(1)} 
-                    className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                    className="flex-1 py-4 rounded-card bg-surface-2 text-ink font-bold text-xs flex items-center justify-center gap-2"
                   >
                     <ArrowLeft size={14} /> Back
                   </button>
                   <button 
                     onClick={() => { setError(null); if (studentDetails.name && studentDetails.rollNumber) setStep(3); else setError('Name and Roll Number are required.'); }}
-                    className="flex-1 py-4 rounded-2xl bg-purple-600 text-white font-bold uppercase tracking-widest text-xs"
+                    className="flex-1 py-4 rounded-card bg-primary text-on-primary font-bold text-xs"
                   >
                     Biometrics
                   </button>
@@ -275,11 +275,11 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="space-y-6">
                 {false ? (
-                  <div className="p-6 rounded-3xl bg-purple-500/10 border border-purple-500/20 text-center space-y-4">
-                    <ShieldCheck size={40} className="mx-auto text-purple-500" />
+                  <div className="p-6 rounded-card bg-primary-light border border-primary-soft text-center space-y-4">
+                    <ShieldCheck size={40} className="mx-auto text-primary" />
                     <div>
-                      <h4 className="text-lg font-bold text-slate-900 dark:text-white">Unified Face-ID Ready</h4>
-                      <p className="text-xs text-slate-500 mt-1">
+                      <h4 className="text-lg font-bold text-ink ">Unified Face-ID Ready</h4>
+                      <p className="text-xs text-ink-2 mt-1">
                         Your registered face biometric profile will be linked automatically to this classroom.
                       </p>
                     </div>
@@ -287,7 +287,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                     <div className="flex gap-3 pt-2">
                       <button
                         onClick={handleClearFaceData}
-                        className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1.5"
+                        className="flex-1 py-3 rounded-button bg-surface-2 text-ink-2 text-xs font-bold flex items-center justify-center gap-1.5"
                       >
                         <RotateCcw size={14} /> Re-scan Face
                       </button>
@@ -295,7 +295,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                       <button
                         onClick={handleJoinClassroom}
                         disabled={isRegistering}
-                        className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-1.5"
+                        className="flex-1 py-3 rounded-button bg-success hover:bg-success text-on-primary font-bold text-xs shadow-raised flex items-center justify-center gap-1.5"
                       >
                         {isRegistering ? 'Joining...' : <><CheckCircle2 size={16} /> Complete Join</>}
                       </button>
@@ -304,24 +304,24 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                 ) : (
                   <>
                     <div className="text-center">
-                      <p className="text-xs font-bold uppercase tracking-widest text-purple-500 mb-1">Face-ID Enrollment</p>
-                      <p className="text-xs text-slate-500">Capture 5 varied angles of your face. Once saved, this Face ID applies to all your classes.</p>
+                      <p className="text-xs font-bold text-primary mb-1">Face-ID Enrollment</p>
+                      <p className="text-xs text-ink-2">Capture 5 varied angles of your face. Once saved, this Face ID applies to all your classes.</p>
                     </div>
 
-                    <div className="relative aspect-video bg-black rounded-[24px] overflow-hidden border border-white/10 shadow-inner flex items-center justify-center">
+                    <div className="relative aspect-video bg-black rounded-card overflow-hidden border border-line shadow-inner flex items-center justify-center">
                       {!isCapturing ? (
                         <button 
                           onClick={startCapture}
-                          className="flex flex-col items-center gap-3 text-white/50 hover:text-white transition-colors p-8"
+                          className="flex flex-col items-center gap-3 text-white hover:text-white transition-colors p-8"
                         >
                           <Camera size={48} className="opacity-50" />
-                          <span className="text-xs font-bold uppercase tracking-widest">Enable Camera</span>
+                          <span className="text-xs font-bold ">Enable Camera</span>
                         </button>
                       ) : (
                         <>
                           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
                           <canvas ref={canvasRef} className="hidden" width={640} height={480} />
-                          <div className="absolute inset-0 pointer-events-none border-[4px] border-purple-500/30 rounded-[24px]" />
+                          <div className="absolute inset-0 pointer-events-none border-[4px] border-primary-soft rounded-card" />
                         </>
                       )}
                     </div>
@@ -330,11 +330,11 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                       <div className="space-y-4">
                         <div className="flex gap-2">
                           {[0, 1, 2, 3, 4].map(i => (
-                            <div key={i} className="flex-1 aspect-square rounded-xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 overflow-hidden relative">
+                            <div key={i} className="flex-1 aspect-square rounded-button bg-surface-2 border border-line overflow-hidden relative">
                               {studentDetails.faceSamples[i] ? (
                                 <img src={studentDetails.faceSamples[i]} className="w-full h-full object-cover" alt={`Sample ${i}`} />
                               ) : (
-                                <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+                                <div className="absolute inset-0 flex items-center justify-center text-ink-2">
                                   <Camera size={16} className="opacity-30" />
                                 </div>
                               )}
@@ -345,7 +345,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                         <div className="flex gap-3">
                           <button 
                             onClick={handleClearFaceData}
-                            className="px-4 py-3.5 rounded-2xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5"
+                            className="px-4 py-3.5 rounded-card bg-danger-bg text-danger-ink hover:bg-danger-bg text-xs font-bold flex items-center gap-1.5"
                             title="Clear captured face data"
                           >
                             <Trash2 size={14} /> Clear Data
@@ -354,7 +354,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                           {studentDetails.faceSamples.length < 5 ? (
                             <button 
                               onClick={captureSample}
-                              className="flex-1 py-3.5 rounded-2xl bg-white dark:bg-white/10 border border-slate-200 dark:border-white/20 font-bold uppercase tracking-widest text-xs"
+                              className="flex-1 py-3.5 rounded-card bg-surface border border-line font-bold text-xs"
                             >
                               Capture Sample ({studentDetails.faceSamples.length}/5)
                             </button>
@@ -362,7 +362,7 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                             <button 
                               onClick={handleJoinClassroom}
                               disabled={isRegistering}
-                              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/30"
+                              className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-card bg-success hover:bg-success text-on-primary font-bold text-xs shadow-raised "
                             >
                               {isRegistering ? 'Registering...' : <><CheckCircle2 size={16} /> Save Face ID & Join</>}
                             </button>
@@ -374,10 +374,10 @@ export const JoinClassWizard: React.FC<JoinClassWizardProps> = ({ isOpen, onClos
                 )}
 
                 {/* Back Button for Step 3 */}
-                <div className="pt-2 border-t border-slate-100 dark:border-white/10 flex justify-between items-center">
+                <div className="pt-2 border-t border-line flex justify-between items-center">
                   <button 
                     onClick={() => { stopCamera(); setStep(2); }} 
-                    className="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5"
+                    className="text-xs font-bold text-ink-2 hover:text-ink flex items-center gap-1.5"
                   >
                     <ArrowLeft size={14} /> Back to Details
                   </button>

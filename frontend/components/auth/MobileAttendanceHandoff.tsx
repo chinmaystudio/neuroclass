@@ -34,5 +34,5 @@ export const MobileAttendanceHandoff: React.FC = () => {
     return () => { cancelled = true; };
   }, [location.hash, location.search]);
 
-  return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950 px-6 text-center text-white"><div className="max-w-sm space-y-4"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-indigo-300/30 border-t-indigo-300" /><h1 className="text-xl font-black">Opening attendance</h1><p className="text-sm leading-6 text-slate-300">{message}</p></div></div>;
+  return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-ink px-6 text-center text-on-primary"><div className="max-w-sm space-y-4"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-primary-soft border-t-primary-soft" /><h1 className="text-xl font-semibold">Opening attendance</h1><p className="text-sm leading-6 text-ink-2">{message}</p></div></div>;
 };

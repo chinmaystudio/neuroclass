@@ -113,7 +113,7 @@ Short and functional: colour, shadow and transform transitions of 120–180 ms (
 
 ## Iconography
 
-`components/ui/icons.tsx`: a small in-house set of geometric line icons (24 px grid, 1.75 stroke, round caps), `aria-hidden` by default. Icons support labels, never replace them; icon-only buttons require a `label`. **No Lucide icons in the design system.** (Legacy screens still use Lucide and are migrated during the page redesign.) No sparkles or decorative AI symbols.
+`components/ui/icons.tsx`: a small in-house set of geometric line icons (24 px grid, 1.75 stroke, round caps), `aria-hidden` by default. Icons support labels, never replace them; icon-only buttons require a `label`. **No Lucide icons:** the dependency has been removed. `components/ui/icons-compat.tsx` draws the remaining older screens' icons in the same style under their former names. No sparkles or decorative AI symbols.
 
 ## Layout
 
@@ -131,7 +131,8 @@ Every token has a dark value; components never use `dark:` overrides for colour,
 |---|---|
 | `frontend/index.css` | Tokens, `@theme`, `bg-brand-gradient`, `focus-ring`, reduced-motion rule, legacy shadow rules (opt-out with `[data-ui]`) |
 | `frontend/lib/utils.ts` | `cn()`; tailwind-merge configured with the token names |
-| `frontend/components/ui/*` | The component library (see guidelines) |
+| `frontend/components/ui/*` | The component library (see guidelines); `chart.ts` holds chart colours |
+| `frontend/features/shell/RoleShell.tsx` | Signed-in frame (top bar, sidebar, drawer) and `PageBody` container |
 | `frontend/features/lms/ui.tsx` | Compatibility layer: the old API, rendered with the kit |
 | `frontend/features/ui-kit/UIKitShowcase.tsx` | `/ui-kit` living style guide |
 | `scripts/ui-audit/kit.mjs` | Automated checks: screenshots, overflow, keyboard behaviour |

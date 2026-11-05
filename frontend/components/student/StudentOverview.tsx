@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
-import { 
-  BookOpen, FileText, CheckCircle2, Award, 
-  Sparkles, ArrowRight, ShieldCheck, Clock, Plus, Zap
-} from 'lucide-react';
+import { ActivityCard, Button, buttonClasses, Card, ClassroomBanner, EmptyState, IconClock, IconPlus, Meta, Skeleton, SkeletonCard, StatCard, StatusBadge } from '../ui';
+import { PageBody } from '../../features/shell/RoleShell';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../features/lms/api';
@@ -28,6 +25,7 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
     completedTestsCount: 0,
     averageScorePercent: 0,
     biometricVerified: false,
+    releasedCount: 0,
   });
   const [recentTests, setRecentTests] = useState<any[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
@@ -69,6 +67,7 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
         completedTestsCount: completedResults.length,
         averageScorePercent,
         biometricVerified: isBio,
+        releasedCount: released.length,
       });
 
       setRecentTests(pendingTests.slice(0, 3));
@@ -80,9 +79,8 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
           activities.push({
             id: `enroll-${sp.id}`,
             type: 'enrollment',
-            title: 'Enrolled in Classroom',
+            title: 'Joined a class',
             time: new Date(sp.joined_at).toLocaleDateString(),
-            icon: <BookOpen className="text-purple-500" size={16} />,
           });
         }
       });
@@ -90,10 +88,9 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
         activities.push({
           id: `res-${cr.id}`,
           type: 'exam',
-          title: `Completed Assessment: ${cr.tests?.title || 'Exam'}`,
-          detail: cr.released ? `Score: ${cr.score}/${cr.tests?.total_marks || 100}` : 'Awaiting results',
-          time: 'Submitted',
-          icon: <CheckCircle2 className="text-emerald-500" size={16} />,
+          title: `Submitted ${cr.tests?.title || 'a test'}`,
+          detail: cr.released ? `Score ${cr.score} of ${cr.tests?.total_marks ?? '—'}` : 'Waiting for results',
+          time: '',
         });
       });
 
@@ -107,197 +104,85 @@ export const StudentOverview: React.FC<StudentOverviewProps> = ({
     }
   };
 
+  const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  const firstName = String(meta.displayname || meta.full_name || meta.name || '').trim().split(/\s+/)[0];
+
   if (loading) {
     return (
-      <div className="p-8 h-full flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageBody>
+        <Skeleton className="h-36 w-full" rounded="card" />
+        <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map((n) => <Skeleton key={n} className="h-28" rounded="card" />)}</div>
+        <div className="mt-6 grid gap-4 lg:grid-cols-[2fr_1fr]"><SkeletonCard /><SkeletonCard /></div>
+      </PageBody>
     );
   }
 
   return (
-    <div className="min-w-0 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-[28px] md:rounded-[36px] bg-gradient-to-r from-purple-900 via-indigo-900 to-black p-5 sm:p-7 md:p-10 text-white shadow-2xl border border-white/10">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
-                <Sparkles size={13} /> Student Portal
-              </span>
-              {stats.biometricVerified ? (
-                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
-                  <ShieldCheck size={13} /> Biometric Verified
-                </span>
-              ) : (
-                <span className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest">
-                  Biometric Pending
-                </span>
-              )}
+    <PageBody>
+      <Card padding="none" className="overflow-hidden">
+        <ClassroomBanner className="px-6 py-7 sm:px-8">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-[1.75rem] font-semibold leading-9 text-white">{firstName ? `Welcome back, ${firstName}` : 'Welcome back'}</h1>
+              <p className="mt-1 max-w-xl text-body text-white/95">
+                {stats.activeTestsCount > 0
+                  ? `You have ${stats.activeTestsCount} ${stats.activeTestsCount === 1 ? 'test' : 'tests'} open right now.`
+                  : stats.enrolledCount > 0 ? 'You’re all caught up. New tests will appear here when they open.' : 'Join a class with the code your teacher gave you to get started.'}
+              </p>
             </div>
-            
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight break-words">
-              Welcome back, {user?.email?.split('@')[0] || 'Student'}! 👋
-            </h1>
-            <p className="text-slate-300 text-sm max-w-xl">
-              Monitor your enrolled courses, complete proctored assessments, and track your academic progress in real time.
-            </p>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button type="button" onClick={onJoinClick} className={buttonClasses('secondary', 'md', 'bg-white text-primary-dark hover:bg-primary-light dark:bg-white dark:text-[#174ea6]')}>
+                <IconPlus size={18} /> Join a class
+              </button>
+            </div>
           </div>
-
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <button
-              onClick={onJoinClick}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3.5 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-purple-500/30 transition-all active:scale-95 sm:w-auto"
-            >
-              <Plus size={16} /> Join Class
-            </button>
-            <button
-              onClick={() => onNavigate('tests')}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 py-3.5 text-xs font-bold uppercase tracking-widest text-white transition-all active:scale-95 sm:w-auto"
-            >
-              <Zap size={16} /> Active Tests
-            </button>
-          </div>
+        </ClassroomBanner>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-6 py-3 sm:px-8">
+          {stats.biometricVerified
+            ? <StatusBadge status="completed" label="Face ID registered" />
+            : <span className="flex flex-wrap items-center gap-2 text-support text-ink-2"><StatusBadge status="pending" label="Face ID not registered" /> Needed for verified attendance and proctored tests. <button type="button" className="font-medium text-primary hover:underline focus-ring rounded-control" onClick={() => onNavigate('settings')}>Set it up</button></span>}
         </div>
-      </div>
+      </Card>
 
-      {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
-        <motion.div
-          whileHover={{ y: -4 }}
-          onClick={() => onNavigate('classes')}
-          className="min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
-              <BookOpen size={24} />
-            </div>
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Classes</span>
+      <section aria-label="Summary" className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Classes" value={stats.enrolledCount} hint="Joined" />
+        <StatCard label="Open tests" value={stats.activeTestsCount} tone="warning" hint="Ready to take" />
+        <StatCard label="Submitted" value={stats.completedTestsCount} tone="success" hint="Tests" />
+        <StatCard label="Average score" value={stats.releasedCount > 0 ? `${stats.averageScorePercent}%` : '—'} tone="info" hint={stats.releasedCount > 0 ? `From ${stats.releasedCount} released ${stats.releasedCount === 1 ? 'result' : 'results'}` : 'No results released yet'} />
+      </section>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Card as="section" padding="none" aria-labelledby="open-tests">
+          <div className="flex items-center justify-between gap-3 border-b border-line-2 px-5 py-4">
+            <h2 id="open-tests" className="text-card text-ink">Open tests</h2>
+            <Button variant="text" size="sm" onClick={() => onNavigate('tests')}>All tests</Button>
           </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{stats.enrolledCount}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Active Enrolled Courses</p>
-        </motion.div>
-
-        <motion.div
-          whileHover={{ y: -4 }}
-          onClick={() => onNavigate('tests')}
-          className="min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
-              <FileText size={24} />
-            </div>
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Active</span>
-          </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{stats.activeTestsCount}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Pending Assessments</p>
-        </motion.div>
-
-        <motion.div
-          whileHover={{ y: -4 }}
-          onClick={() => onNavigate('history')}
-          className="min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-              <CheckCircle2 size={24} />
-            </div>
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Completed</span>
-          </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{stats.completedTestsCount}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Exams Submitted</p>
-        </motion.div>
-
-        <motion.div
-          whileHover={{ y: -4 }}
-          onClick={() => onNavigate('performance')}
-          className="min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 shadow-xl shadow-slate-200/50 dark:shadow-none"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
-              <Award size={24} />
-            </div>
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Average</span>
-          </div>
-          <p className="text-3xl font-black text-slate-900 dark:text-white">{stats.averageScorePercent}%</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Overall Grade Score</p>
-        </motion.div>
-      </div>
-
-      {/* Main Grid: Active Tests Widget & Recent Activity Timeline */}
-      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3 md:gap-8">
-        {/* Left 2 Cols: Quick Pending Assessments */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Clock className="text-purple-500" size={20} />
-              Pending Assessments
-            </h2>
-            <button
-              onClick={() => onNavigate('tests')}
-              className="text-xs font-bold uppercase tracking-widest text-purple-500 hover:underline flex items-center gap-1"
-            >
-              View All <ArrowRight size={14} />
-            </button>
-          </div>
-
           {recentTests.length === 0 ? (
-            <div className="p-8 border border-dashed border-black/10 dark:border-white/10 rounded-3xl bg-white/40 dark:bg-black/20 text-center space-y-3">
-              <CheckCircle2 size={36} className="mx-auto text-emerald-500" />
-              <p className="text-slate-700 dark:text-slate-300 font-bold">You are all caught up!</p>
-              <p className="text-xs text-slate-500">No pending tests in your enrolled classrooms.</p>
-            </div>
+            <div className="p-4"><EmptyState compact title="No open tests" body="When a teacher opens a test in one of your classes, it appears here." /></div>
           ) : (
-            <div className="space-y-4">
-              {recentTests.map((t) => (
-                <div
-                  key={t.id}
-                  className="min-w-0 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-5 md:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all"
-                >
-                  <div className="space-y-1">
-                    <span className="px-3 py-0.5 rounded-full bg-purple-500/10 text-purple-500 text-[10px] font-bold uppercase tracking-widest">
-                      {t.classrooms?.name || 'Classroom'}
-                    </span>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t.title}</h3>
-                    <p className="text-xs text-slate-500">Duration: {t.durationMinutes ?? t.duration_mins ?? 45} Mins • {t.totalMarks ?? 0} Marks</p>
+            <ul className="divide-y divide-line-2">
+              {recentTests.map((test) => (
+                <li key={test.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-body font-medium text-ink">{test.title}</p>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                      <Meta>{test.classrooms?.name || 'Class'}</Meta>
+                      {test.duration_mins ? <Meta icon={<IconClock size={16} />}>{test.duration_mins} min</Meta> : null}
+                      {typeof test.totalMarks === 'number' && <Meta>{test.totalMarks} marks</Meta>}
+                    </div>
                   </div>
-                  <button
-                    onClick={() => onStartTest(t.id)}
-                    className="w-full rounded-xl bg-purple-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-purple-500/20 transition-colors active:scale-95 sm:w-auto"
-                  >
-                    {t.openAttemptId ? 'Resume Exam' : 'Start Exam'}
-                  </button>
-                </div>
+                  <Button size="sm" className="shrink-0" onClick={() => onStartTest(test.id)}>{test.openAttemptId ? 'Resume test' : 'Start test'}</Button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </div>
+        </Card>
 
-        {/* Right Col: Activity Timeline */}
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recent Activity</h2>
-          <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-6 space-y-4 shadow-sm">
-            {recentActivities.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-6">No recent activity logged.</p>
-            ) : (
-              recentActivities.map((act) => (
-                <div key={act.id} className="flex items-start gap-3 border-b border-slate-100 dark:border-white/5 pb-3 last:border-0 last:pb-0">
-                  <div className="p-2 rounded-xl bg-slate-100 dark:bg-white/10 shrink-0">
-                    {act.icon}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">{act.title}</p>
-                    {act.detail && <p className="text-[11px] text-slate-500">{act.detail}</p>}
-                    <span className="text-[10px] text-slate-400">{act.time}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <ActivityCard
+          title="Recent activity"
+          items={recentActivities.map((a) => ({ id: a.id, title: a.title, detail: a.detail, time: a.time, tone: a.type === 'exam' ? 'success' : 'primary' }))}
+        />
       </div>
-    </div>
+    </PageBody>
   );
 };

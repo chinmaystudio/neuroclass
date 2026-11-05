@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { CheckCircle2, ChevronDown, Code2, Loader2, Moon, Play, ShieldAlert, Sun, Wand2, XCircle, FlaskConical } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Code2, Loader2, Moon, Play, ShieldAlert, Sun, Wand2, XCircle, FlaskConical } from '../../components/ui/icons-compat';
 import './monacoSetup';
 import { monaco } from './monacoSetup';
 import { api, ApiRequestError } from '../lms/api';
@@ -133,36 +133,36 @@ export const CodingWorkspace: React.FC<CodingWorkspaceProps> = ({ mode, language
 
   const format = () => editorRef.current?.getAction('editor.action.formatDocument')?.run();
   const canFormat = FORMATTABLE.has(meta?.monaco ?? '');
-  const statusTone = (status?: string) => (status === 'ok' ? 'text-emerald-500' : status === 'compile_error' ? 'text-amber-500' : 'text-rose-500');
+  const statusTone = (status?: string) => (status === 'ok' ? 'text-success-ink' : status === 'compile_error' ? 'text-warning-ink' : 'text-danger-ink');
   const statusLabel: Record<string, string> = { ok: 'Finished', compile_error: 'Compilation failed', runtime_error: 'Runtime error', time_limit: 'Time limit exceeded', memory_limit: 'Memory limit exceeded', output_limit: 'Output limit exceeded', internal_error: 'Runner error' };
 
   return (
-    <div ref={containerRef} className="flex h-full min-h-[480px] flex-col overflow-hidden rounded-2xl border border-black/10 bg-white dark:border-white/10 dark:bg-[#0d0d0f]" style={{ height }}>
+    <div ref={containerRef} className="flex h-full min-h-[480px] flex-col overflow-hidden rounded-card border border-line bg-surface " style={{ height }}>
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-black/5 px-3 py-2 dark:border-white/10">
-        <Code2 size={16} className="text-blue-500" aria-hidden />
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 ">
+        <Code2 size={16} className="text-primary" aria-hidden />
         <div className="relative">
-          <select aria-label="Programming language" value={language} disabled={readOnly || available.length < 2} onChange={(e) => switchLanguage(e.target.value as LanguageId)} className="appearance-none rounded-lg border border-black/10 bg-slate-50 py-1.5 pl-3 pr-8 text-xs font-bold dark:border-white/10 dark:bg-white/5">
+          <select aria-label="Programming language" value={language} disabled={readOnly || available.length < 2} onChange={(e) => switchLanguage(e.target.value as LanguageId)} className="appearance-none rounded-lg border border-line bg-surface-2 py-1.5 pl-3 pr-8 text-xs font-bold ">
             {available.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
-          <ChevronDown size={14} className="pointer-events-none absolute right-2 top-2 text-slate-400" aria-hidden />
+          <ChevronDown size={14} className="pointer-events-none absolute right-2 top-2 text-ink-2" aria-hidden />
         </div>
-        {meta?.fileName && <span className="hidden font-mono text-[11px] text-slate-400 sm:inline">{meta.fileName}</span>}
+        {meta?.fileName && <span className="hidden font-mono text-meta text-ink-2 sm:inline">{meta.fileName}</span>}
         <div className="ml-auto flex items-center gap-1.5">
-          {saveState && saveState !== 'idle' && <span className={cn('mr-2 text-[10px] font-bold uppercase tracking-widest', saveState === 'saved' ? 'text-emerald-500' : saveState === 'offline' || saveState === 'error' ? 'text-amber-500' : 'text-slate-400')}>{saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : saveState === 'offline' ? 'Saved on device' : 'Not saved'}</span>}
-          <button type="button" title={canFormat ? 'Format code' : 'Formatting is available for JavaScript and TypeScript'} disabled={!canFormat || readOnly} onClick={format} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-white/10" aria-label="Format code"><Wand2 size={15} /></button>
-          <button type="button" title="Toggle editor theme" onClick={() => setTheme((t) => (t === 'vs-dark' ? 'light' : 'vs-dark'))} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Toggle editor theme">{theme === 'vs-dark' ? <Sun size={15} /> : <Moon size={15} />}</button>
+          {saveState && saveState !== 'idle' && <span className={cn('mr-2 text-meta font-bold ', saveState === 'saved' ? 'text-success-ink' : saveState === 'offline' || saveState === 'error' ? 'text-warning-ink' : 'text-ink-2')}>{saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : saveState === 'offline' ? 'Saved on device' : 'Not saved'}</span>}
+          <button type="button" title={canFormat ? 'Format code' : 'Formatting is available for JavaScript and TypeScript'} disabled={!canFormat || readOnly} onClick={format} className="rounded-lg p-2 text-ink-2 hover:bg-surface-2 disabled:opacity-30 " aria-label="Format code"><Wand2 size={15} /></button>
+          <button type="button" title="Toggle editor theme" onClick={() => setTheme((t) => (t === 'vs-dark' ? 'light' : 'vs-dark'))} className="rounded-lg p-2 text-ink-2 hover:bg-surface-2 " aria-label="Toggle editor theme">{theme === 'vs-dark' ? <Sun size={15} /> : <Moon size={15} />}</button>
           {mode === 'teacher' ? (
-            <button type="button" disabled={Boolean(running)} onClick={() => run('all')} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white disabled:opacity-50">{running === 'all' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Run all tests</button>
+            <button type="button" disabled={Boolean(running)} onClick={() => run('all')} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-meta font-bold text-on-primary disabled:opacity-50">{running === 'all' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Run all tests</button>
           ) : (
             <>
-              <button type="button" disabled={Boolean(running) || !sampleTestCases.length} onClick={() => run('samples')} className="inline-flex items-center gap-1.5 rounded-lg border border-black/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest disabled:opacity-40 dark:border-white/10" title={sampleTestCases.length ? 'Run the visible sample tests' : 'No visible sample tests'}>{running === 'samples' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Run tests</button>
-              <button type="button" disabled={Boolean(running)} onClick={() => run('custom')} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white disabled:opacity-50">{running === 'custom' ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} {meta?.compiled ? 'Compile & run' : 'Run'}</button>
+              <button type="button" disabled={Boolean(running) || !sampleTestCases.length} onClick={() => run('samples')} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-meta font-bold disabled:opacity-40 " title={sampleTestCases.length ? 'Run the visible sample tests' : 'No visible sample tests'}>{running === 'samples' ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />} Run tests</button>
+              <button type="button" disabled={Boolean(running)} onClick={() => run('custom')} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-meta font-bold text-on-primary disabled:opacity-50">{running === 'custom' ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />} {meta?.compiled ? 'Compile & run' : 'Run'}</button>
             </>
           )}
         </div>
       </div>
-      {blockClipboard && <div className="flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/5 px-3 py-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300"><ShieldAlert size={13} aria-hidden /> Secure mode: copy, paste and drag-and-drop are disabled in this editor and attempts are logged.</div>}
+      {blockClipboard && <div className="flex items-center gap-2 border-b border-warning/30 bg-warning-bg px-3 py-1.5 text-meta font-semibold text-warning-ink "><ShieldAlert size={13} aria-hidden /> Secure mode: copy, paste and drag-and-drop are disabled in this editor and attempts are logged.</div>}
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(240px,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-1">
         <div className="min-h-[240px]">
@@ -173,7 +173,7 @@ export const CodingWorkspace: React.FC<CodingWorkspaceProps> = ({ mode, language
             value={source}
             onMount={onMount}
             onChange={(next) => { if (!readOnly) onChange({ language, source: next ?? '' }); }}
-            loading={<div className="p-6 text-xs text-slate-500">Loading editor…</div>}
+            loading={<div className="p-6 text-xs text-ink-2">Loading editor…</div>}
             options={{
               readOnly,
               minimap: { enabled: false },
@@ -194,47 +194,47 @@ export const CodingWorkspace: React.FC<CodingWorkspaceProps> = ({ mode, language
         </div>
 
         {/* Input / output panel */}
-        <div className="flex min-h-[220px] flex-col border-t border-black/5 dark:border-white/10 lg:border-l lg:border-t-0">
-          <div className="flex border-b border-black/5 text-[11px] font-bold uppercase tracking-widest dark:border-white/10">
-            {(['output', 'tests'] as const).map((p) => <button key={p} type="button" onClick={() => setPanel(p)} className={cn('flex-1 px-3 py-2', panel === p ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-slate-400')}>{p === 'output' ? 'Input & output' : `Tests${result?.total !== undefined ? ` (${result.passed}/${result.total})` : ''}`}</button>)}
+        <div className="flex min-h-[220px] flex-col border-t border-line lg:border-l lg:border-t-0">
+          <div className="flex border-b border-line text-meta font-bold ">
+            {(['output', 'tests'] as const).map((p) => <button key={p} type="button" onClick={() => setPanel(p)} className={cn('flex-1 px-3 py-2', panel === p ? 'border-b-2 border-primary text-primary ' : 'text-ink-2')}>{p === 'output' ? 'Input & output' : `Tests${result?.total !== undefined ? ` (${result.passed}/${result.total})` : ''}`}</button>)}
           </div>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 text-xs">
-            {error && <p role="alert" className="rounded-xl bg-rose-500/10 p-3 font-semibold text-rose-600">{error}</p>}
+            {error && <p role="alert" className="rounded-button bg-danger-bg p-3 font-semibold text-danger-ink">{error}</p>}
             {panel === 'output' ? (
               <>
-                <label className="block"><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Standard input</span>
-                  <textarea value={stdin} onChange={(e) => setStdin(e.target.value)} rows={4} spellCheck={false} className="mt-1 w-full rounded-lg border border-black/10 bg-slate-50 p-2 font-mono text-xs dark:border-white/10 dark:bg-black/40" placeholder="Input passed to your program" />
+                <label className="block"><span className="text-meta font-bold text-ink-2">Standard input</span>
+                  <textarea value={stdin} onChange={(e) => setStdin(e.target.value)} rows={4} spellCheck={false} className="mt-1 w-full rounded-lg border border-line bg-surface-2 p-2 font-mono text-xs " placeholder="Input passed to your program" />
                 </label>
                 {result?.run && (
                   <div className="space-y-2" aria-live="polite">
-                    <div className="flex items-center justify-between"><span className={cn('font-bold', statusTone(result.run.status))}>{statusLabel[result.run.status] ?? result.run.status}</span><span className="font-mono text-slate-400">{result.run.timeMs ?? '—'} ms · {result.run.memoryKb ? `${Math.round(result.run.memoryKb / 1024)} MB` : '—'} · exit {result.run.exitCode ?? '—'}</span></div>
-                    {result.run.compileOutput && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-amber-500/10 p-2 font-mono text-amber-700 dark:text-amber-300">{result.run.compileOutput}</pre>}
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Output</span>
-                    <pre className="max-h-48 min-h-[3rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-2 font-mono text-emerald-300">{result.run.stdout || '(no output)'}</pre>
-                    {result.run.stderr && <><span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Errors / debug output (stderr)</span><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-rose-950/80 p-2 font-mono text-rose-200">{result.run.stderr}</pre></>}
+                    <div className="flex items-center justify-between"><span className={cn('font-bold', statusTone(result.run.status))}>{statusLabel[result.run.status] ?? result.run.status}</span><span className="font-mono text-ink-2">{result.run.timeMs ?? '—'} ms · {result.run.memoryKb ? `${Math.round(result.run.memoryKb / 1024)} MB` : '—'} · exit {result.run.exitCode ?? '—'}</span></div>
+                    {result.run.compileOutput && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-warning-bg p-2 font-mono text-warning-ink ">{result.run.compileOutput}</pre>}
+                    <span className="text-meta font-bold text-ink-2">Output</span>
+                    <pre className="max-h-48 min-h-[3rem] overflow-auto whitespace-pre-wrap rounded-lg bg-ink p-2 font-mono text-on-primary">{result.run.stdout || '(no output)'}</pre>
+                    {result.run.stderr && <><span className="text-meta font-bold text-ink-2">Errors / debug output (stderr)</span><pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-danger/80 p-2 font-mono text-danger-ink">{result.run.stderr}</pre></>}
                   </div>
                 )}
-                {!result?.run && !error && <p className="text-slate-400">Run your code to see its output. Print to stderr for debugging; step-through debuggers are not available in the browser sandbox.</p>}
+                {!result?.run && !error && <p className="text-ink-2">Run your code to see its output. Print to stderr for debugging; step-through debuggers are not available in the browser sandbox.</p>}
               </>
             ) : (
               <div className="space-y-2" aria-live="polite">
-                {result?.compileError && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-amber-500/10 p-2 font-mono text-amber-700 dark:text-amber-300">{result.compileError}</pre>}
+                {result?.compileError && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-warning-bg p-2 font-mono text-warning-ink ">{result.compileError}</pre>}
                 {result?.results?.map((r, i) => (
-                  <div key={r.testCaseId} className="rounded-xl border border-black/5 p-2.5 dark:border-white/10">
-                    <div className="flex items-center justify-between font-bold">{r.passed ? <span className="flex items-center gap-1 text-emerald-500"><CheckCircle2 size={14} /> Test {i + 1} passed</span> : <span className="flex items-center gap-1 text-rose-500"><XCircle size={14} /> Test {i + 1} {statusLabel[r.status] && r.status !== 'ok' ? `– ${statusLabel[r.status]}` : 'failed'}</span>}{r.hidden && <span className="text-[10px] uppercase tracking-widest text-slate-400">hidden</span>}</div>
+                  <div key={r.testCaseId} className="rounded-button border border-line p-2.5 ">
+                    <div className="flex items-center justify-between font-bold">{r.passed ? <span className="flex items-center gap-1 text-success-ink"><CheckCircle2 size={14} /> Test {i + 1} passed</span> : <span className="flex items-center gap-1 text-danger-ink"><XCircle size={14} /> Test {i + 1} {statusLabel[r.status] && r.status !== 'ok' ? `– ${statusLabel[r.status]}` : 'failed'}</span>}{r.hidden && <span className="text-meta text-ink-2">hidden</span>}</div>
                     {!r.hidden && r.input !== undefined && (
-                      <div className="mt-2 grid gap-1.5 font-mono text-[11px]">
-                        <div><span className="text-slate-400">input</span><pre className="whitespace-pre-wrap rounded bg-slate-100 p-1.5 dark:bg-white/5">{r.input || '(empty)'}</pre></div>
-                        <div><span className="text-slate-400">expected</span><pre className="whitespace-pre-wrap rounded bg-slate-100 p-1.5 dark:bg-white/5">{r.expectedOutput}</pre></div>
-                        {!r.passed && <div><span className="text-slate-400">your output</span><pre className="whitespace-pre-wrap rounded bg-rose-500/10 p-1.5">{r.stdout || '(no output)'}</pre></div>}
+                      <div className="mt-2 grid gap-1.5 font-mono text-meta">
+                        <div><span className="text-ink-2">input</span><pre className="whitespace-pre-wrap rounded bg-surface-2 p-1.5 ">{r.input || '(empty)'}</pre></div>
+                        <div><span className="text-ink-2">expected</span><pre className="whitespace-pre-wrap rounded bg-surface-2 p-1.5 ">{r.expectedOutput}</pre></div>
+                        {!r.passed && <div><span className="text-ink-2">your output</span><pre className="whitespace-pre-wrap rounded bg-danger-bg p-1.5">{r.stdout || '(no output)'}</pre></div>}
                       </div>
                     )}
                   </div>
                 ))}
                 {!result?.results && !result?.compileError && (
-                  <div className="space-y-2 text-slate-400">
+                  <div className="space-y-2 text-ink-2">
                     <p>{mode === 'teacher' ? 'Run your reference solution against every test case, hidden ones included.' : 'Run the visible sample tests. Hidden tests are run by the server when you submit.'}</p>
-                    {sampleTestCases.map((c, i) => <div key={i} className="rounded-lg bg-slate-100 p-2 font-mono text-[11px] dark:bg-white/5"><div>input: {c.input || '(empty)'}</div><div>expected: {c.expectedOutput}</div></div>)}
+                    {sampleTestCases.map((c, i) => <div key={i} className="rounded-lg bg-surface-2 p-2 font-mono text-meta "><div>input: {c.input || '(empty)'}</div><div>expected: {c.expectedOutput}</div></div>)}
                   </div>
                 )}
               </div>

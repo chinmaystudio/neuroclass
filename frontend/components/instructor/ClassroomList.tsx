@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Users, LayoutTemplate, X, Trash2 } from 'lucide-react';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
-import { cn } from '../../lib/utils';
-import { useConfirm, useToast } from '../ui';
+import { Button, ClassroomCard, Dropdown, EmptyState, Field, IconButton, IconMore, IconPlus, Input, Modal, PageHeader, SearchInput, SkeletonCard, StatusBadge, useConfirm, useToast } from '../ui';
+import { PageBody } from '../../features/shell/RoleShell';
 
-export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect }) => {
+export const ClassroomList: React.FC<{ onSelect: (id: string) => void; embedded?: boolean }> = ({ onSelect, embedded }) => {
+  const [query, setQuery] = useState('');
   const askConfirm = useConfirm();
   const toast = useToast();
   const { user } = useAuth();
@@ -61,8 +60,7 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
     fetchClassrooms();
   }, [user]);
 
-  const handleDeleteClass = async (e: React.MouseEvent, classId: string) => {
-    e.stopPropagation();
+  const handleDeleteClass = async (classId: string) => {
     const target = classrooms.find((c: any) => c.id === classId);
     const ok = await askConfirm({
       title: `Delete ${target?.name ?? 'this classroom'}?`,
@@ -123,6 +121,7 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
       setCreateModalOpen(false);
       setNewClassName('');
       fetchClassrooms();
+      toast.success(`${classroomData.name} was created. Class code ${code}.`);
     } catch (err: any) {
       setError(err.message || 'Failed to create classroom.');
     } finally {
@@ -130,120 +129,87 @@ export const ClassroomList: React.FC<{ onSelect: (id: string) => void }> = ({ on
     }
   };
 
-  return (
-    <div className="min-w-0 p-4 sm:p-6 md:p-8">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between mb-6 md:mb-8">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight mb-2">My Classrooms</h2>
-          <p className="text-sm font-medium text-slate-500 uppercase tracking-widest">Active Instances</p>
-        </div>
-        <motion.button 
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setCreateModalOpen(true)}
-          className="flex w-full sm:w-auto items-center justify-center gap-2 px-5 sm:px-6 py-3.5 sm:py-3 rounded-full bg-blue-600 text-white font-bold uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/30 hover:bg-blue-500 transition-colors active:scale-95"
-        >
-          <Plus size={16} />
-          Create Class
-        </motion.button>
-      </div>
+  const filtered = classrooms.filter((c: any) => !query.trim() || `${c.name} ${c.code}`.toLowerCase().includes(query.trim().toLowerCase()));
 
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-        </div>
-      ) : classrooms.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl">
-          <LayoutTemplate size={48} className="text-slate-300 dark:text-white/20 mb-4" />
-          <h3 className="text-lg font-bold">No classrooms yet</h3>
-          <p className="text-slate-500 text-sm mb-6">Create your first instance to begin.</p>
-          <button onClick={() => setCreateModalOpen(true)} className="text-blue-500 font-bold hover:underline">Create now</button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {classrooms.map((cls, index) => (
-            <motion.div
-              key={cls.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              onClick={() => onSelect(cls.id)}
-              className="group min-w-0 cursor-pointer bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[24px] p-5 sm:p-6 hover:shadow-2xl hover:border-blue-500/30 transition-all"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                  {cls.name.substring(0, 1).toUpperCase()}
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-bold uppercase tracking-widest border border-emerald-500/20">
-                    {cls.status || 'Active'}
-                  </div>
-                  <button
-                    onClick={(e) => handleDeleteClass(e, cls.id)}
-                    className="w-8 h-8 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
-                    title="Delete Classroom"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-              <h3 className="text-xl font-bold mb-2 group-hover:text-blue-500 transition-colors">{cls.name}</h3>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-6 pt-6 border-t border-slate-100 dark:border-white/10">
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="text-slate-400" />
-                  <span className="text-sm font-semibold">{cls.students || 0}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Code:</span>
-                  <code className="text-sm font-mono font-bold text-blue-500">{cls.code}</code>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+  const createDialog = (
+    <Modal
+      open={isCreateModalOpen}
+      onClose={() => { if (!isCreating) { setCreateModalOpen(false); setError(null); } }}
+      title="Create a classroom"
+      description="Students join with the class code that is generated for it."
+      footer={
+        <>
+          <Button variant="text" onClick={() => { setCreateModalOpen(false); setError(null); }} disabled={isCreating}>Cancel</Button>
+          <Button onClick={() => void handleCreateClass()} loading={isCreating} disabled={!newClassName.trim()}>Create classroom</Button>
+        </>
+      }
+    >
+      <form onSubmit={(e) => { e.preventDefault(); void handleCreateClass(); }}>
+        <Field label="Classroom name" required error={error ?? undefined} hint="For example, Computer Engineering A4.">
+          <Input autoFocus value={newClassName} onChange={(e) => setNewClassName(e.target.value)} maxLength={120} />
+        </Field>
+      </form>
+    </Modal>
+  );
+
+  const createButton = <Button iconLeft={<IconPlus size={18} />} onClick={() => setCreateModalOpen(true)}>Create classroom</Button>;
+
+  const body = loading ? (
+    <div className="grid gap-4 sm:grid-cols-2" aria-busy="true" aria-label="Loading classrooms">
+      <SkeletonCard banner /><SkeletonCard banner />
+    </div>
+  ) : classrooms.length === 0 ? (
+    <EmptyState title="No classrooms yet" body="Create a classroom, then share its class code so students can join." action={createButton} />
+  ) : (
+    <>
+      {classrooms.length > 4 && (
+        <div className="mb-4 max-w-sm">
+          <SearchInput value={query} onChange={(e) => setQuery(e.target.value)} onClear={() => setQuery('')} placeholder="Search classrooms" aria-label="Search classrooms" />
         </div>
       )}
-
-      {/* Create Modal */}
-      <AnimatePresence>
-        {isCreateModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto bg-white dark:bg-[#0a0a0a] rounded-[28px] border border-slate-200 dark:border-white/10 p-6 sm:p-10 shadow-2xl"
-            >
-              <div className="flex justify-between items-center mb-7 sm:mb-10">
-                <h3 className="text-2xl font-light tracking-tight text-slate-900 dark:text-white">New Classroom</h3>
-                <button onClick={() => setCreateModalOpen(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="space-y-6 sm:space-y-8">
-                <div className="space-y-4">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Classroom Name</label>
-                  <input 
-                    autoFocus
-                    type="text" 
-                    value={newClassName}
-                    onChange={(e) => setNewClassName(e.target.value)}
-                    placeholder="e.g. Advanced AI Theory" 
-                    className="w-full px-4 sm:px-6 py-4 sm:py-5 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/50"
+      {filtered.length === 0 ? (
+        <EmptyState compact title="No classrooms match your search" action={<Button variant="text" onClick={() => setQuery('')}>Clear search</Button>} />
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2" aria-label="Classrooms">
+          {filtered.map((cls: any) => (
+            <li key={cls.id} className="min-w-0">
+              <ClassroomCard
+                name={cls.name}
+                subject={cls.subject || null}
+                code={cls.code}
+                studentCount={cls.students || 0}
+                onOpen={() => onSelect(cls.id)}
+                upcoming={cls.status && cls.status !== 'Active' ? <StatusBadge status={String(cls.status).toLowerCase()} label={cls.status} /> : undefined}
+                actions={
+                  <Dropdown
+                    label={`Actions for ${cls.name}`}
+                    items={[
+                      { id: 'open', label: 'Open classroom', onSelect: () => onSelect(cls.id) },
+                      { id: 'copy', label: 'Copy class code', onSelect: () => { void navigator.clipboard?.writeText(cls.code).then(() => toast.success('Class code copied.'), () => toast.error('Couldn’t copy the code.')); } },
+                      { id: 'delete', label: 'Delete classroom', danger: true, separatorBefore: true, onSelect: () => void handleDeleteClass(cls.id) },
+                    ]}
+                    trigger={(props) => <IconButton {...props} label={`More actions for ${cls.name}`} icon={<IconMore size={20} />} size="sm" />}
                   />
-                  {error && <p className="text-xs text-rose-500 mt-2">{error}</p>}
-                </div>
-                <button 
-                  onClick={handleCreateClass}
-                  disabled={isCreating}
-                  className="w-full py-5 rounded-3xl bg-blue-600 text-white font-bold uppercase tracking-widest text-[11px] shadow-lg shadow-blue-500/20 hover:bg-blue-500 transition-all transform active:scale-95 disabled:opacity-50"
-                >
-                  {isCreating ? 'Creating...' : 'Create Instance'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+
+  if (embedded) return <div className="min-w-0">{body}{createDialog}</div>;
+
+  return (
+    <PageBody>
+      <PageHeader
+        title="Classrooms"
+        description={classrooms.length ? `${classrooms.length} ${classrooms.length === 1 ? 'classroom' : 'classrooms'} · ${classrooms.reduce((n: number, c: any) => n + (c.students || 0), 0)} students` : 'Your classes, their students and their work.'}
+        actions={classrooms.length > 0 ? createButton : undefined}
+      />
+      <div className="mt-6">{body}</div>
+      {createDialog}
+    </PageBody>
   );
 };
