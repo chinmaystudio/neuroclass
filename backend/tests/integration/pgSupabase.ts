@@ -21,8 +21,19 @@ export class PgSupabase {
   storageObjects = new Map<string, Buffer>();
   private columnTypes = new Map<string, Map<string, string>>();
 
-  constructor(connectionString: string) {
-    this.pool = new pg.Pool({ connectionString, max: 4 });
+  /** Simulated network round trip per query/auth call (load tests), in ms. */
+  latencyMs = 0;
+  queries = 0;
+
+  constructor(connectionString: string, opts: { max?: number; latencyMs?: number } = {}) {
+    this.pool = new pg.Pool({ connectionString, max: opts.max ?? 4 });
+    this.latencyMs = opts.latencyMs ?? 0;
+  }
+
+  /** Every PostgREST call is one HTTP round trip in production. */
+  async roundTrip() {
+    this.queries += 1;
+    if (this.latencyMs > 0) await new Promise((r) => setTimeout(r, this.latencyMs));
   }
 
   async columnType(table: string, column: string) {
@@ -51,6 +62,7 @@ export class PgSupabase {
     if (keys.some((k) => !/^[a-z_][a-z0-9_]*$/.test(k))) return { data: null, error: { message: 'invalid argument' } };
     const sql = `select public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as result`;
     try {
+      await this.roundTrip();
       const { rows } = await this.pool.query(sql, keys.map((k) => args[k]));
       return { data: rows[0]?.result ?? null, error: null };
     } catch (e: any) {
@@ -60,6 +72,7 @@ export class PgSupabase {
 
   auth = {
     getUser: async (token: string) => {
+      await this.roundTrip(); // GoTrue /user call
       const user = this.users.get(token);
       return user ? { data: { user: { id: user.id, email: user.email } as any }, error: null } : { data: { user: null }, error: { message: 'invalid token' } };
     },
@@ -142,7 +155,9 @@ class Builder implements PromiseLike<Result> {
       if (this.op === 'select') {
         if (this.head && this.countMode) {
           sql = `SELECT count(*)::int AS c FROM ${t}${this.where(values)}`;
-          const { rows } = await this.client.pool.query(sql, values);
+          await this.client.roundTrip();
+          await this.client.roundTrip();
+      const { rows } = await this.client.pool.query(sql, values);
           return { data: null, error: null, count: rows[0].c };
         }
         sql = `SELECT ${this.cols(this.columns)} FROM ${t}${this.where(values)}`;
@@ -174,6 +189,7 @@ class Builder implements PromiseLike<Result> {
       } else {
         sql = `DELETE FROM ${t}${this.where(values)} RETURNING *`;
       }
+      await this.client.roundTrip();
       const { rows } = await this.client.pool.query(sql, values);
       const data = this.op !== 'select' && this.returning === null ? null : rows;
       if (this.singleMode === 'maybe') {

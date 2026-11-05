@@ -32,9 +32,10 @@ export async function findEnrollment(classroomId: string, user: AuthedUser): Pro
 
 /** Resolves whether the caller is the classroom owner or an enrolled student. */
 export async function resolveClassroomAccess(classroomId: string, user: AuthedUser): Promise<ClassroomAccess> {
-  const classroom = await getClassroom(classroomId);
+  // Both lookups only need the classroom id: run them together (one round trip
+  // of latency instead of two on every student request).
+  const [classroom, enrollment] = await Promise.all([getClassroom(classroomId), findEnrollment(classroomId, user)]);
   if (classroom.user_id === user.id) return { role: 'teacher', classroom, enrollment: null };
-  const enrollment = await findEnrollment(classroomId, user);
   if (enrollment) return { role: 'student', classroom, enrollment };
   throw notFound('Classroom not found.');
 }

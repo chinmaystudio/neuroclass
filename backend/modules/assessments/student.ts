@@ -216,7 +216,11 @@ export async function saveAnswer(attemptId: string, questionId: string, user: Au
     throw conflict('Time is up. Your saved answers have been submitted.', { status: 'auto_submitted' });
   }
   if (!attempt.question_order.includes(questionId)) throw notFound('Question not found in this attempt.');
-  const { data: question } = await db().from('test_questions').select('id,type').eq('id', questionId).eq('test_id', test.id).maybeSingle();
+  // Independent reads in parallel: the question's type and the current answer row.
+  const [{ data: question }, { data: existing }] = await Promise.all([
+    db().from('test_questions').select('id,type').eq('id', questionId).eq('test_id', test.id).maybeSingle(),
+    db().from('attempt_answers').select('id,revision').eq('attempt_id', attemptId).eq('question_id', questionId).maybeSingle(),
+  ]);
   if (!question) throw notFound('Question not found in this attempt.');
   let response: unknown;
   try {
@@ -227,19 +231,21 @@ export async function saveAnswer(attemptId: string, questionId: string, user: Au
   if (question.type === 'coding' && response && !(readQuestionLanguages(await loadQuestions(test.id), questionId) ?? []).includes((response as any).language)) {
     throw badRequest('That language is not allowed for this question.');
   }
-  const { data: existing } = await db().from('attempt_answers').select('id,revision').eq('attempt_id', attemptId).eq('question_id', questionId).maybeSingle();
   // Out-of-order offline replays must never overwrite a newer answer.
   if (existing && input.revision !== undefined && input.revision < existing.revision) return { saved: false, stale: true, revision: existing.revision };
   const revision = input.revision ?? (existing?.revision ?? 0) + 1;
   const row = { response, marked_for_review: input.markedForReview, revision, saved_at: new Date().toISOString() };
-  const result = existing
-    ? await db().from('attempt_answers').update(row).eq('id', existing.id)
-    : await db().from('attempt_answers').insert({ attempt_id: attemptId, question_id: questionId, ...row });
+  // The answer write and the activity timestamp don't depend on each other.
+  const [result] = await Promise.all([
+    existing
+      ? db().from('attempt_answers').update(row).eq('id', existing.id)
+      : db().from('attempt_answers').insert({ attempt_id: attemptId, question_id: questionId, ...row }),
+    db().from('attempts').update({ last_activity_at: row.saved_at }).eq('id', attemptId),
+  ]);
   if (result.error) {
     if (result.error.code === '23505') return saveAnswer(attemptId, questionId, user, raw);
     dbFail('save answer', result.error);
   }
-  await db().from('attempts').update({ last_activity_at: new Date().toISOString() }).eq('id', attemptId);
   return { saved: true, revision, savedAt: row.saved_at };
 }
 
@@ -286,14 +292,30 @@ export async function finalizeAttempt(attempt: AttemptRow, test: TestRow, source
   const questions = await loadQuestions(test.id);
   const { data: answers } = await db().from('attempt_answers').select('id,question_id,response').eq('attempt_id', attempt.id);
   const byQ = new Map((answers ?? []).map((a: any) => [a.question_id, a]));
+  // Grade every non-coding question; write updates concurrently (in small
+  // batches) and insert unanswered questions in one request, so a submit costs
+  // a handful of round trips instead of one per question.
+  const updates: Array<() => PromiseLike<{ error: any }>> = [];
+  const missing: Array<Record<string, unknown>> = [];
   for (const q of questions) {
     if (q.type === 'coding') continue;
     const a = byQ.get(q.id);
     const grade = gradeObjective(q, a?.response ?? null, config.negativeMarking);
     const needsManual = grade.needsManual && Boolean(a?.response);
     const row = { auto_score: OBJECTIVE_TYPES.has(q.type) ? grade.score : null, awarded_marks: grade.score, needs_manual_review: needsManual };
-    if (a) await db().from('attempt_answers').update(row).eq('id', a.id);
-    else await db().from('attempt_answers').insert({ attempt_id: attempt.id, question_id: q.id, response: null, ...row });
+    if (a) updates.push(() => db().from('attempt_answers').update(row).eq('id', a.id));
+    else missing.push({ attempt_id: attempt.id, question_id: q.id, response: null, ...row });
+  }
+  if (missing.length) {
+    const { error: insertError } = await db().from('attempt_answers').insert(missing);
+    if (insertError && insertError.code !== '23505') console.error('[attempt] grading unanswered questions failed', attempt.id, insertError.code, insertError.message);
+  }
+  for (let i = 0; i < updates.length; i += 8) {
+    const batch = await Promise.all(updates.slice(i, i + 8).map((run) => run()));
+    // The attempt is already locked as submitted; a failed write is logged and
+    // left for the teacher's review (re-grading recomputes it) rather than
+    // turning the student's submit into an error.
+    for (const r of batch) if (r.error) console.error('[attempt] grading write failed', attempt.id, r.error.code, r.error.message);
   }
   if (questions.some((q) => q.type === 'coding')) {
     // Coding answers are evaluated against hidden test cases in the sandbox.

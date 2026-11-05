@@ -20,7 +20,7 @@ const setCanonical = (href: string | null) => {
 /** Keeps <title>, description, canonical, Open Graph and robots in sync with the route. */
 export function usePageMeta({ title, description = SITE.description, path, noindex, type = 'website' }: Meta) {
   React.useEffect(() => {
-    const full = title === SITE.name ? title : `${title} | ${SITE.name}`;
+    const full = title.startsWith(SITE.name) ? title : `${title} | ${SITE.name}`;
     document.title = full;
     setMeta('name', 'description', description);
     setMeta('name', 'robots', noindex ? 'noindex, nofollow' : 'index, follow');
