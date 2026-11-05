@@ -5,6 +5,7 @@ import * as student from './assessments/student';
 import * as proctoring from './proctoring/service';
 import * as coding from './coding/service';
 import * as assignments from './assignments/service';
+import * as tokens from './tokens/service';
 import { z } from 'zod';
 
 type Ctx = { request: Request; user: AuthedUser; params: Record<string, string>; url: URL };
@@ -31,6 +32,11 @@ route('GET', 'classrooms/:classroomId/tests', async (c) => {
 });
 route('POST', 'classrooms/:classroomId/tests', async (c) => teacher.createTest(id(c, 'classroomId'), c.user, await body(c)));
 route('GET', 'me/tests', async (c) => ({ tests: await student.listAllStudentTests(c.user) }));
+
+// Personal access tokens for the MCP endpoint and REST API.
+route('GET', 'me/tokens', async (c) => tokens.listTokens(c.user));
+route('POST', 'me/tokens', async (c) => tokens.createToken(c.user, await body(c)));
+route('DELETE', 'me/tokens/:tokenId', async (c) => tokens.revokeToken(c.user, c.params.tokenId));
 route('GET', 'tests/:testId', async (c) => teacher.getTeacherTest(id(c, 'testId'), c.user));
 route('PATCH', 'tests/:testId', async (c) => teacher.updateTest(id(c, 'testId'), c.user, await body(c)));
 route('DELETE', 'tests/:testId', async (c) => teacher.deleteTest(id(c, 'testId'), c.user));

@@ -9,6 +9,52 @@ export type Guide = { slug: string; title: string; description: string; audience
 
 export const GUIDES: Guide[] = [
   {
+    slug: 'mcp-integration',
+    title: 'Connect AI tools to NeuroClass (MCP)',
+    description: 'Let Claude, ChatGPT, Cursor and other AI clients run NeuroClass through the Model Context Protocol.',
+    audience: 'Everyone',
+    minutes: 4,
+    sections: [
+      {
+        heading: 'What this is',
+        paragraphs: ['NeuroClass has a built-in MCP server. Any MCP-capable AI client, from Claude Desktop to ChatGPT’s connectors and Cursor, can call it with a personal access token. The AI then does what you can do in the app: for teachers, create classrooms, publish tests, grade attempts, release results; for students, join a class, list your tests and read released results.'],
+        bullets: [
+          'The token inherits your role. A teacher token acts as a teacher; a student token acts as a student.',
+          'The AI never gets more than your account can do. The same database rules and permission checks apply.',
+          'You can revoke a token at any time, and the AI client loses access within a minute.',
+        ],
+      },
+      {
+        heading: 'Create a token',
+        steps: [
+          'Sign in to NeuroClass.',
+          'Open the account menu (top right) and choose “Connect AI (MCP)”. You can also go directly to /teacher/integrations or /student/integrations.',
+          'Choose Create token, name it after the client that will use it (for example “My laptop — Claude Desktop”), and copy the token it shows. You only see it once.',
+        ],
+      },
+      {
+        heading: 'Add it to your AI client',
+        paragraphs: ['The Integrations page shows copy-paste ready snippets for Claude Desktop, ChatGPT and Cursor, with your endpoint pre-filled. Replace the placeholder with your token.'],
+      },
+      {
+        heading: 'Tools available',
+        bullets: [
+          'Shared: whoami, list_my_classrooms',
+          'Teacher: create_classroom, get_classroom, list_tests, create_test (optionally publishes), replace_test_questions, publish_test, change_test_status, get_test_results, grade_attempt, release_test_results, list_assignments, create_assignment (optionally publishes), change_assignment_status, list_assignment_submissions, grade_submission',
+          'Student: join_classroom, list_my_tests, get_my_result, list_my_assignments, get_my_submission',
+        ],
+      },
+      {
+        heading: 'Safety and best practice',
+        bullets: [
+          'Treat the token like a password. Don’t paste it into a public chat or commit it to source control.',
+          'Use one token per client so you can revoke a lost device without affecting the others.',
+          'Everything an AI client does through MCP shows up in the audit log and in your usual screens.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'getting-started-teachers',
     title: 'Getting started as a teacher',
     description: 'Create your first classroom, invite students with a class code, and find your way around tests, assignments, materials and attendance.',

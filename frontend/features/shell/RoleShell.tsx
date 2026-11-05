@@ -66,6 +66,7 @@ export const RoleShell: React.FC<{
             />
           }
           menuItems={[
+            { id: 'integrations', label: 'Connect AI (MCP)', onSelect: () => navigate(roleLabel.toLowerCase() === 'teacher' ? '/teacher/integrations' : '/student/integrations') },
             { id: 'settings', label: 'Settings', onSelect: onOpenSettings },
             { id: 'home', label: 'Home page', onSelect: () => navigate('/') },
             { id: 'signout', label: 'Sign out', onSelect: () => void signOut(), separatorBefore: true },

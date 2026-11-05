@@ -6,6 +6,7 @@ import { StudentOverview } from './StudentOverview';
 import { StudentPerformance } from './StudentPerformance';
 import { StudentHistory } from './StudentHistory';
 import { StudentSettings } from './StudentSettings';
+import { IntegrationsPage } from '../../features/integrations/IntegrationsPage';
 import { ProjectAdvisor } from './ProjectAdvisor';
 import { ClassroomLearningBot } from './ClassroomLearningBot';
 import { StudentAttendanceModal } from './StudentAttendanceModal';
@@ -17,8 +18,8 @@ import { BarChart3, BookOpen, Clock, FileText, LayoutDashboard, Lightbulb, Messa
 import { Button, buttonClasses, Modal, PageHeader, Spinner, type NavSectionDef } from '../ui';
 import { RoleShell, PageBody } from '../../features/shell/RoleShell';
 
-type Section = 'dashboard' | 'classes' | 'tests' | 'performance' | 'history' | 'project-advisor' | 'learning-bot' | 'settings';
-const SECTIONS: Section[] = ['dashboard', 'classes', 'tests', 'performance', 'history', 'project-advisor', 'learning-bot', 'settings'];
+type Section = 'dashboard' | 'classes' | 'tests' | 'performance' | 'history' | 'project-advisor' | 'learning-bot' | 'settings' | 'integrations';
+const SECTIONS: Section[] = ['dashboard', 'classes', 'tests', 'performance', 'history', 'project-advisor', 'learning-bot', 'settings', 'integrations'];
 
 // The secure exam is code-split: it pulls in the camera/vision and IDE bundles.
 const SecureExam = lazy(() => import('../../features/exam/SecureExam'));
@@ -163,6 +164,8 @@ export const StudentDashboard: React.FC = () => {
         return <ClassroomLearningBot />;
       case 'settings':
         return <StudentSettings onRegisterFaceClick={() => setJoinWizardOpen(true)} />;
+      case 'integrations':
+        return <IntegrationsPage />;
       default:
         return (
           <StudentOverview

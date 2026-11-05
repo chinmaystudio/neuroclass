@@ -4,6 +4,7 @@ import { ClassroomList } from './ClassroomList';
 import { ClassroomDetail } from './ClassroomDetail';
 import { StripeDashboard } from './stripe/StripeDashboard';
 import { InstructorSettings } from './InstructorSettings';
+import { IntegrationsPage } from '../../features/integrations/IntegrationsPage';
 import { AttendanceSystem } from '../ai/AttendanceSystem';
 import { ProctoringSystem } from '../ai/ProctoringSystem';
 import { AnalyticsDashboard } from '../evaluation/AnalyticsDashboard';
@@ -12,8 +13,8 @@ import { PageHeader, type NavSectionDef } from '../ui';
 import { BarChart3, ClipboardList, CreditCard, Settings, ShieldCheck, UserCheck, Users } from '../ui/icons-compat';
 import { RoleShell, PageBody } from '../../features/shell/RoleShell';
 
-type Section = 'classrooms' | 'attendance' | 'tests' | 'proctoring' | 'reports' | 'settings' | 'stripe';
-const SECTIONS: Section[] = ['classrooms', 'attendance', 'tests', 'proctoring', 'reports', 'settings', 'stripe'];
+type Section = 'classrooms' | 'attendance' | 'tests' | 'proctoring' | 'reports' | 'settings' | 'integrations' | 'stripe';
+const SECTIONS: Section[] = ['classrooms', 'attendance', 'tests', 'proctoring', 'reports', 'settings', 'integrations', 'stripe'];
 // Older links and nav ids that pointed at duplicate screens.
 const ALIASES: Record<string, Section> = { dashboard: 'classrooms', monitoring: 'proctoring', 'classroom-detail': 'classrooms' };
 
@@ -93,6 +94,8 @@ export const InstructorDashboard: React.FC = () => {
         return <PageBody><AnalyticsDashboard /></PageBody>;
       case 'settings':
         return <InstructorSettings />;
+      case 'integrations':
+        return <IntegrationsPage />;
       case 'stripe':
         return FEATURES.payments ? <StripeDashboard /> : <ClassroomList onSelect={(id) => openClassroom(id)} />;
       default:
