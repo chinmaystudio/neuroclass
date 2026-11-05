@@ -17,9 +17,76 @@ const MCP_ENDPOINT = (() => {
   return 'https://neuroclass-swart.vercel.app/api/mcp';
 })();
 
+const INTEGRATIONS_URL = (() => {
+  if (typeof window !== 'undefined') return `${window.location.origin}/app/integrations`;
+  return 'https://neuroclass-swart.vercel.app/app/integrations';
+})();
+
 const CLAUDE_DESKTOP = (token = 'nc_live_YOUR_TOKEN') => JSON.stringify({ mcpServers: { neuroclass: { url: MCP_ENDPOINT, headers: { Authorization: `Bearer ${token}` } } } }, null, 2);
 const CHATGPT_CONFIG = (token = 'nc_live_YOUR_TOKEN') => `URL: ${MCP_ENDPOINT}\nAuthentication: Custom\nHeader name: Authorization\nHeader value: Bearer ${token}`;
 const CURSOR_CONFIG = (token = 'nc_live_YOUR_TOKEN') => JSON.stringify({ mcpServers: { neuroclass: { url: MCP_ENDPOINT, env: { AUTHORIZATION: `Bearer ${token}` } } } }, null, 2);
+
+// A natural-language prompt the user can paste into Claude, ChatGPT or Cursor.
+// The agent reads it and walks the user through adding the MCP server, or (in
+// clients that support it, like Claude Desktop with filesystem access, or
+// Claude Code) adds it directly.
+const SETUP_PROMPT = (client: 'claude-desktop' | 'chatgpt' | 'cursor' | 'generic', token = 'nc_live_YOUR_TOKEN') => {
+  const hasToken = token !== 'nc_live_YOUR_TOKEN';
+  const tokenLine = hasToken
+    ? `My personal access token is: ${token}`
+    : `First open ${INTEGRATIONS_URL} in my browser, sign in, open "Connect AI (MCP)" and create a token. Paste it back here, then continue.`;
+  const intro = `Please connect me to the NeuroClass MCP server so you can act on my account (classrooms, tests, assignments, grading — whatever my role allows).`;
+  const endpointLine = `MCP endpoint: ${MCP_ENDPOINT}
+Transport: Streamable HTTP (JSON-RPC 2.0)
+Auth: Bearer token in the Authorization header`;
+  switch (client) {
+    case 'claude-desktop':
+      return `${intro}
+
+${tokenLine}
+
+Add this server to Claude Desktop:
+1. Open Settings → Developer → Edit Config (claude_desktop_config.json).
+2. Merge this block into "mcpServers":
+${CLAUDE_DESKTOP(token)}
+3. Save and restart Claude Desktop.
+4. Confirm the "neuroclass" tools appear in the tool picker and call tools/list once to list them.
+
+${endpointLine}`;
+    case 'chatgpt':
+      return `${intro}
+
+${tokenLine}
+
+Add this server to ChatGPT (Team/Enterprise or Plus with Developer Mode):
+1. Settings → Connectors → Add connector → Custom MCP server.
+2. URL: ${MCP_ENDPOINT}
+3. Authentication: Custom header; Header name: Authorization; Header value: Bearer <my token>
+4. Save, then confirm you can list my NeuroClass tools.
+
+${endpointLine}`;
+    case 'cursor':
+      return `${intro}
+
+${tokenLine}
+
+Add this server to Cursor:
+1. Settings → MCP → Add new MCP server.
+2. Paste:
+${CURSOR_CONFIG(token)}
+3. Save and reload. The NeuroClass tools should appear in Composer.
+
+${endpointLine}`;
+    default:
+      return `${intro}
+
+${tokenLine}
+
+${endpointLine}
+
+Please help me add this MCP server to my current client and verify it connects. If you can add it yourself (filesystem or CLI access), do so; otherwise walk me through the exact steps for this client.`;
+  }
+};
 
 const CodeBlock: React.FC<{ code: string; language?: string; label?: string }> = ({ code, language = 'json', label }) => {
   const toast = useToast();
@@ -29,6 +96,27 @@ const CodeBlock: React.FC<{ code: string; language?: string; label?: string }> =
       {label && <p className="mb-1.5 text-support text-ink-2">{label}</p>}
       <pre className="overflow-x-auto rounded-control border border-line bg-surface-2 p-3 text-support leading-6 text-ink" data-language={language}><code>{code}</code></pre>
       <div className="mt-2 flex justify-end"><Button size="sm" variant="outline" iconLeft={<Copy size={14} />} onClick={() => void copy()}>Copy</Button></div>
+    </div>
+  );
+};
+
+// Shows a one-paste prompt the user drops into Claude/ChatGPT/Cursor to get
+// the agent to walk them through (or do) the MCP setup on their end.
+const PromptBlock: React.FC<{ prompt: string; hasRealToken: boolean }> = ({ prompt, hasRealToken }) => {
+  const toast = useToast();
+  const copy = async () => { try { await navigator.clipboard.writeText(prompt); toast.success('Prompt copied. Paste it into your AI client.'); } catch { toast.error('Couldn’t copy. Select the text and copy it manually.'); } };
+  return (
+    <div className="rounded-control border border-dashed border-primary/50 bg-primary/5 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-support font-medium text-ink">One-paste setup prompt</p>
+        <Button size="sm" variant="primary" iconLeft={<Copy size={14} />} onClick={() => void copy()}>Copy prompt</Button>
+      </div>
+      <p className="mb-2 text-support text-ink-2">
+        {hasRealToken
+          ? 'Paste this straight into your AI client. It has your real token baked in and will guide the client through adding NeuroClass — in many clients it does it for you.'
+          : 'Create a token above first, then come back — the prompt will carry your token in. (Pasting this version still works: the client will ask you to create a token and come back.)'}
+      </p>
+      <pre className="max-h-48 overflow-auto rounded border border-line bg-surface-2 p-2 text-support leading-5 text-ink-2 whitespace-pre-wrap break-words">{prompt}</pre>
     </div>
   );
 };
@@ -133,6 +221,8 @@ export const IntegrationsPage: React.FC = () => {
           <TabPanel tabId={tab} idPrefix="mcp-client" className="pt-4">
             {tab === 'claude-desktop' && (
               <div className="flex flex-col gap-3">
+                <PromptBlock prompt={SETUP_PROMPT('claude-desktop', tokenValue)} hasRealToken={Boolean(issued)} />
+                <p className="text-support text-ink-3">Or set it up by hand:</p>
                 <ol className="list-decimal space-y-1 pl-6 text-body text-ink-2">
                   <li>Open Claude Desktop, then <strong className="text-ink">Settings → Developer → Edit Config</strong>.</li>
                   <li>Merge the snippet below into <code className="font-mono">claude_desktop_config.json</code>.</li>
@@ -143,6 +233,8 @@ export const IntegrationsPage: React.FC = () => {
             )}
             {tab === 'chatgpt' && (
               <div className="flex flex-col gap-3">
+                <PromptBlock prompt={SETUP_PROMPT('chatgpt', tokenValue)} hasRealToken={Boolean(issued)} />
+                <p className="text-support text-ink-3">Or set it up by hand:</p>
                 <ol className="list-decimal space-y-1 pl-6 text-body text-ink-2">
                   <li>Open <strong className="text-ink">Settings → Connectors</strong> in ChatGPT (Team, Enterprise or Plus with Developer Mode).</li>
                   <li>Choose <strong className="text-ink">Add connector</strong>, then <strong className="text-ink">Custom MCP server</strong>.</li>
@@ -154,6 +246,8 @@ export const IntegrationsPage: React.FC = () => {
             )}
             {tab === 'cursor' && (
               <div className="flex flex-col gap-3">
+                <PromptBlock prompt={SETUP_PROMPT('cursor', tokenValue)} hasRealToken={Boolean(issued)} />
+                <p className="text-support text-ink-3">Or set it up by hand:</p>
                 <ol className="list-decimal space-y-1 pl-6 text-body text-ink-2">
                   <li>In Cursor, open <strong className="text-ink">Settings → MCP → Add new MCP server</strong>.</li>
                   <li>Paste the configuration below.</li>
@@ -164,6 +258,8 @@ export const IntegrationsPage: React.FC = () => {
             )}
             {tab === 'other' && (
               <div className="flex flex-col gap-3">
+                <PromptBlock prompt={SETUP_PROMPT('generic', tokenValue)} hasRealToken={Boolean(issued)} />
+                <p className="text-support text-ink-3">Or set it up by hand:</p>
                 <p className="text-body text-ink-2">Any MCP-compatible client works. Point it at the NeuroClass MCP endpoint with a Bearer token in the Authorization header.</p>
                 <dl className="grid gap-2 sm:grid-cols-[auto_1fr] text-body">
                   <dt className="font-medium text-ink">URL</dt><dd className="font-mono text-ink-2">{MCP_ENDPOINT}</dd>
@@ -226,6 +322,9 @@ export const IntegrationsPage: React.FC = () => {
       >
         {issued && <>
           <CodeBlock code={issued.token} language="text" label="Token" />
+          <div className="mt-4">
+            <PromptBlock prompt={SETUP_PROMPT(tab === 'chatgpt' || tab === 'cursor' || tab === 'claude-desktop' ? tab : 'generic', issued.token)} hasRealToken={true} />
+          </div>
           <p className="mt-3 text-support text-ink-2">The token acts as your NeuroClass account. Treat it like a password: don’t commit it to source control or paste it into a public chat.</p>
         </>}
       </Modal>
