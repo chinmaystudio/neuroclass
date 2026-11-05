@@ -12,15 +12,38 @@ import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
 import { FeedbackProvider, Spinner } from './components/ui';
 
+// When a user has the app open across a deploy, their current index.html
+// references chunk filenames that no longer exist on the server. The server
+// returns the SPA fallback (HTML) for the missing chunk, the browser rejects
+// it as a module (MIME mismatch), and the lazy import rejects. `lazyWithReload`
+// catches that specific failure and reloads the page once, so the new
+// index.html (with the fresh chunk names) takes over. One-shot, flag-gated via
+// sessionStorage to prevent reload loops.
+const lazyWithReload = <T extends React.ComponentType<unknown>>(loader: () => Promise<{ default: T }>) =>
+  lazy(() =>
+    loader().catch((err) => {
+      const msg = String(err?.message || err);
+      const isChunkLoadFailure = /Failed to fetch dynamically imported module|Loading chunk|ChunkLoadError|MIME type|module script/i.test(msg);
+      if (isChunkLoadFailure && typeof window !== 'undefined' && !sessionStorage.getItem('nc_chunk_reload')) {
+        sessionStorage.setItem('nc_chunk_reload', '1');
+        window.location.reload();
+        // Keep React happy: return a never-resolving promise so Suspense shows
+        // the fallback until the reload takes over.
+        return new Promise(() => {});
+      }
+      throw err;
+    })
+  );
+
 // Dashboards pull in TensorFlow, camera and attendance code. Loading them on
 // demand keeps the public landing page small.
-const InstructorDashboard = lazy(() => import('./components/instructor/InstructorDashboard').then((m) => ({ default: m.InstructorDashboard })));
-const StudentDashboard = lazy(() => import('./components/student/StudentDashboard').then((m) => ({ default: m.StudentDashboard })));
-const AIModuleDashboard = lazy(() => import('./components/ai/AIModuleDashboard').then((m) => ({ default: m.AIModuleDashboard })));
-const UIKitShowcase = lazy(() => import('./features/ui-kit/UIKitShowcase'));
-const MobileAttendanceHandoff = lazy(() => import('./components/auth/MobileAttendanceHandoff').then((m) => ({ default: m.MobileAttendanceHandoff })));
-const MobileStudentAttendancePortal = lazy(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileStudentAttendancePortal })));
-const MobileTeacherAttendancePortal = lazy(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileTeacherAttendancePortal })));
+const InstructorDashboard = lazyWithReload(() => import('./components/instructor/InstructorDashboard').then((m) => ({ default: m.InstructorDashboard })));
+const StudentDashboard = lazyWithReload(() => import('./components/student/StudentDashboard').then((m) => ({ default: m.StudentDashboard })));
+const AIModuleDashboard = lazyWithReload(() => import('./components/ai/AIModuleDashboard').then((m) => ({ default: m.AIModuleDashboard })));
+const UIKitShowcase = lazyWithReload(() => import('./features/ui-kit/UIKitShowcase'));
+const MobileAttendanceHandoff = lazyWithReload(() => import('./components/auth/MobileAttendanceHandoff').then((m) => ({ default: m.MobileAttendanceHandoff })));
+const MobileStudentAttendancePortal = lazyWithReload(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileStudentAttendancePortal })));
+const MobileTeacherAttendancePortal = lazyWithReload(() => import('./components/attendance/MobileAttendancePortals').then((m) => ({ default: m.MobileTeacherAttendancePortal })));
 
 const PageFallback = () => (
   <div className="flex min-h-[60vh] items-center justify-center"><Spinner label="Loading…" /></div>
