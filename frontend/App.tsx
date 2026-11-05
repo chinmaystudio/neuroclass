@@ -4,6 +4,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/common/Navbar';
 import { Landing } from './features/landing/Landing';
+import { AboutPage, ContactPage, NotFoundPage, PrivacyPage, TermsPage } from './features/public/InfoPages';
+import { GuidePage, HelpIndexPage } from './features/public/HelpPages';
 import { AnimatePresence } from 'motion/react';
 import { AuthModal } from './components/auth/AuthModal';
 import { SessionGuardian } from './components/auth/SessionGuardian';
@@ -52,6 +54,12 @@ const AppContent = () => {
         <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<Home onLaunchAuth={openAuth} />} />
+          <Route path="/help" element={<HelpIndexPage />} />
+          <Route path="/help/:slug" element={<GuidePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route path="/ui-kit" element={<UIKitShowcase />} />
           <Route path="/attendance/mobile-handoff" element={<MobileAttendanceHandoff />} />
           <Route
@@ -81,8 +89,8 @@ const AppContent = () => {
             } 
           />
 
-          {/* Catch-all redirect to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Unknown URLs get a real "not found" page (noindex) instead of a silent redirect. */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
         </Suspense>
       </main>

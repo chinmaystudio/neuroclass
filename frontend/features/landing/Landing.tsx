@@ -1,5 +1,8 @@
 import React from 'react';
 import { Badge, Button, Card, ClassroomBanner } from '../../components/ui';
+import { SiteFooter } from '../public/PublicLayout';
+import { usePageMeta } from '../public/usePageMeta';
+import { PUBLIC_ROUTES } from '../public/content';
 import { BookOpen, ClipboardList, Code2, LayoutDashboard, MessageCircle, ShieldCheck, UserCheck, Users } from '../../components/ui/icons-compat';
 
 const FEATURES = [
@@ -18,7 +21,9 @@ const STEPS = [
   { title: 'Review, grade and release', body: 'See scores and question performance, grade written answers, and release results.' },
 ];
 
-export const Landing: React.FC<{ onSignIn: () => void; onSignUp: () => void }> = ({ onSignIn, onSignUp }) => (
+export const Landing: React.FC<{ onSignIn: () => void; onSignUp: () => void }> = ({ onSignIn, onSignUp }) => {
+  usePageMeta({ title: PUBLIC_ROUTES[0].title, description: PUBLIC_ROUTES[0].description, path: '/' });
+  return (
   <div data-ui="landing" className="bg-canvas text-ink">
     {/* Hero */}
     <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-28 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:px-8 lg:pb-24 lg:pt-36">
@@ -140,11 +145,7 @@ export const Landing: React.FC<{ onSignIn: () => void; onSignUp: () => void }> =
       </ClassroomBanner>
     </section>
 
-    <footer className="border-t border-line bg-surface">
-      <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-support text-ink-2 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-        <span>© {new Date().getFullYear()} NeuroClass</span>
-        <button type="button" onClick={onSignIn} className="focus-ring self-start rounded-control text-primary hover:underline sm:self-auto">Sign in</button>
-      </div>
-    </footer>
+    <SiteFooter />
   </div>
 );
+};

@@ -4,6 +4,7 @@ import { AppShell, SidebarNav, TopBar, IconButton, type NavSectionDef, type NavI
 import { IconHome, IconMoon, IconSignOut, IconSun } from '../../components/ui/icons';
 import { useAuth } from '../../context/AuthContext';
 import { cn } from '../../lib/utils';
+import { usePageMeta } from '../public/usePageMeta';
 import { useTheme } from '../../context/ThemeContext';
 
 /** The signed-in app frame shared by the teacher and student portals. */
@@ -17,6 +18,7 @@ export const RoleShell: React.FC<{
   children: React.ReactNode;
 }> = ({ roleLabel, sections, activeId, onNavigate, onOpenSettings, title, children }) => {
   const { user, logout } = useAuth();
+  usePageMeta({ title: `${roleLabel} portal`, noindex: true });
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;

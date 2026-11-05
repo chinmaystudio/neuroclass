@@ -1,12 +1,13 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
+import { seoPlugin } from './scripts/seo-plugin';
 
 // Security: never inject server secrets (e.g. GEMINI_API_KEY) with `define`.
 // Only VITE_* variables are exposed to the browser, and they must be public.
-export default defineConfig(() => ({
-  plugins: [react(), tailwindcss()],
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), tailwindcss(), seoPlugin(loadEnv(mode, process.cwd(), 'VITE_'))],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),

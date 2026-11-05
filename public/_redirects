@@ -1,1 +1,3 @@
-/*    /index.html   200
+# Single-page app routing is Cloudflare Pages' default when there is no 404.html.
+# A catch-all "/* /index.html 200" rule here would hide robots.txt, sitemap.xml
+# and the per-page HTML files, so it is intentionally absent.

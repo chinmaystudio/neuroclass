@@ -36,6 +36,13 @@ const PAGES = [
   ['student', 's-assistant', '/student/learning-bot'],
   ['student', 's-settings', '/student/settings'],
   [null, 'landing', '/'],
+  [null, 'p-help', '/help'],
+  [null, 'p-guide', '/help/how-proctoring-works'],
+  [null, 'p-about', '/about'],
+  [null, 'p-contact', '/contact'],
+  [null, 'p-privacy', '/privacy'],
+  [null, 'p-terms', '/terms'],
+  [null, 'p-404', '/no-such-page'],
 ];
 
 const browser = await chromium.launch();

@@ -1,6 +1,12 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_SITE_URL?: string;
+  readonly VITE_CONTACT_EMAIL?: string;
+  readonly VITE_SITE_OPERATOR?: string;
+  readonly VITE_ADSENSE_CLIENT?: string;
+  readonly VITE_ADSENSE_SLOT?: string;
+  readonly VITE_GOOGLE_SITE_VERIFICATION?: string;
   readonly VITE_ALGOD_SERVER_URL?: string;
   readonly VITE_ALGORAND_PORT?: string;
   readonly VITE_NEUROCLASS_TREASURY_ADDRESS?: string;

@@ -20,11 +20,11 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
   if (/^\/(student|teacher|ui-kit)/.test(location.pathname)) return null;
 
   const isHome = location.pathname === '/';
-  const links = isHome ? [
-    { name: 'Features', href: '#features' },
-    { name: 'How it works', href: '#how-it-works' },
-    { name: 'Tests and proctoring', href: '#exams' },
-  ] : [];
+  const links = [
+    { name: 'Features', href: isHome ? '#features' : '/#features' },
+    { name: 'Help', href: '/help' },
+    { name: 'About', href: '/about' },
+  ];
 
   const themeButton = (
     <IconButton label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} icon={theme === 'dark' ? <IconSun size={20} /> : <IconMoon size={20} />} onClick={toggleTheme} />
@@ -46,9 +46,11 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
     <header data-ui="public-header" className="fixed inset-x-0 top-0 z-50 border-b border-line bg-surface">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link to="/" aria-label="NeuroClass home" className="focus-ring rounded-control"><BrandMark /></Link>
-        {links.length > 0 && (
+        {(
           <nav aria-label="Page sections" className="ml-6 hidden items-center gap-1 md:flex">
-            {links.map((l) => (
+            {links.map((l) => l.href.startsWith('/') && !l.href.includes('#') ? (
+              <Link key={l.href} to={l.href} aria-current={location.pathname.startsWith(l.href) ? 'page' : undefined} className="focus-ring rounded-button px-3 py-2 text-button font-medium text-ink-2 hover:bg-surface-2 hover:text-ink aria-[current=page]:text-primary">{l.name}</Link>
+            ) : (
               <a key={l.href} href={l.href} className="focus-ring rounded-button px-3 py-2 text-button font-medium text-ink-2 hover:bg-surface-2 hover:text-ink">{l.name}</a>
             ))}
           </nav>
@@ -61,7 +63,9 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
       </div>
       <NavDrawer open={open} onClose={() => setOpen(false)} label="Menu">
         <div className="flex h-full flex-col gap-1 p-3" onClickCapture={(e) => { if ((e.target as HTMLElement).closest('a,button')) setOpen(false); }}>
-          {links.map((l) => (
+          {links.map((l) => l.href.startsWith('/') && !l.href.includes('#') ? (
+            <Link key={l.href} to={l.href} className="focus-ring flex h-11 items-center rounded-button px-3 text-body text-ink hover:bg-surface-2">{l.name}</Link>
+          ) : (
             <a key={l.href} href={l.href} className="focus-ring flex h-11 items-center rounded-button px-3 text-body text-ink hover:bg-surface-2">{l.name}</a>
           ))}
           <div className="mt-auto flex flex-col gap-2 border-t border-line-2 pt-3 [&>*]:w-full">{account}</div>
