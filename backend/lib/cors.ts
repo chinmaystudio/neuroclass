@@ -44,7 +44,7 @@ export function getCorsHeaders(requestOrigin?: string | null): Record<string, st
   const headers: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, Idempotency-Key, X-Request-ID, PAYMENT-SIGNATURE, X-PAYMENT, X-402-Version, payment-signature, x-payment',
-    'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-402-Transaction-Id',
+    'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-402-Transaction-Id, X-NC-Region',
     'Access-Control-Max-Age': '600',
     Vary: 'Origin',
   };

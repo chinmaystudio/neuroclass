@@ -8,5 +8,8 @@
       "path": "/api/workers/material-ingestion?limit=5",
       "schedule": "0 0 * * *"
     }
+  ],
+  "regions": [
+    "bom1"
   ]
 }

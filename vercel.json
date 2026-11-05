@@ -1,7 +1,4 @@
 {
   "installCommand": "npm install",
-  "buildCommand": "node scripts/vercel-build.mjs",
-  "regions": [
-    "bom1"
-  ]
+  "buildCommand": "node scripts/vercel-build.mjs"
 }
