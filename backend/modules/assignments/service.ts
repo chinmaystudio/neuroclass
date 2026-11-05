@@ -1,3 +1,4 @@
+import { notifyClassroom } from '../notifications/notify';
 import { z } from 'zod';
 import { badRequest, conflict, db, dbFail, durableRateLimit, forbidden, notFound, rateLimit, readForm, type AuthedUser } from '../core/http';
 import { audit, requireTeacher, resolveClassroomAccess } from '../core/access';
@@ -168,6 +169,9 @@ export async function setAssignmentStatus(id: string, user: AuthedUser, action: 
   const { error } = await db().from('assignments').update(patch).eq('id', id);
   if (error) dbFail(`assignment ${action}`, error);
   await audit({ actor: user.id, classroomId: assignment.classroom_id, entityType: 'assignment', entityId: id, action });
+  if (action === 'publish') {
+    await notifyClassroom({ kind: 'assignment.published', assignmentId: id, classroomId: assignment.classroom_id, title: assignment.title, dueAt: assignment.due_at ?? null, totalMarks: assignment.total_marks ?? null });
+  }
   return getAssignment(id, user);
 }
 

@@ -101,6 +101,7 @@ class Builder implements PromiseLike<Result> {
   private head = false;
   private payload: any = null;
   private onConflict: string | null = null;
+  private ignoreDuplicates = false;
 
   constructor(private client: PgSupabase, private table: string) {}
 
@@ -112,7 +113,7 @@ class Builder implements PromiseLike<Result> {
     return this;
   }
   insert(rows: any) { this.op = 'insert'; this.payload = Array.isArray(rows) ? rows : [rows]; return this; }
-  upsert(rows: any, options?: { onConflict?: string }) { this.op = 'upsert'; this.payload = Array.isArray(rows) ? rows : [rows]; this.onConflict = options?.onConflict ?? 'id'; return this; }
+  upsert(rows: any, options?: { onConflict?: string; ignoreDuplicates?: boolean }) { this.op = 'upsert'; this.payload = Array.isArray(rows) ? rows : [rows]; this.onConflict = options?.onConflict ?? 'id'; this.ignoreDuplicates = Boolean(options?.ignoreDuplicates); return this; }
   update(patch: any) { this.op = 'update'; this.payload = patch; return this; }
   delete() { this.op = 'delete'; return this; }
 
@@ -120,6 +121,8 @@ class Builder implements PromiseLike<Result> {
   eq(col: string, v: unknown) { return this.add(`${quote(col)} = $?`, v); }
   neq(col: string, v: unknown) { return this.add(`${quote(col)} IS DISTINCT FROM $?`, v); }
   gte(col: string, v: unknown) { return this.add(`${quote(col)} >= $?`, v); }
+  lt(col: string, v: unknown) { return this.add(`${quote(col)} < $?`, v); }
+  gt(col: string, v: unknown) { return this.add(`${quote(col)} > $?`, v); }
   lte(col: string, v: unknown) { return this.add(`${quote(col)} <= $?`, v); }
   ilike(col: string, v: unknown) { return this.add(`${quote(col)} ILIKE $?`, v); }
   in(col: string, values: unknown[]) { return values.length ? this.add(`${quote(col)}::text = ANY($?::text[])`, values.map(String)) : this.add('false'); }
@@ -176,7 +179,7 @@ class Builder implements PromiseLike<Result> {
           tuples.push(`(${placeholders.join(', ')})`);
         }
         sql = `INSERT INTO ${t} (${keys.map(quote).join(', ')}) VALUES ${tuples.join(', ')}`;
-        if (this.op === 'upsert') sql += ` ON CONFLICT (${this.onConflict!.split(',').map((c) => quote(c.trim())).join(', ')}) DO UPDATE SET ${keys.map((k) => `${quote(k)} = EXCLUDED.${quote(k)}`).join(', ')}`;
+        if (this.op === 'upsert') sql += ` ON CONFLICT (${this.onConflict!.split(',').map((c) => quote(c.trim())).join(', ')}) ${this.ignoreDuplicates ? 'DO NOTHING' : `DO UPDATE SET ${keys.map((k) => `${quote(k)} = EXCLUDED.${quote(k)}`).join(', ')}`}`;
         sql += ` RETURNING ${this.cols(this.returning)}`;
       } else if (this.op === 'update') {
         const sets: string[] = [];

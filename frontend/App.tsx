@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/common/Navbar';
 import { Landing } from './features/landing/Landing';
+import { AuthCallbackPage, RoleChooser } from './features/auth/GoogleAuth';
 import { AboutPage, ContactPage, NotFoundPage, PrivacyPage, TermsPage } from './features/public/InfoPages';
 import { GuidePage, HelpIndexPage } from './features/public/HelpPages';
 import { AnimatePresence } from 'motion/react';
@@ -49,11 +50,13 @@ const AppContent = () => {
     <div className="relative min-h-screen bg-canvas font-sans text-ink">
 
       <Navbar onLogin={openAuth} />
+      <RoleChooser />
 
       <main className="relative z-10">
         <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<Home onLaunchAuth={openAuth} />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/help" element={<HelpIndexPage />} />
           <Route path="/help/:slug" element={<GuidePage />} />
           <Route path="/about" element={<AboutPage />} />

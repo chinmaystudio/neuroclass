@@ -81,7 +81,7 @@ export const PrivacyPage: React.FC = () => {
 
         <h2>Information we collect</h2>
         <h3>Account information</h3>
-        <p>Your name, email address, password (stored only as a secure hash by our authentication provider), your role (teacher or student) and, if you give it, your mobile number.</p>
+        <p>Your name, email address, password (stored only as a secure hash by our authentication provider), your role (teacher or student) and, if you give it, your mobile number. If you sign in with Google, Google shares your name, email address and profile picture with us; we don’t receive your Google password or access to your Google account’s other data.</p>
         <h3>Classroom content</h3>
         <p>Classrooms you create or join, rosters, tests, questions, your answers and submitted code, uploaded files and assignments, grades, feedback, appeals and correction requests, and materials teachers upload.</p>
         <h3>Face ID (biometric data)</h3>
@@ -99,6 +99,7 @@ export const PrivacyPage: React.FC = () => {
           <li>To keep it secure and fair: authenticate you, limit abuse, and give teachers integrity signals to review.</li>
           <li>To answer questions with the class assistant and help teachers draft questions, using the AI provider listed below.</li>
           <li>To communicate with you about your account and respond to requests.</li>
+          <li>To email students when a teacher publishes a test or an assignment, or releases results. You can turn these emails off in Settings.</li>
           <li>To show advertising on public pages, where enabled (see “Cookies and advertising”).</li>
         </ul>
         <p>We do not sell your personal information. Advertising is never shown on signed-in, test or attendance screens, and classroom data is not used for advertising.</p>
@@ -111,6 +112,7 @@ export const PrivacyPage: React.FC = () => {
           <li><strong>Render</strong>: the service that checks proctoring signals and identity.</li>
           <li><strong>Google</strong>: the Gemini AI model for the class assistant and question tools; Google Drive, only if a teacher connects it (limited to files the app creates or opens); and, where enabled, Google AdSense on public pages.</li>
           <li>A code-execution provider, which runs submitted code in an isolated environment.</li>
+          <li>An email delivery provider, which sends classroom notification emails.</li>
         </ul>
         <p>Teachers can see information about the students in their classrooms, including names, emails, roll numbers, answers, grades, attendance and proctoring events for their tests. Students cannot see other students’ information.</p>
 
@@ -131,6 +133,7 @@ export const PrivacyPage: React.FC = () => {
         <h2>Your choices and rights</h2>
         <ul>
           <li>Update your name and mobile number in Settings.</li>
+          <li>Turn classroom email notifications on or off in Settings.</li>
           <li>Delete your Face ID data in Settings at any time.</li>
           <li>Ask us for a copy of your data, or to correct or delete it, by contacting us at <Contact />. Depending on where you live, you may have further rights, including the right to complain to your data protection authority.</li>
         </ul>

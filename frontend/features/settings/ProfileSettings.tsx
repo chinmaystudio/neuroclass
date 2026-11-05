@@ -2,7 +2,7 @@ import React from 'react';
 import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Avatar, Button, Card, CardHeader, ErrorState, Field, Input, RadioGroup, SkeletonText, useToast } from '../../components/ui';
+import { Avatar, Button, Card, CardHeader, ErrorState, Field, Input, RadioGroup, SkeletonText, Toggle, useToast } from '../../components/ui';
 
 type Profile = { displayname: string; mobile_number: string; email: string };
 
@@ -113,6 +113,57 @@ export const AppearanceSettings: React.FC = () => {
           inline
           options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]}
         />
+      </div>
+    </Card>
+  );
+};
+
+/** Opt in or out of classroom emails (new tests, assignments, released results). */
+export const EmailNotificationSettings: React.FC = () => {
+  const { user } = useAuth();
+  const toast = useToast();
+  const [enabled, setEnabled] = React.useState<boolean | null>(null);
+  const [saving, setSaving] = React.useState(false);
+  const [unavailable, setUnavailable] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await (supabase.from('users') as any).select('email_notifications').eq('uid', user.id).maybeSingle();
+      if (cancelled) return;
+      // Hidden if the setting isn't available on this database yet.
+      if (error) { setUnavailable(true); return; }
+      setEnabled(data?.email_notifications !== false);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const change = async (next: boolean) => {
+    if (!user?.id) return;
+    const previous = enabled;
+    setEnabled(next);
+    setSaving(true);
+    const { error } = await (supabase.from('users') as any).update({ email_notifications: next }).eq('uid', user.id);
+    setSaving(false);
+    if (error) { setEnabled(previous); toast.error('Couldn’t save your email setting. Try again.'); return; }
+    toast.success(next ? 'Email notifications are on.' : 'Email notifications are off.');
+  };
+
+  if (unavailable) return null;
+  return (
+    <Card as="section" aria-labelledby="email-heading">
+      <CardHeader title={<span id="email-heading">Email notifications</span>} subtitle={user?.email ? `Sent to ${user.email}.` : undefined} />
+      <div className="mt-4">
+        {enabled === null ? <SkeletonText lines={1} /> : (
+          <Toggle
+            checked={enabled}
+            disabled={saving}
+            onChange={(v) => void change(v)}
+            label="Email me about my classes"
+            description="When a teacher publishes a test or an assignment, and when test results are released."
+          />
+        )}
       </div>
     </Card>
   );

@@ -22,4 +22,4 @@ export const SITE = {
 } as const;
 
 /** Signed-in, transactional or private screens: never indexed, never show ads. */
-export const isPrivatePath = (path: string) => /^\/(teacher|student|attendance|ui-kit)(\/|$)/.test(path);
+export const isPrivatePath = (path: string) => /^\/(teacher|student|attendance|ui-kit|auth)(\/|$)/.test(path);

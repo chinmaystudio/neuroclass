@@ -77,6 +77,7 @@ export function seoPlugin(env: Record<string, string>): Plugin {
           'Disallow: /student',
           'Disallow: /attendance',
           'Disallow: /ui-kit',
+          'Disallow: /auth',
           '',
           `Sitemap: ${site}/sitemap.xml`,
           '',

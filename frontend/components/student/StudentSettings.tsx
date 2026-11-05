@@ -3,7 +3,7 @@ import { supabase } from '../../database/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { Button, Card, CardFooter, CardHeader, InfoCard, PageHeader, SkeletonText, useConfirm, useToast } from '../ui';
 import { PageBody } from '../../features/shell/RoleShell';
-import { AppearanceSettings, ProfileSettings } from '../../features/settings/ProfileSettings';
+import { AppearanceSettings, EmailNotificationSettings, ProfileSettings } from '../../features/settings/ProfileSettings';
 
 interface StudentSettingsProps {
   onRegisterFaceClick: () => void;
@@ -58,7 +58,7 @@ export const StudentSettings: React.FC<StudentSettingsProps> = ({ onRegisterFace
 
   return (
     <PageBody className="max-w-4xl">
-      <PageHeader title="Settings" description="Your profile, Face ID and how NeuroClass looks on this device." />
+      <PageHeader title="Settings" description="Your profile, Face ID, email notifications and how NeuroClass looks on this device." />
       <div className="mt-6 flex flex-col gap-4">
         <ProfileSettings roleLabel="Student" />
         <Card as="section" aria-labelledby="faceid-heading">
@@ -80,6 +80,7 @@ export const StudentSettings: React.FC<StudentSettingsProps> = ({ onRegisterFace
             <Button onClick={onRegisterFaceClick}>{hasBiometric ? 'Register again' : 'Register Face ID'}</Button>
           </CardFooter>
         </Card>
+        <EmailNotificationSettings />
         <AppearanceSettings />
       </div>
     </PageBody>

@@ -1,8 +1,9 @@
+import { notifyClassroom } from '../notifications/notify';
 import { z } from 'zod';
 import { badRequest, conflict, db, dbFail, forbidden, notFound, type AuthedUser } from '../core/http';
 import { audit, requireTeacher } from '../core/access';
 import {
-  availabilityOf, gradeCoding, integrityScore, questionInputSchema, readConfig, riskLevelFrom, summarizeAttempt, testMetaSchema,
+  availabilityOf, gradeCoding, integrityScore, questionInputSchema, readConfig, readSecurity, riskLevelFrom, summarizeAttempt, testMetaSchema,
   toEditableQuestion, toStoredQuestion, validatePublication,
 } from './domain';
 import { countAttempts, loadQuestions, loadTest, loadTestCases, loadTestWithAccess, testSummary, TEST_COLUMNS, type TestRow } from './repo';
@@ -165,7 +166,16 @@ export async function publishTest(testId: string, user: AuthedUser, raw: unknown
   const { data, error } = await db().from('tests').update({ status: 'published', scheduled_start: start ?? null, scheduled_end: end ?? null, published_at: new Date().toISOString(), total_marks: total, updated_at: new Date().toISOString() }).eq('id', testId).select(TEST_COLUMNS).single();
   if (error) dbFail('publish test', error);
   await audit({ actor: user.id, classroomId: test.classroom_id, entityType: 'test', entityId: testId, action: 'publish', details: { start, end } });
-  return { ...testSummary(data as unknown as TestRow, questions.length), availability: availabilityOf(data as unknown as TestRow) };
+  // Email enrolled students (once per test, however many times it is re-published).
+  const published = data as unknown as TestRow;
+  const security = readSecurity(published.security);
+  const notified = await notifyClassroom({
+    kind: 'test.published', testId, classroomId: test.classroom_id!, title: published.title,
+    opensAt: published.scheduled_start, closesAt: published.scheduled_end,
+    durationMinutes: published.duration_minutes, totalMarks: total,
+    proctored: Boolean(security.requireCamera || security.requireIdentityVerification || security.liveProctoring),
+  });
+  return { ...testSummary(published, questions.length), availability: availabilityOf(published), notifications: notified };
 }
 
 export async function setTestStatus(testId: string, user: AuthedUser, action: 'unpublish' | 'close' | 'archive' | 'reopen') {
@@ -357,7 +367,8 @@ export async function releaseResults(testId: string, user: AuthedUser, raw: unkn
   const { error } = await db().from('tests').update({ results_released: released, updated_at: new Date().toISOString() }).eq('id', testId);
   if (error) dbFail('release results', error);
   await audit({ actor: user.id, classroomId: test.classroom_id, entityType: 'test', entityId: testId, action: released ? 'results.release' : 'results.withhold' });
-  return { released };
+  const notifications = released ? await notifyClassroom({ kind: 'test.results_released', testId, classroomId: test.classroom_id!, title: test.title }) : undefined;
+  return { released, notifications };
 }
 
 /* ------------------------------ Live monitor ------------------------------ */

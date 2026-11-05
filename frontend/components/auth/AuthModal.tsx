@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BookOpen, GraduationCap } from '../ui/icons-compat';
 import { Button, Field, InfoCard, Input, Modal, PasswordInput } from '../ui';
+import { GoogleMark } from '../../features/auth/GoogleAuth';
 import { twMerge } from 'tailwind-merge';
 import { clsx, type ClassValue } from 'clsx';
 import { authService } from '../../services/authService';
@@ -89,6 +90,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSelectR
   }, [isOpen, authMode]);
 
   const isSignup = authMode === 'signup';
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const continueWithGoogle = async () => {
+    setGoogleBusy(true);
+    setError('');
+    try {
+      // Redirects to Google; the page comes back to /auth/callback.
+      await authService.signInWithGoogle(isSignup ? role : undefined);
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in is not available right now.');
+      setGoogleBusy(false);
+    }
+  };
+  const googleButton = (
+    <>
+      <Button type="button" variant="outline" size="lg" className="w-full" loading={googleBusy} iconLeft={<GoogleMark />} onClick={() => void continueWithGoogle()}>
+        {isSignup ? 'Sign up with Google' : 'Continue with Google'}
+      </Button>
+      <div className="flex items-center gap-3 text-support text-ink-2" aria-hidden><span className="h-px flex-1 bg-line" />or<span className="h-px flex-1 bg-line" /></div>
+    </>
+  );
   const switchMode = (next: 'signin' | 'signup') => { setAuthMode(next); setError(''); setStep(next === 'signup' ? 1 : 2); };
 
   return (
@@ -97,7 +118,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSelectR
       onClose={resetState}
       size="sm"
       title={isSignup ? (step === 1 ? 'Create your account' : `Create a ${role} account`) : 'Sign in to NeuroClass'}
-      description={isSignup ? (step === 1 ? 'Choose how you’ll use NeuroClass.' : 'You can update your name and phone number later in Settings.') : 'Use the email and password you signed up with.'}
+      description={isSignup ? (step === 1 ? 'Choose how you’ll use NeuroClass.' : 'You can update your name and phone number later in Settings.') : 'Use Google or the email and password you signed up with.'}
     >
       {isSignup && step === 1 ? (
         <div className="flex flex-col gap-3">
@@ -114,6 +135,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSelectR
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate={false}>
+          {googleButton}
           {isSignup && (
             <>
               <Field label="Full name" required><Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required autoFocus /></Field>

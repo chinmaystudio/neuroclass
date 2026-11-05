@@ -18,6 +18,8 @@ export const supabase = createClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      // PKCE is the recommended OAuth flow for browser apps (Google sign-in).
+      flowType: 'pkce',
     },
   }
 );

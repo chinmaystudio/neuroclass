@@ -5,6 +5,9 @@ interface AuthContextType {
   user: AppUser | null;
   userRole: 'teacher' | 'student' | null;
   loading: boolean;
+  /** Signed in with Google for the first time: must choose teacher or student. */
+  needsRole: boolean;
+  chooseRole: (role: 'teacher' | 'student') => Promise<'teacher' | 'student'>;
   setUserRole: (role: 'teacher' | 'student') => void;
   refreshAuth: () => Promise<void>;
   logout: () => Promise<void>;
@@ -16,10 +19,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [userRole, setUserRoleState] = useState<'teacher' | 'student' | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsRole, setNeedsRole] = useState(false);
 
   const fetchRole = async (uid: string) => {
-    const role = await authService.getUserRole(uid);
-    setUserRoleState(role);
+    try {
+      const state = await authService.getRoleState(uid);
+      setUserRoleState(state.role);
+      setNeedsRole(state.needsChoice);
+    } catch (error) {
+      console.warn('Could not resolve the account role', error);
+      setUserRoleState(null);
+      setNeedsRole(false);
+    }
+  };
+
+  const chooseRole = async (role: 'teacher' | 'student') => {
+    const stored = await authService.chooseRole(role);
+    setUserRoleState(stored);
+    setNeedsRole(false);
+    return stored;
   };
 
   useEffect(() => {
@@ -29,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await fetchRole(currentUser.id);
       } else {
         setUserRoleState(null);
+        setNeedsRole(false);
       }
       setLoading(false);
     });
@@ -53,10 +72,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await authService.logout();
     setUser(null);
     setUserRoleState(null);
+    setNeedsRole(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, userRole, loading, setUserRole, refreshAuth, logout }}>
+    <AuthContext.Provider value={{ user, userRole, loading, needsRole, chooseRole, setUserRole, refreshAuth, logout }}>
       {children}
     </AuthContext.Provider>
   );

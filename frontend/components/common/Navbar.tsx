@@ -30,7 +30,7 @@ const Navbar: React.FC<NavbarProps> = ({ onLogin }) => {
     <IconButton label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} icon={theme === 'dark' ? <IconSun size={20} /> : <IconMoon size={20} />} onClick={toggleTheme} />
   );
 
-  const account = user ? (
+  const account = user && userRole ? (
     <>
       <Link to={`/${userRole ?? ''}`} className={buttonClasses('primary')}>Open dashboard</Link>
       <Button variant="text" onClick={() => void logout()}>Sign out</Button>

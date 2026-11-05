@@ -88,9 +88,11 @@ export const TestEditor: React.FC<Props> = ({ classroomId, testId: initialId, on
     if (!testId) return;
     if (dirtyQuestions) throw new Error('Save your question changes before publishing.');
     await api.patch(`tests/${testId}`, locked ? { title: meta.title, instructions: meta.instructions || null, security: meta.security, scheduledStart: fromLocalInput(meta.scheduledStart), scheduledEnd: fromLocalInput(meta.scheduledEnd) } : metaPayload());
-    await api.post(`tests/${testId}/publish`, { scheduledStart: fromLocalInput(meta.scheduledStart), scheduledEnd: fromLocalInput(meta.scheduledEnd) });
+    const published = await api.post<{ notifications?: { sent: number; failed: number; skipped: boolean } }>(`tests/${testId}/publish`, { scheduledStart: fromLocalInput(meta.scheduledStart), scheduledEnd: fromLocalInput(meta.scheduledEnd) });
     load(await api.get<TeacherTestDetail>(`tests/${testId}`));
-    setNotice(meta.scheduledStart && new Date(meta.scheduledStart) > new Date() ? 'Scheduled. Students will see it when it opens.' : 'Published. Enrolled students can now see this test.');
+    const n = published?.notifications;
+    const emailed = n && !n.skipped && n.sent > 0 ? ` Emailed ${n.sent} ${n.sent === 1 ? 'student' : 'students'}.` : n && !n.skipped && n.failed > 0 ? ' Emails will be retried.' : '';
+    setNotice((meta.scheduledStart && new Date(meta.scheduledStart) > new Date() ? 'Scheduled. Students will see it when it opens.' : 'Published. Enrolled students can now see this test.') + emailed);
   });
 
   const updateQuestion = (i: number, q: EditableQuestion) => { setQuestions((list) => list.map((x, j) => (j === i ? q : x))); setDirtyQuestions(true); };
